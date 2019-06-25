@@ -1,6 +1,8 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ExileMappedBackground
@@ -20,27 +22,48 @@ namespace ExileMappedBackground
             this.dataGridView1.ColumnCount = 256;
             this.dataGridView1.RowCount = 256;
 
+            for (int i = 0; i < 256; i++)
+                {
+                this.dataGridView1.Rows[i].HeaderCell.Value = i.ToString("X");
+                this.dataGridView1.Columns[i].HeaderCell.Value = i.ToString("X");
+                }
+
             var hashOfPositions = new HashSet<int>();
             int c = 0;
             byte y = 0;
+            var tasks = new ConcurrentBag<Task>();
+            TaskScheduler uiContext = TaskScheduler.FromCurrentSynchronizationContext();
             do
                 {
+                System.Diagnostics.Trace.WriteLine(y.ToString());
+
                 byte x = 0;
                 do
                     {
-                    string log = string.Empty;
-                    Color? backgroundColour = null;
-                    
-                    var mapResult = mapper.GetBackground(x, y);
-                    if (mapResult.IsMappedData)
+                    var x1 = x;
+                    var y1 = y;
+                    var task = Task.Factory.StartNew(() =>
                         {
-                        c++;
-                        hashOfPositions.Add(mapResult.PositionInMappedData.Value);
-                        log = $"Position: {mapResult.PositionInMappedData.Value}";
-                        backgroundColour = Color.Cornsilk;
-                        }
-                    var squareValue = mapper.GetMapData(mapResult.Result, x, ref log);
-                    AddLocation(x, y, squareValue, backgroundColour, log);
+                        string log = string.Empty;
+                        Color? backgroundColour = null;
+
+                        var mapResult = mapper.GetBackground(x1, y1);
+                        if (mapResult.IsMappedData)
+                            {
+                            c++;
+                            hashOfPositions.Add(mapResult.PositionInMappedData);
+                            log = $"Position: {mapResult.PositionInMappedData}";
+                            backgroundColour = Color.Cornsilk;
+                            }
+
+                        var squareValue = mapper.GetMapData(mapResult.Result, x1, ref log);
+                        });
+                    var continuedTask = task.ContinueWith(() =>
+                        {
+                        AddLocation(x1, y1, squareValue, backgroundColour, log);
+                        }, uiContext);
+
+                    tasks.Add(continuedTask);
 
                     x += 1;
                     if (x == 0)
@@ -55,9 +78,19 @@ namespace ExileMappedBackground
             MessageBox.Show("total of mapped data: " + c + "\r\nTotal unique positions:" + hashOfPositions.Count);
             }
 
+
+
         private void AddLocation(byte x, byte y, byte squareValue, Color? backgroundColour, string log)
             {
+            if (this.dataGridView1.InvokeRequired)
+                {
+                this.dataGridView1.Invoke(AddLocation, new[] {x, y, squareValue, backgroundColour, log});
+                return;
+                }
+
             var cell = this.dataGridView1.Rows[y].Cells[x];
+
+            this.dataGridView1.in
             cell.Value = string.Format("{0:x2}{1}", 
                                         squareValue & 0x3f, 
                                         (squareValue & 0xC0) == 0xC0 ? "+" :

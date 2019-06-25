@@ -86,7 +86,7 @@ L17B2:
     
             yreg = 0;                                           // LDY #LO(map_data)           ; $EC ; &4fec - &53ec
             result.PositionInMappedData = (map_address_high << 8) + map_address;
-            result.Result = MapData[result.PositionInMappedData.Value + yreg];            // LDA (map_address),Y         ; use mapped data
+            result.Result = MapData[result.PositionInMappedData + yreg];            // LDA (map_address),Y         ; use mapped data
             return result;                                      // RTS
 
 L17EC:
@@ -509,14 +509,14 @@ L19A5:
             return result;
             }
 
-        void AddWithCarry(ref byte accumulator, byte data, ref Flags flags)
+        private static void AddWithCarry(ref byte accumulator, byte data, ref Flags flags)
             {
             int result = accumulator + data + (flags.Carry ? 1 : 0);
             accumulator = (byte) (result % 256);
             flags.Carry = result > 255;
             }
 
-        void SubtractWithBorrow(ref byte accumulator, byte data, ref Flags flags)
+        private static void SubtractWithBorrow(ref byte accumulator, byte data, ref Flags flags)
             {
             int result = accumulator - data - (flags.Carry ? 0 : 1);
             if (result < 0)
@@ -531,19 +531,19 @@ L19A5:
             accumulator = (byte) (result % 256);
             }
 
-        void LogicalShiftRight(ref byte accumulator, ref Flags flags)
+        private static void LogicalShiftRight(ref byte accumulator, ref Flags flags)
             {
             flags.Carry = (accumulator & 1) != 0;
             accumulator = (byte) (accumulator >> 1);
             }
 
-        void ArithmeticShiftLeft(ref byte accumulator, ref Flags flags)
+        private static void ArithmeticShiftLeft(ref byte accumulator, ref Flags flags)
             {
             flags.Carry = (accumulator & 0x80) != 0;
             accumulator = (byte) (accumulator << 1);
             }    
 
-        void RotateLeft(ref byte accumulator, ref Flags flags)
+        private static void RotateLeft(ref byte accumulator, ref Flags flags)
             {
             bool currentCarryValue = flags.Carry;
             flags.Carry = (accumulator & 0x80) != 0;
@@ -554,7 +554,7 @@ L19A5:
             flags.Negative = (accumulator & 0x80) != 0;
             }
 
-        void RotateRight(ref byte data, ref Flags flags)
+        private static void RotateRight(ref byte data, ref Flags flags)
             {
             bool currentCarryValue = flags.Carry;
             flags.Carry = (data & 0x1) != 0;
@@ -565,7 +565,7 @@ L19A5:
             flags.Negative = (data & 0x80) != 0;
             }
 
-        void Compare(byte registerValue, byte operand, ref Flags flags)
+        private static void Compare(byte registerValue, byte operand, ref Flags flags)
             {
             byte result = (byte) (registerValue - operand);
             flags.Carry = registerValue >= operand;
@@ -573,21 +573,21 @@ L19A5:
             flags.Negative = (result & 0x80) != 0;
             }
 
-        void And(ref byte accumulator, byte operand, ref Flags flags)
+        private static void And(ref byte accumulator, byte operand, ref Flags flags)
             {
             accumulator &= operand;
             flags.Zero = (accumulator == 0);
             flags.Negative = (accumulator & 0x80) != 0;
             }
 
-        void Or(ref byte accumulator, byte operand, ref Flags flags)
+        private static void Or(ref byte accumulator, byte operand, ref Flags flags)
             {
             accumulator |= operand;
             flags.Zero = (accumulator == 0);
             flags.Negative = (accumulator & 0x80) != 0;
             }
 
-        void BitTest(byte accumulator, byte operand, ref Flags flags)
+        private static void BitTest(byte accumulator, byte operand, ref Flags flags)
             {
             byte result = (byte) (accumulator & operand);
             flags.Zero = result == 0;
