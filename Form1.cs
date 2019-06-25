@@ -17,33 +17,8 @@ namespace ExileMappedBackground
 
         private void Form1_Shown(object sender, EventArgs e)
             {
-            this.tableLayoutPanel1.SuspendLayout();
-
-            this.tableLayoutPanel1.ColumnCount = 256;
-            this.tableLayoutPanel1.RowCount = 256;
-
-            for (int i = 0; i < 256; i++)
-                {
-                if (this.tableLayoutPanel1.RowStyles.Count < i)
-                    {
-                    this.tableLayoutPanel1.RowStyles[i].SizeType = SizeType.Absolute;
-                    this.tableLayoutPanel1.RowStyles[i].Height = 15f;
-                    }
-                else 
-                    {
-                    this.tableLayoutPanel1.RowStyles.Add(new RowStyle(SizeType.Absolute, 15f));
-                    }
-
-                if (this.tableLayoutPanel1.ColumnStyles.Count < i)
-                    {
-                    this.tableLayoutPanel1.ColumnStyles[i].SizeType = SizeType.Absolute;
-                    this.tableLayoutPanel1.ColumnStyles[i].Width = 30f;
-                    }
-                else
-                    {
-                    this.tableLayoutPanel1.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 30f));
-                    }
-                }
+            this.dataGridView1.ColumnCount = 256;
+            this.dataGridView1.RowCount = 256;
 
             var hashOfPositions = new HashSet<int>();
             int c = 0;
@@ -53,14 +28,19 @@ namespace ExileMappedBackground
                 byte x = 0;
                 do
                     {
-                    var position = mapper.GetBackground(x, y);
-                    if (position.HasValue)
+                    string log = string.Empty;
+                    Color? backgroundColour = null;
+                    
+                    var mapResult = mapper.GetBackground(x, y);
+                    if (mapResult.IsMappedData)
                         {
                         c++;
-                        hashOfPositions.Add(position.Value);
-                        var squareValue = mapper.GetMapData(position.Value, x, out string log);
-                        AddLocation(x, y, squareValue, log);
+                        hashOfPositions.Add(mapResult.PositionInMappedData.Value);
+                        log = $"Position: {mapResult.PositionInMappedData.Value}";
+                        backgroundColour = Color.Cornsilk;
                         }
+                    var squareValue = mapper.GetMapData(mapResult.Result, x, ref log);
+                    AddLocation(x, y, squareValue, backgroundColour, log);
 
                     x += 1;
                     if (x == 0)
@@ -72,29 +52,25 @@ namespace ExileMappedBackground
                     break;
                 } while (true);
 
-            this.tableLayoutPanel1.ResumeLayout();
-
             MessageBox.Show("total of mapped data: " + c + "\r\nTotal unique positions:" + hashOfPositions.Count);
             }
 
-        private void AddLocation(byte x, byte y, byte squareValue, string log)
+        private void AddLocation(byte x, byte y, byte squareValue, Color? backgroundColour, string log)
             {
-            var label = new Label();
-            this.tableLayoutPanel1.Controls.Add(label, x, y);
-            label.Dock = DockStyle.Fill;
-            label.TextAlign = ContentAlignment.MiddleCenter;
-            label.Text = string.Format("{0:x2}{1}", 
+            var cell = this.dataGridView1.Rows[y].Cells[x];
+            cell.Value = string.Format("{0:x2}{1}", 
                                         squareValue & 0x3f, 
                                         (squareValue & 0xC0) == 0xC0 ? "+" :
                                             (squareValue & 0x40) != 0 ? "|" : 
                                                 (squareValue & 0x80) != 0 ? "-" : 
                                                     string.Empty);
-            label.Font = new Font("Arial Narrow", 7f);
+            if (backgroundColour.HasValue)
+                cell.Style.BackColor = backgroundColour.Value;
+            if (squareValue < 0x10)
+                cell.Style.ForeColor = Color.Red;
 
-            var tooltip = new ToolTip();
-            var coords = $"({x:X2}, {y:X2}\r\n{log}";
-            tooltip.SetToolTip(label, coords);
-            tooltip.ShowAlways = true;
+            var coords = $"({x:X2}, {y:X2})\r\n{log}";
+            cell.ToolTipText = coords;
             }
         }
     }
