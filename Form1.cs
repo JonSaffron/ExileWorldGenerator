@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Data;
 using System.Drawing;
 using System.Linq;
@@ -11,12 +10,15 @@ namespace ExileMappedBackground
     {
     public partial class Form1 : Form
         {
-        const float size = 1.0f / 256.0f;
         private CalculateBackground mapper = new CalculateBackground();
+        private readonly Image spriteSheet;
+        private SquareProperties[,] squareProperties = new SquareProperties[256, 256]; 
 
         public Form1()
             {
             InitializeComponent();
+
+            this.spriteSheet = Image.FromFile("ExileSpriteKey.png");
             }
 
         private void Form1_Shown(object sender, EventArgs e)
@@ -36,16 +38,17 @@ namespace ExileMappedBackground
 
             var hashOfPositions = new ConcurrentBag<int>();
 
-            var dt = BuildDataTable();
+            Parallel.For(0, 0x10000, i => { NewMethod(i, hashOfPositions); });
 
-            Parallel.For(0, 0x10000, i => { NewMethod(i, hashOfPositions, dt); });
-
-            this.dataGridView1.DataSource = dt;
             this.dataGridView1.ResumeLayout();
-            MessageBox.Show("total of mapped data: " + hashOfPositions.Count + "\r\nTotal unique positions:" + hashOfPositions.Distinct().Count());
+
+            if (hashOfPositions.Count != 1024)
+                throw new InvalidOperationException("1024 positions are expected to be explictly mapped, rather than " + hashOfPositions.Count);
+            if (hashOfPositions.Distinct().Count() != 1024)
+                throw new InvalidOperationException("All 1024 explicit map positions should be unique.");
             }
 
-        private void NewMethod(int i, ConcurrentBag<int> hashOfPositions, DataTable dt)
+        private void NewMethod(int i, ConcurrentBag<int> hashOfPositions)
             {
             byte y = (byte) (i >> 8);
             byte x = (byte) (i & 0xFF);
@@ -53,75 +56,78 @@ namespace ExileMappedBackground
             if (x == 0)
                 System.Diagnostics.Trace.WriteLine(y.ToString());
 
-            string log = string.Empty;
-            Color? backgroundColour = null;
-
             var mapResult = mapper.GetBackground(x, y);
             if (mapResult.IsMappedData)
                 {
                 hashOfPositions.Add(mapResult.PositionInMappedData);
-                log = $"Position: {mapResult.PositionInMappedData}";
-                backgroundColour = Color.Cornsilk;
                 }
 
-            var squareValue = mapper.GetMapData(mapResult.Result, x, ref log);
+            var background = mapper.GetMapData(mapResult.Result, x);
+            var data = new SquareProperties();
+            data.X = x;
+            data.Y = y;
+            data.CalculatedBackground = mapResult.Result;
+            if (mapResult.IsMappedData)
+                data.MappedDataPosition = mapResult.PositionInMappedData;
+            data.Background = background.background;
+            data.BackgroundObjectId = background.backgroundObjectId;
+            data.IsHashDefault = background.isHashDefault;
+            data.BackgroundEventTypeName = CalculateBackground.GetBackgroundEventTypeName(background.background);
 
-            if (dt.Rows.Count <= y)
-                System.Diagnostics.Debugger.Break();
-            if (dt.Columns.Count <= x)
-                System.Diagnostics.Debugger.Break();
+            this.squareProperties[x, y] = data;
+            }
 
-            var dataRow = dt.Rows[y];
-            var column = x.ToString("X2");
+        private void dataGridView1_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+            {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                {
+                return;
+                }
+
+            Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, e.CellBounds.Width, e.CellBounds.Height);
+            Rectangle sourceRectangle = new Rectangle(156, 80, 16, 16);
+            e.Graphics.DrawImage(this.spriteSheet, destinationRectangle, sourceRectangle, GraphicsUnit.Pixel);
+
+            using (Brush brush = new SolidBrush(Color.Pink))
+                {
+                using (Pen pen = new Pen(brush))
+                    {
+                    e.Graphics.DrawLine(pen, e.CellBounds.Left,
+                        e.CellBounds.Bottom - 1, e.CellBounds.Right - 1,
+                        e.CellBounds.Bottom - 1);
+                    e.Graphics.DrawLine(pen, e.CellBounds.Right - 1,
+                        e.CellBounds.Top, e.CellBounds.Right - 1,
+                        e.CellBounds.Bottom);
+                    }
+
+                //e.Graphics.DrawString(text, e.CellStyle.Font, Brushes.Blue, e.CellBounds.Left, e.CellBounds.Top, StringFormat.GenericDefault);
+                }
+
+            e.Handled = true;
+            }
+
+        private class SquareProperties
+            {
+            public byte X;
+            public byte Y;
+            public byte CalculatedBackground;
+            public byte Background;
+            public int? MappedDataPosition;
+            public bool IsHashDefault;
+            public int? BackgroundObjectId;
+            public string BackgroundEventTypeName;
+            }
+
+        private void dataGridView1_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
+            {
+            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+                {
+                return;
+                }
+
+            var squareValue = this.squareProperties[e.ColumnIndex, e.RowIndex].Background;
             var text = $"{squareValue & 0x3f:x2}{((squareValue & 0xC0) == 0xC0 ? "+" : (squareValue & 0x40) != 0 ? "|" : (squareValue & 0x80) != 0 ? "-" : string.Empty)}";
-            lock (dt.Rows.SyncRoot)
-                {
-                dataRow[column] = text;
-                }
-            AddLocation(x, y, squareValue, backgroundColour, log);
-            }
-
-        private DataTable BuildDataTable()
-            {
-            var result = new DataTable();
-            for (int i = 0; i < 0x100; i++)
-                {
-                result.Columns.Add(i.ToString("X2"), typeof(string));
-                }
-            for (int i = 0; i < 0x100; i++)
-                {
-                var dr = result.NewRow();
-                result.Rows.Add(dr);
-                }
-            return result;
-            }
-
-        delegate void AddLocationDelegate(byte x, byte y, byte squareValue, Color? backgroundColour, string log);
-        private void AddLocation(byte x, byte y, byte squareValue, Color? backgroundColour, string log)
-            {
-            //if (this.dataGridView1.InvokeRequired)
-            //    {
-            //    AddLocationDelegate thisMethodDelegated = AddLocation;
-            //    object[] args = {x, y, squareValue, backgroundColour, log};
-            //    this.dataGridView1.Invoke(thisMethodDelegated, args);
-            //    return;
-            //    }
-
-            var cell = this.dataGridView1.Rows[y].Cells[x];
-
-            //cell.Value = string.Format("{0:x2}{1}", 
-            //                            squareValue & 0x3f, 
-            //                            (squareValue & 0xC0) == 0xC0 ? "+" :
-            //                                (squareValue & 0x40) != 0 ? "|" : 
-            //                                    (squareValue & 0x80) != 0 ? "-" : 
-            //                                        string.Empty);
-            if (backgroundColour.HasValue)
-                cell.Style.BackColor = backgroundColour.Value;
-            if ((squareValue & 0x3f) < 0x10)
-                cell.Style.ForeColor = Color.Red;
-
-            var coords = $"({x:X2}, {y:X2})\r\n{log}";
-            cell.ToolTipText = coords;
+            e.ToolTipText = text;
             }
         }
     }

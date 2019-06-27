@@ -429,84 +429,74 @@ L19A5:
 
             }
 
-        public byte GetMapData(byte background, byte squareX, ref string log)
+        public (byte background, int? backgroundObjectId, bool isHashDefault) GetMapData(byte calculatedBackground, byte squareX)
             {
-            byte result;
-
-            var spriteOrHash = background & 0x3f;
-            if (spriteOrHash < 9)
+            var spriteOrHash = calculatedBackground & 0x3f;
+            if (spriteOrHash >= 9)
                 {
-                // check the background objects X lookup list
-                var listOfX = BackgroundObjectsXLookup[spriteOrHash];
-                var positionInHash = Array.IndexOf(listOfX, squareX);
-                if (positionInHash == -1)
-                    {
-                    log += "\r\nUsing UnmatchedHash";
-                    result = LookupForUnmatchedHash[spriteOrHash];
-                    }
-                else
-                    {
-                    log += "\r\nUsing HandlerLookup";
-                    var handlerList = BackgroundObjectsHandlerLookup[spriteOrHash];
-                    result = handlerList[positionInHash];
-                    }
-                }
-            else
-                {
-                result = background;
+                return (background: calculatedBackground, backgroundObjectId: null, isHashDefault: false);
                 }
 
-            var spriteOrBackgroundHandler = result & 0x3f;
+            // check the background objects X lookup list
+            var listOfX = BackgroundObjectsXLookup[spriteOrHash];
+            var positionInHash = Array.IndexOf(listOfX, squareX);
+            if (positionInHash == -1)
+                {
+                byte defaultBackground = LookupForUnmatchedHash[spriteOrHash];
+                return (background: defaultBackground, backgroundObjectId: null, isHashDefault: true);
+                }
+
+            var handlerList = BackgroundObjectsHandlerLookup[spriteOrHash];
+            byte result = handlerList[positionInHash];
+            int backgroundObjectId = positionInHash;
+            for (int i = 0; i < spriteOrHash; i++)
+                {
+                var countOfItemsInHash = BackgroundObjectsXLookup[i].Length;
+                backgroundObjectId += countOfItemsInHash;
+                }
+            return (background: result, backgroundObjectId: backgroundObjectId, isHashDefault: false);
+            }
+
+        public static string GetBackgroundEventTypeName(byte background)
+            {
+            var spriteOrBackgroundHandler = background & 0x3f;
             if (spriteOrBackgroundHandler < 0x10)
                 {
                 switch (spriteOrBackgroundHandler)
                     {
-                    case 0:
-                        log += "\r\nhandle_background_invisible_switch";
-                        break;
+                    case 0: 
+                        return "handle_background_invisible_switch";
                     case 1:
-                        log += "\r\nhandle_background_teleport_beam";
-                        break;
+                        return "handle_background_teleport_beam";
                     case 2:
-                        log += "\r\nhandle_background_object_from_data";
-                        break;
+                        return "handle_background_object_from_data";
                     case 3:
-                        log += "\r\nhandle_background_door";
-                        break;
+                        return "handle_background_door";
                     case 4:
-                        log += "\r\nhandle_background_stone_door";
-                        break;
+                        return "handle_background_stone_door";
                     case 5:
                     case 6:
                     case 7:
-                        log += "\r\nhandle_background_object_from_type";
-                        break;
+                        return "handle_background_object_from_type";
                     case 8:
-                        log += "\r\nhandle_background_switch";
-                        break;
+                        return "handle_background_switch";
                     case 9:
                     case 0xA:
-                        log += "\r\nhandle_background_object_emerging";
-                        break;
+                        return "handle_background_object_emerging";
                     case 0xB:
-                        log += "\r\nhandle_background_object_fixed_wind";
-                        break;
+                        return "handle_background_object_fixed_wind";
                     case 0xC:
-                        log += "\r\nhandle_background_engine_thruster";
-                        break;
+                        return "handle_background_engine_thruster";
                     case 0xD:
-                        log += "\r\nhandle_background_object_water";
-                        break;
+                        return "handle_background_object_water";
                     case 0xE:
-                        log += "\r\nhandle_background_object_random_wind";
-                        break;
+                        return "handle_background_object_random_wind";
                     case 0xF:
-                        log += "\r\nhandle_background_mushrooms";
-                        break;
+                        return "handle_background_mushrooms";
                     }
                 }
 
-            return result;
+            return null;
             }
 
         private static void AddWithCarry(ref byte accumulator, byte data, ref Flags flags)
