@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Data;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Threading.Tasks;
@@ -88,19 +89,24 @@ namespace ExileMappedBackground
             Rectangle sourceRectangle = new Rectangle(156, 80, 16, 16);
             e.Graphics.DrawImage(this.spriteSheet, destinationRectangle, sourceRectangle, GraphicsUnit.Pixel);
 
-            using (Brush brush = new SolidBrush(Color.Pink))
+            var squareProperties = this.squareProperties[e.ColumnIndex, e.RowIndex];
+            if (squareProperties.MappedDataPosition.HasValue)
                 {
-                using (Pen pen = new Pen(brush))
+                using (Brush brush = new SolidBrush(Color.White))
                     {
-                    e.Graphics.DrawLine(pen, e.CellBounds.Left,
-                        e.CellBounds.Bottom - 1, e.CellBounds.Right - 1,
-                        e.CellBounds.Bottom - 1);
-                    e.Graphics.DrawLine(pen, e.CellBounds.Right - 1,
-                        e.CellBounds.Top, e.CellBounds.Right - 1,
-                        e.CellBounds.Bottom);
-                    }
+                    using (Pen pen = new Pen(brush, 3.0f))
+                        {
+                        var topLeft = new Point(e.CellBounds.Left + 1, e.CellBounds.Top + 1);
+                        var topRight = new Point(e.CellBounds.Right - 1, e.CellBounds.Top + 1);
+                        var bottomRight = new Point(e.CellBounds.Right - 1, e.CellBounds.Bottom - 1);
+                        var bottomLeft = new Point(e.CellBounds.Left + 1, e.CellBounds.Bottom - 1);
 
-                //e.Graphics.DrawString(text, e.CellStyle.Font, Brushes.Blue, e.CellBounds.Left, e.CellBounds.Top, StringFormat.GenericDefault);
+                        e.Graphics.DrawLine(pen, topLeft, topRight);
+                        e.Graphics.DrawLine(pen, topRight, bottomRight);
+                        e.Graphics.DrawLine(pen, bottomRight, bottomLeft);
+                        e.Graphics.DrawLine(pen, bottomLeft, topLeft);
+                        }
+                    }
                 }
 
             e.Handled = true;
@@ -125,8 +131,30 @@ namespace ExileMappedBackground
                 return;
                 }
 
-            var squareValue = this.squareProperties[e.ColumnIndex, e.RowIndex].Background;
-            var text = $"{squareValue & 0x3f:x2}{((squareValue & 0xC0) == 0xC0 ? "+" : (squareValue & 0x40) != 0 ? "|" : (squareValue & 0x80) != 0 ? "-" : string.Empty)}";
+            var squareValue = this.squareProperties[e.ColumnIndex, e.RowIndex];
+            var text = $"({squareValue.X:X2},{squareValue.Y:X2}) ";
+            if (squareValue.MappedDataPosition.HasValue)
+                text += "Explicitly mapped using position " + squareValue.MappedDataPosition.Value;
+            var calculatedBackground = squareValue.CalculatedBackground;
+            var background = squareValue.Background;
+            if ((calculatedBackground & 0x3f) < 0x9)
+                {
+                text += $"\r\nPre-Hash Result: = {calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? "+" : (calculatedBackground & 0x40) != 0 ? "|" : (calculatedBackground & 0x80) != 0 ? "-" : string.Empty)}";
+                text += $"\r\nPost-Hash Result: = {background & 0x3f:x2}{((background & 0xC0) == 0xC0 ? "+" : (background & 0x40) != 0 ? "|" : (background & 0x80) != 0 ? "-" : string.Empty)}";
+                if (squareValue.IsHashDefault)
+                    text += "\r\nUsing hash default value";
+                if (squareValue.BackgroundObjectId.HasValue)
+                    text += $"\r\nBackground object id = {squareValue.BackgroundObjectId.Value:X2}";
+                }
+            else
+                {
+                Debug.Assert(background == calculatedBackground);
+                Debug.Assert(!squareValue.IsHashDefault);
+                Debug.Assert(!squareValue.BackgroundObjectId.HasValue);
+                text += $"\r\nResult: = {calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? "+" : (calculatedBackground & 0x40) != 0 ? "|" : (calculatedBackground & 0x80) != 0 ? "-" : string.Empty)}";
+                }
+            if (squareValue.BackgroundEventTypeName != null)
+                text += "\r\nBackground event: " + squareValue.BackgroundEventTypeName;
             e.ToolTipText = text;
             }
         }
