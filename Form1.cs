@@ -217,10 +217,10 @@ namespace ExileMappedBackground
                 text += "\r\nBackground event: " + squareValue.BackgroundEventTypeName;
 
             byte sprite = (byte) (_backgroundSpriteLookup[background & 0x3f] & 0x7f);
-            text += "\r\nSprite: {sprite:x2}";
-            text += "\r\nFlip sprite horizontally: " + _flipSpriteHorizontally[sprite];
-            text += "\r\nFlip vertically for background: " + _flipBackgroundSpriteVertically[background & 0x3f];
-            text += "\r\nFlip sprite vertically: " + _flipSpriteVertically[sprite];
+            text += $"\r\nSprite: {sprite:x2}";
+            text += $"\r\nFlip sprite horizontally: {_flipSpriteHorizontally[sprite]}";
+            text += $"\r\nFlip vertically for background: {_flipBackgroundSpriteVertically[background & 0x3f]}";
+            text += $"\r\nFlip sprite vertically: {_flipSpriteVertically[sprite]}";
 
             e.ToolTipText = text;
             }
