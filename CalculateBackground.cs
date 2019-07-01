@@ -443,6 +443,7 @@ L19A5:
             if (positionInHash == -1)
                 {
                 byte defaultBackground = LookupForUnmatchedHash[spriteOrHash];
+                defaultBackground ^= (byte) (spriteOrHash & 0xc0);
                 return (background: defaultBackground, backgroundObjectId: null, isHashDefault: true);
                 }
 
