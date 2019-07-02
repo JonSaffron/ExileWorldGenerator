@@ -82,6 +82,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Doco\exile-disassembly.txt" />
     <Content Include="ExileSpriteKey.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

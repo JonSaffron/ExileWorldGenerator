@@ -20,6 +20,7 @@ namespace ExileMappedBackground
         private readonly bool[] _flipBackgroundSpriteVertically = BuildFlipBackgroundSpriteVertically();
         private readonly bool[] _flipSpriteHorizontally = BuildFlipSpriteHorizontally();
         private readonly bool[] _flipSpriteVertically = BuildFlipSpriteVertically();
+        private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
         private int zoom = 2;
 
         public Form1()
@@ -101,22 +102,36 @@ namespace ExileMappedBackground
             if (!this._sourceRectangles.TryGetValue(sprite, out var sourceRectangle))
                 throw new InvalidOperationException($"Required sprite number {sprite:x2}");
 
-            bool flipHorizontally = (squareProperties.Background & 0x80) != 0;
-            flipHorizontally ^= _flipSpriteHorizontally[sprite];
-            bool flipVertically = (squareProperties.Background & 0x40) != 0;
+            bool rightAlign = (squareProperties.Background & 0x80) != 0;
+            bool flipHorizontally = rightAlign ^ _flipSpriteHorizontally[sprite];
+
+            bool bottomAlign = (squareProperties.Background & 0x40) != 0;
+            bool flipVertically = bottomAlign;
             flipVertically ^= _flipBackgroundSpriteVertically[background];
             flipVertically ^= _flipSpriteVertically[sprite];
 
-            var image = FlipImage(this._spriteSheet, sourceRectangle, flipHorizontally, flipVertically);
+            byte offsetAlongY;
+            if (!bottomAlign)
+                {
+                offsetAlongY = (byte) (this._backgroundYOffsetLookup[background] & 0xf0);
+                offsetAlongY >>= 3;
+                }
+            else
+                {
+                offsetAlongY = this._backgroundYOffsetLookup[background];
+                
+                }
+                
+            var image = FlipImage(this._spriteSheet, sourceRectangle, flipHorizontally, flipVertically, rightAlign, bottomAlign);
 
             Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, 16 * zoom, 32 * zoom);
             e.Graphics.DrawImage(image, destinationRectangle);
 
             if (squareProperties.MappedDataPosition.HasValue)
                 {
-                using (Brush brush = new SolidBrush(Color.White))
+                using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.White)))
                     {
-                    using (Pen pen = new Pen(brush, 2.0f))
+                    using (Pen pen = new Pen(brush, 1.0f))
                         {
                         var topLeft = new Point(e.CellBounds.Left + 1, e.CellBounds.Top + 1);
                         var topRight = new Point(e.CellBounds.Right - 1, e.CellBounds.Top + 1);
@@ -134,7 +149,7 @@ namespace ExileMappedBackground
             e.Handled = true;
             }
 
-        private Image FlipImage(Image image, Rectangle sourceRectangle, bool flipHorizontally, bool flipVertically)
+        private Image FlipImage(Image image, Rectangle sourceRectangle, bool flipHorizontally, bool flipVertically, bool rightAlign, bool bottomAlign)
             {
             if (image == null) throw new ArgumentNullException(nameof(image));
             if (sourceRectangle.Height > 32 || sourceRectangle.Width > 16 || sourceRectangle.Width <= 0 || sourceRectangle.Height <= 0)
@@ -152,8 +167,8 @@ namespace ExileMappedBackground
                         flipVertically ? sourceRectangle.Height : 0,
                         MatrixOrder.Append);
                     m.Translate(
-                        flipHorizontally ? 16 - sourceRectangle.Width : 0,
-                        flipVertically ? 32 - sourceRectangle.Height : 0,
+                        rightAlign ? 16 - sourceRectangle.Width : 0,
+                        bottomAlign ? 32 - sourceRectangle.Height : 0,
                         MatrixOrder.Append);
 
                     g.Transform = m;
@@ -193,8 +208,8 @@ namespace ExileMappedBackground
             var background = squareValue.Background;
             if ((calculatedBackground & 0x3f) < 0x9)
                 {
-                text += $"\r\nPre-Hash Result: {calculatedBackground:x2} (range {calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped along y" : (calculatedBackground & 0x80) != 0 ? " flipped along x" : string.Empty)})";
-                text += $"\r\nPost-Hash Result: {background:x2} ({background & 0x3f:x2}{((background & 0xC0) == 0xC0 ? " flipped both ways" : (background & 0x40) != 0 ? " flipped along y" : (background & 0x80) != 0 ? " flipped along x" : string.Empty)})";
+                text += $"\r\nPre-Hash Result: {calculatedBackground:x2} (range {calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped vertically" : (calculatedBackground & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
+                text += $"\r\nPost-Hash Result: {background:x2} ({background & 0x3f:x2}{((background & 0xC0) == 0xC0 ? " flipped both ways" : (background & 0x40) != 0 ? " flipped vertically" : (background & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
                 if (squareValue.IsHashDefault)
                     {
                     Debug.Assert(!squareValue.BackgroundObjectId.HasValue);
@@ -211,7 +226,7 @@ namespace ExileMappedBackground
                 Debug.Assert(background == calculatedBackground);
                 Debug.Assert(!squareValue.IsHashDefault);
                 Debug.Assert(!squareValue.BackgroundObjectId.HasValue);
-                text += $"\r\nResult: {calculatedBackground:x2} ({calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped along y" : (calculatedBackground & 0x80) != 0 ? " flipped along x" : string.Empty)})";
+                text += $"\r\nResult: {calculatedBackground:x2} ({calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped vertically" : (calculatedBackground & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
                 }
             if (squareValue.BackgroundEventTypeName != null)
                 text += "\r\nBackground event: " + squareValue.BackgroundEventTypeName;
@@ -290,6 +305,18 @@ namespace ExileMappedBackground
                 0x11,0x19,0x20,0x29,0x41,0xF8,0x70,0x30,0x20,0x20,0x19,0x18,0x28,0x60,0x48,0x80, // 50
                 0x58,0x58,0x39,0x19,0x68,0x68,0x68,0x58,0x68,0x58,0x38,0x38,0x28,0x48,0x48,0x48, // 60
                 0x48,0x08,0x30,0x20,0x28,0x39,0x70,0x38,0x30,0x20,0x20,0x20,0x20                 // 70
+                };
+            return result;
+            }
+
+        private static byte[] BuildBackgroundYOffsetLookup()
+            {
+            var result = new byte[]
+                {
+                0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xD0,0xC5,0xB0,0xC7,0x00,0x06,0x00,0x00,0xC0, // 00
+                0xB0,0xA0,0x07,0x08,0x00,0x04,0x80,0xC0,0x70,0x00,0xB0,0x80,0x99,0x08,0x00,0x80, // 10
+                0xC0,0x00,0xA0,0x03,0x02,0x82,0x01,0x41,0x81,0xC1,0x04,0xF0,0xB0,0x00,0x03,0x02, // 20
+                0x82,0x70,0x06,0xC0,0xC5,0x04,0x80,0x06,0x80,0x04,0x99,0x30,0xC7,0x06,0xA9,0x00  // 30
                 };
             return result;
             }
