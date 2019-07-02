@@ -21,6 +21,7 @@ namespace ExileMappedBackground
         private readonly bool[] _flipSpriteHorizontally = BuildFlipSpriteHorizontally();
         private readonly bool[] _flipSpriteVertically = BuildFlipSpriteVertically();
         private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
+        private readonly byte[] _spriteHeightLookup = BuildSpriteHeightLookup();
         private int zoom = 2;
 
         public Form1()
@@ -110,19 +111,15 @@ namespace ExileMappedBackground
             flipVertically ^= _flipBackgroundSpriteVertically[background];
             flipVertically ^= _flipSpriteVertically[sprite];
 
-            byte offsetAlongY;
-            if (!bottomAlign)
+            byte offsetAlongY = (byte) (this._backgroundYOffsetLookup[background] & 0xf0);
+            if (bottomAlign)
                 {
-                offsetAlongY = (byte) (this._backgroundYOffsetLookup[background] & 0xf0);
-                offsetAlongY >>= 3;
-                }
-            else
-                {
-                offsetAlongY = this._backgroundYOffsetLookup[background];
-                
+                offsetAlongY += this._spriteHeightLookup[sprite];
+                offsetAlongY |= 7;
+                offsetAlongY ^= 0xff;
                 }
                 
-            var image = FlipImage(this._spriteSheet, sourceRectangle, flipHorizontally, flipVertically, rightAlign, bottomAlign);
+            var image = FlipImage(this._spriteSheet, sourceRectangle, flipHorizontally, flipVertically, rightAlign, offsetAlongY >> 3);
 
             Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, 16 * zoom, 32 * zoom);
             e.Graphics.DrawImage(image, destinationRectangle);
@@ -149,7 +146,7 @@ namespace ExileMappedBackground
             e.Handled = true;
             }
 
-        private Image FlipImage(Image image, Rectangle sourceRectangle, bool flipHorizontally, bool flipVertically, bool rightAlign, bool bottomAlign)
+        private Image FlipImage(Image image, Rectangle sourceRectangle, bool flipHorizontally, bool flipVertically, bool rightAlign, int offsetAlongY)
             {
             if (image == null) throw new ArgumentNullException(nameof(image));
             if (sourceRectangle.Height > 32 || sourceRectangle.Width > 16 || sourceRectangle.Width <= 0 || sourceRectangle.Height <= 0)
@@ -168,7 +165,7 @@ namespace ExileMappedBackground
                         MatrixOrder.Append);
                     m.Translate(
                         rightAlign ? 16 - sourceRectangle.Width : 0,
-                        bottomAlign ? 32 - sourceRectangle.Height : 0,
+                        offsetAlongY,
                         MatrixOrder.Append);
 
                     g.Transform = m;
@@ -331,7 +328,7 @@ namespace ExileMappedBackground
                     {0x1a, new Rectangle(13, 38, 9, 16)},
                     {0x23, new Rectangle(124, 38, 16, 32)},
                     {0x24, new Rectangle(144, 38, 16, 32)},
-                    {0x25, new Rectangle(164, 38, 8, 16)},
+                    {0x25, new Rectangle(164, 38, 8, 14)},
                     {0x26, new Rectangle(176, 38, 4, 32)},
                     {0x27, new Rectangle(188, 38, 16, 32)},
                     {0x28, new Rectangle(208, 38, 16, 24)},
