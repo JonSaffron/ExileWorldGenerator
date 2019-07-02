@@ -28,6 +28,21 @@ heavily optimised. The carry flag is often used in association with shift
 operations to process boolean variables. The BIT operation is often used for
 efficient branching as well as providing multiple entry points to functions.
 
+Graphics
+========
+The co-ordinate system is based on 16 bits on both X and Y axis.
+For display purposes, not all of the bits are used:
+ - For the X axis the top 12 bits are relevant. 
+ - For the Y axis the top 13 bits are relevant.
+The non-visible lower bits are maintained to give smoother movement.
+The world is defined using 256x256 squares which correspond to the high byte in 
+the X and Y co-ordinate. Therefore each square is displayed using 16x32 pixels.
+
+The screen is 128x128 pixels, with each pixel taking 4 bits to give 16 colours.
+Therefore screen memory is 8Kb between &6000 and &7FFF.
+There are 16 characters per character row, so each character takes 32 bytes,
+so each character row is &200 bytes. There are 16 rows.
+
 Areas of particular interest:
 
 &0d4d - &10cf : sprite plotting routines
@@ -140,7 +155,7 @@ Disassembly
 ;     &06 current_object_rotator
 ;     &07 current_object_rotator_low
 ;     &08 square_sprite
-;     &09 square_orientation
+;     &09 square_orientation			# bit 6 indicates upside down, bit 7 indicates flipped left/right
 ;     &0a held_object_x_low
 ;     &0b held_object_x
 ;     &0c held_object_y_low
@@ -152,7 +167,7 @@ Disassembly
 ;     &12 this_object_timer
 ;     &13 this_object_timer_old
 ;     &14 this_object_tx
-;     &15 this_object_energy
+;     &15 this_object_energy			# max player energy = 255. bit 7 can be set to indicate if the object is stuck in one position (e.g grenade)
 ;     &16 this_object_ty
 ;     &17 object_onscreen
 ;     &18 wall_collision_bottom_minus_top
@@ -176,7 +191,12 @@ Disassembly
 ;     &2a screen_background_flash_counter
 ;     &2b object_is_invisible
 ;     &2c object_affected_by_gravity
-;     &2d background_processing_flag
+;     &2d background_processing_flag				# set to &10 at 265e (in process_events), 
+													#		 &20 at 2eea (in do_object_wall_collisions),
+													#		 &40 at 3607 (in line_of_sight_without_obstructions) and 39d5 (in find_wall_underneath_y),
+													#		 &80/0 at 3777 (in redraw_screen) and 4f9e (in handle_explosion).
+													# determine_background compares the top 4 bits of the high byte of the object handler for the background objects.
+													# tested in handle_background_object_emerging, handle_background_stone_door, handle_background_door, reserve_object_for_background
 ;     &2e objects_to_reserve
 ;     &2f objects_two_reserve
 ;     &30 child_created
@@ -255,14 +275,14 @@ Disassembly
 ;     &79 wall_collision_count_right
 ;     &7a wall_collision_count_bottom
 ;     &7b support_delta_x_low
-;     &7c support_delta_x wall_y_start_lookup_pointer
-;     &7d support_delta_y_low wall_y_start_lookup_pointer_h_4
-;     &7e support_delta_y wall_y_start_base
-;     &7f support_overlap_x_low wall_sprite
-;     &80 support_overlap_x wall_y_start_lookup_pointer_4
-;     &81 support_overlap_y_low wall_y_start_lookup_pointer_h_4
-;     &82 support_overlap_y wall_y_start_base_4
-;     &83 distance wall_sprite_4
+;     &7c support_delta_x			wall_y_start_lookup_pointer
+;     &7d support_delta_y_low		wall_y_start_lookup_pointer_h_4
+;     &7e support_delta_y			wall_y_start_base
+;     &7f support_overlap_x_low		wall_sprite
+;     &80 support_overlap_x			wall_y_start_lookup_pointer_4
+;     &81 support_overlap_y_low		wall_y_start_lookup_pointer_h_4
+;     &82 support_overlap_y			wall_y_start_base_4
+;     &83 distance					wall_sprite_4
 ;     &84 this_object_y_low_bumped some_kind_of_velocity_copy distance_left
 ;     &85 this_object_y_max_low_bumped
 ;     &86 (unused)
@@ -307,8 +327,8 @@ Disassembly
 ;     &ad (unused)
 ;     &ae plotter_x
 ;     &af strip_length
-;     &b0 screen_offset
-;     &b1 screen_offset_h
+;     &b0 screen_offset						; used to set where the 6845 begins displaying the screen for hardware scrolling
+;     &b1 screen_offset_h					; only indicates within the 8k where to start - doesn't take into account &6000 where screen memory starts
 ;     &b2 screen_start_square_x_low_copy
 ;     &b3 some_screen_address_offset
 ;     &b4 velocity_x
@@ -379,24 +399,30 @@ Disassembly
 #0198: 80 68 48 10 00 00 00 00
 #01a0: 00 00 00 00 10 48 68 80
 
-; process_keys
-&01a8: a2 26            LDX #&26
+; process_keys - called from handle_player_object
+&01a8: a2 26            LDX #&26										# init loop counter - there are &26 different key commands
 &01aa: 86 ac            STX &ac ; key_number
-&01ac: a6 ac            LDX &ac ; key_number
-&01ae: bd 6b 12         LDA &126b,X ; keys_pressed
-&01b1: 10 0f            BPL &01c2 ; not_pressed
-&01b3: c9 c0            CMP #&c0
-&01b5: bd 1d 12         LDA &121d,X ; function_table_h
-&01b8: 6a               ROR
-&01b9: 10 04            BPL &01bf
+
+&01ac: a6 ac            LDX &ac ; key_number							# get loop index
+&01ae: bd 6b 12         LDA &126b,X ; keys_pressed						# bit 7 will be set if that key command is to be triggered
+&01b1: 10 0f            BPL &01c2 ; not_pressed							# branch if key not pressed
+
+&01b3: c9 c0            CMP #&c0										# set carry flag if C0 <= A
+&01b5: bd 1d 12         LDA &121d,X ; function_table_h					# get high byte of key command handler
+&01b8: 6a               ROR												# divide by 2, set bit 7 from carry
+&01b9: 10 04            BPL &01bf										# branch to call the handler where 
 &01bb: b0 05            BCS &01c2 ; not_pressed
 &01bd: 29 7f            AND #&7f
+
 &01bf: 20 ca 01         JSR &01ca ; call_function
+
 ; not_pressed
-&01c2: c6 ac            DEC &ac ; key_number
-&01c4: 10 e6            BPL &01ac
-&01c6: ee f5 11         INC &11f5 ; keys_processed
+&01c2: c6 ac            DEC &ac ; key_number							# decrement loop counter
+&01c4: 10 e6            BPL &01ac										# and loop around
+
+&01c6: ee f5 11         INC &11f5 ; keys_processed						# set processing flag to 1
 &01c9: 60               RTS
+
 ; call_function
 &01ca: 48               PHA
 &01cb: bd f6 11         LDA &11f6,X ; function_table
@@ -415,8 +441,9 @@ Disassembly
 &01dd: d0 fb            BNE &01da
 &01df: e6 90            INC &90; screen_address_h
 &01e1: 10 f7            BPL &01da
-&01e3: a9 01            LDA #&01
-&01e5: a2 40            LDX #&40
+
+&01e3: a9 01            LDA #&01											# 6845 register 1 - horizontal displayed
+&01e5: a2 40            LDX #&40											# &40 character positions with 4 bits of colour = 16 character width
 &01e7: 8d 00 fe         STA &fe00 	                                        # write to video controller (register number)
 &01ea: 8e 01 fe         STX &fe01 	                                        # write to video controller (register value)
 &01ed: 4c b6 19         JMP &19b6 ; main_loop
@@ -465,130 +492,131 @@ Disassembly
 #   ===============
 #   background objects:
 #   no   l   h    addr  name                                    object created          80 40 20 10
-#   &00  &d7 &20  3ef2 handle_background_invisible_switch                               -  -  +  -
-#   &01  &c8 &b0  3ee3 handle_background_teleport_beam     	teleport beam           +  -  +  +
-#   &02  &a4 &91  3fbf handle_background_object_from_data	(use object_data & &7f) +  -  -  +
-#   &03  &7d &f0  3e98 handle_background_door			door                    +  +  +  +
-#   &04  &7a &f0  3e95 handle_background_stone_door		stone door              +  +  +  +
-#   &05  &9c &b1  3fb7 handle_background_object_from_type	(use object_type)       +  -  +  +
-#   &06  &9c &b1  3fb7 handle_background_object_from_type	(use object_type)       +  -  +  +
-#   &07  &9c &b1  3fb7 handle_background_object_from_type	(use object_type)       +  -  +  +
-#   &08  &b2 &b1  3fcd handle_background_switch       		switch                  +  -  +  +
-#   &09  &00 &b0  3e1b handle_background_object_emerging	(use object_type)       +  -  +  +
-#   &0a  &00 &b0  3e1b handle_background_object_emerging	(use object_type)       +  -  +  +
+#   &00  &d7 &20  3ef2 handle_background_invisible_switch                               -  -  +  -		
+#   &01  &c8 &b0  3ee3 handle_background_teleport_beam     		teleport beam			+  -  +  +
+#   &02  &a4 &91  3fbf handle_background_object_from_data		(use object_data & &7f)	+  -  -  +		used by keys, weapons, robot, whistle, energy pod, chatter, protection suit, rock
+#   &03  &7d &f0  3e98 handle_background_door					door					+  +  +  +
+#   &04  &7a &f0  3e95 handle_background_stone_door				stone door				+  +  +  +
+#   &05  &9c &b1  3fb7 handle_background_object_from_type		(use object_type)		+  -  +  +		used by suckers, mushroom immunity pill, turret, nest, coronium boulder, destinator, key, 
+#   &06  &9c &b1  3fb7 handle_background_object_from_type		(use object_type)		+  -  +  +		used by turrets, suckers, "discharge device", red slime, RIP, coronium boulders, gargoyle, cannon control device, robot, giant wall
+#   &07  &9c &b1  3fb7 handle_background_object_from_type		(use object_type)		+  -  +  +		used by nests
+#   &08  &b2 &b1  3fcd handle_background_switch       			switch					+  -  +  +
+#   &09  &00 &b0  3e1b handle_background_object_emerging		(use object_type)		+  -  +  +		used by worms, maggots, birds, frogmen, green slime, fireball, big fish, piranha
+#   &0a  &00 &b0  3e1b handle_background_object_emerging		(use object_type)		+  -  +  +		used by imps, hover balls, fireballs, energy capsules, birds, piranhas, crew members
 #   &0b  &26 &31  3f41 handle_background_object_fixed_wind                              -  -  +  +
-#   &0c  &6f &90  3e8a handle_background_engine_thruster 	engine thruster         +  -  -  +
+#   &0c  &6f &90  3e8a handle_background_engine_thruster 		engine thruster			+  -  -  +
 #   &0d  &88 &31  3fa3 handle_background_object_water                                   -  -  +  +
-#   &0e  &fd &30  3f18 handle_background_object_random_wind                             -  -  +  +
-#   &0f  &b7 &31  3fd2 handle_background_mushrooms		mushroom ball           -  -  +  +
-#   &10  &7b &02  4096 handle_explosion_type_00
-#   &11  &a3 &02  40be handle_explosion_type_40
-#   &12  &a0 &02  40bb handle_explosion_type_80
-#   &13  &aa &02  40c5 handle_explosion_type_c0
+#   &0e  &fd &30  3f18 handle_background_object_random_wind                             -  -  +  +		not specifically referenced
+#   &0f  &b7 &31  3fd2 handle_background_mushrooms				mushroom ball			-  -  +  +		not specifically referenced
 #
-#   stack objects:
-# r no   l   h    addr  name			      object
-# 0:&00  &f6 &0b  &4a11 handle_player_object          player
-#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter
-#   &02  &d5 &88  &46f0 handle_crew_member            pericles crew member
-#   &03  &6d &84  &4288 handle_fluffy                 fluffy
-# 1:&04  &94 &cd  &4baf handle_nest                   small nest
-#   &05  &94 &cd  &4baf handle_nest                   big nest
-# 2:&06  &48 &86  &4463 handle_frogman_red            red frogman
-#   &07  &5c &86  &4477 handle_frogman_green          green frogman
-#   &08  &5a &86  &4475 handle_frogman_cyan           cyan frogman
-#   &09  &ae &09  &47c9 handle_red_slime              red slime
-#   &0a  &0f &04  &422a handle_green_slime            green slime
-#   &0b  &4b &04  &4266 handle_yellow_ball            yellow ball
-#   &0c  &6e &09  &4789 handle_sucker                 sucker
-#   &0d  &d2 &0f  &4ded handle_sucker_deadly          deadly sucker
-#   &0e  &46 &89  &4761 handle_big_fish               big fish
-# 3:&0f  &ef &83  &420a handle_worm                   worm
-#   &10  &06 &d1  &4f21 handle_nest_dweller           pirahna
-#   &11  &06 &91  &4f21 handle_nest_dweller           wasp
-# 4:&12  &dc &c4  &42f7 handle_grenade_active         active grenade
-#   &13  &a4 &c8  &46bf handle_icer_bullet            icer bullet
-#   &14  &f9 &c7  &4614 handle_tracer_bullet          tracer bullet
-#   &15  &0b &c5  &4326 handle_cannonball	      cannonball
-#   &16  &17 &c5  &4332 handle_death_ball_blue        blue death ball
-#   &17  &2f &c5  &434a handle_red_bullet             red bullet
-#   &18  &00 &c6  &441b handle_pistol_bullet          pistol bullet
-#   &19  &6d &8c  &4a88 handle_plasma_ball            plasma ball
-#   &1a  &cc &45  &43e7 handle_hover_ball             hover ball
-#   &1b  &d0 &45  &43eb handle_hover_ball_invisible   invisible hover ball
-# 5:&1c  &c3 &50  &4ede handle_robot                  magenta robot
-#   &1d  &c3 &50  &4ede handle_robot                  red robot
-#   &1e  &c7 &50  &4ee2 handle_robot_blue             blue robot
-#   &1f  &bd &50  &4ed8 handle_turret                 green/white turret
-#   &20  &bd &50  &4ed8 handle_turret                 cyan/red turret
-#   &21  &e9 &49  &4804 handle_hovering_robot         hovering robot
-# 6:&22  &04 &4a  &481f handle_clawed_robot           magenta clawed robot
-#   &23  &04 &4a  &481f handle_clawed_robot           cyan clawed robot
-#   &24  &04 &4a  &481f handle_clawed_robot           green clawed robot
-#   &25  &04 &4a  &481f handle_clawed_robot           red clawed robot
-#   &26  &e9 &08  &4704 handle_triax                  triax
-#   &27  &37 &90  &4e52 handle_maggot                 maggot
-#   &28  &55 &c3  &4170 handle_gargoyle               gargoyle
-#   &29  &d4 &86  &44ef handle_imp                    red/magenta imp
-#   &2a  &d4 &86  &44ef handle_imp                    red/yellow imp
-#   &2b  &d4 &86  &44ef handle_imp                    blue/cyan imp
-#   &2c  &d4 &86  &44ef handle_imp                    cyan/yellow imp
-#   &2d  &d4 &86  &44ef handle_imp                    red/cyan imp
-#   &2e  &16 &88  &4631 handle_bird                   green/yellow bird
-#   &2f  &16 &88  &4631 handle_bird                   white/yellow bird
-#   &30  &06 &88  &4621 handle_bird_red               red/magenta bird
-#   &31  &10 &88  &462b handle_bird_invisible         invisible bird
-# 7:&32  &e6 &02  &4000 handle_lightning              lightning
-#   &33  &7d &08  &4698 handle_mushroom_ball          red mushroom ball
-#   &34  &7d &08  &4698 handle_mushroom_ball          blue mushroom ball
-#   &35  &76 &09  &4791 handle_engine_fire            engine fire
-#   &36  &7e &c9  &4799 handle_red_drop               red drop
-#   &37  &bb &0c  &4ad6 handle_fireball               fireball
-# 8:&38  &a6 &0a  &48c1 handle_chatter_inactive       inactive chatter
-#   &39  &0b &0d  &4b26 handle_moving_fireball        moving fireball
-#   &3a  &81 &05  &439c handle_giant_wall             giant wall
-#   &3b  &fa &0d  &4c15 handle_engine_thruster        engine thruster
-#   &3c  &68 &ce  &4c83 handle_door                   horizontal door
-#   &3d  &68 &ce  &4c83 handle_door                   vertical door
-#   &3e  &68 &ce  &4c83 handle_door                   horizontal stone door
-#   &3f  &68 &ce  &4c83 handle_door                   vertical stone door
-#   &40  &8e &0d  &4ba9 handle_bush                   bush
-#   &41  &6b &0f  &4d86 handle_teleport_beam          teleport beam
-#   &42  &82 &cb  &499d handle_switch                 switch
-#   &43  &92 &05  &43ad (null function)               chest 
-#   &44  &81 &11  &4f9c handle_explosion              explosion
-#   &45  &92 &05  &43ad (null function)               rock 
-#   &46  &d3 &02  &40ee handle_cannon                 cannon
-#   &47  &fb &43  &4216 handle_mysterious_weapon      mysterious weapon
-#   &48  &84 &03  &419f handle_maggot_machine         maggot machine
-#   &49  &49 &0d  &4b64 handle_placeholder            placeholder
-# 9:&4a  &59 &05  &4374 handle_destinator             destinator
-#   &4b  &45 &85  &4360 handle_energy_capsule         energy capsule
-#   &4c  &8c &05  &43a7 handle_flask                  empty flask
-#   &4d  &93 &05  &43ae handle_flask_full             full flask
-#   &4e  &36 &05  &4351 handle_remote_control         remote control device
-#   &4f  &36 &05  &4351 handle_remote_control         cannon control device
-#   &50  &3d &c3  &4158 handle_grenade_inactive       inactive grenade
-#   &51  &6d &0d  &4b88 handle_collectable            cyan/yellow/green key
-#   &52  &6d &0d  &4b88 handle_collectable            red/yellow/green key
-#   &53  &6d &0d  &4b88 handle_collectable            green/yellow/red key
-#   &54  &6d &0d  &4b88 handle_collectable            yellow/white/red key
-#   &55  &af &03  &41ca handle_coronium_boulder       coronium boulder
-#   &56  &6d &0d  &4b88 handle_collectable            red/magenta/red key
-#   &57  &6d &0d  &4b88 handle_collectable            blue/cyan/green key
-#   &58  &a7 &03  &41c2 handle_coronium_crystal       coronium crystal
-#   &59  &6d &0d  &4b88 handle_collectable            jetpack booster
-#   &5a  &6d &0d  &4b88 handle_collectable            pistol
-#   &5b  &6d &0d  &4b88 handle_collectable            icer
-#   &5c  &6d &0d  &4b88 handle_collectable            discharge device
-#   &5d  &6d &0d  &4b88 handle_collectable            plasma gun
-#   &5e  &6d &0d  &4b88 handle_collectable            protection suit
-#   &5f  &6d &0d  &4b88 handle_collectable            fire immunity device
-#   &60  &6d &0d  &4b88 handle_collectable            mushroom immunity pull
-#   &61  &6d &0d  &4b88 handle_collectable            whistle 1
-#   &62  &6d &0d  &4b88 handle_collectable            whistle 2
-#   &63  &6d &0d  &4b88 handle_collectable            radiation immunity pull
-#   &64  &92 &05  &43ad (null function)               ?
+#   &10  &7b &02  4096 handle_explosion_type_00		player or doesn't explode
+#   &11  &a3 &02  40be handle_explosion_type_40		plays extra sound then same as handle_explosion_type_c0
+#   &12  &a0 &02  40bb handle_explosion_type_80		turns into fireball
+#   &13  &aa &02  40c5 handle_explosion_type_c0		turns exploding object into an explosion
+#
+#   stack objects by object_type:
+# r no   l   h    addr  name						  object					explosion (top 2 bits of h)
+# 0:&00  &f6 &0b  &4a11 handle_player_object          player					0
+#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			0 (indestructable)
+#   &02  &d5 &88  &46f0 handle_crew_member            pericles crew member		80
+#   &03  &6d &84  &4288 handle_fluffy                 fluffy					80
+# 1:&04  &94 &cd  &4baf handle_nest                   small nest				c0
+#   &05  &94 &cd  &4baf handle_nest                   big nest					c0
+# 2:&06  &48 &86  &4463 handle_frogman_red            red frogman				80
+#   &07  &5c &86  &4477 handle_frogman_green          green frogman				80
+#   &08  &5a &86  &4475 handle_frogman_cyan           cyan frogman				80
+#   &09  &ae &09  &47c9 handle_red_slime              red slime					0
+#   &0a  &0f &04  &422a handle_green_slime            green slime				0
+#   &0b  &4b &04  &4266 handle_yellow_ball            yellow ball				0
+#   &0c  &6e &09  &4789 handle_sucker                 sucker					0
+#   &0d  &d2 &0f  &4ded handle_sucker_deadly          deadly sucker				0
+#   &0e  &46 &89  &4761 handle_big_fish               big fish					80
+# 3:&0f  &ef &83  &420a handle_worm                   worm						80
+#   &10  &06 &d1  &4f21 handle_nest_dweller           pirahna					c0
+#   &11  &06 &91  &4f21 handle_nest_dweller           wasp						80
+# 4:&12  &dc &c4  &42f7 handle_grenade_active         active grenade			c0
+#   &13  &a4 &c8  &46bf handle_icer_bullet            icer bullet				c0
+#   &14  &f9 &c7  &4614 handle_tracer_bullet          tracer bullet				c0
+#   &15  &0b &c5  &4326 handle_cannonball			  cannonball				c0
+#   &16  &17 &c5  &4332 handle_death_ball_blue        blue death ball			c0
+#   &17  &2f &c5  &434a handle_red_bullet             red bullet				c0
+#   &18  &00 &c6  &441b handle_pistol_bullet          pistol bullet				c0
+#   &19  &6d &8c  &4a88 handle_plasma_ball            plasma ball				80
+#   &1a  &cc &45  &43e7 handle_hover_ball             hover ball				40
+#   &1b  &d0 &45  &43eb handle_hover_ball_invisible   invisible hover ball		40
+# 5:&1c  &c3 &50  &4ede handle_robot                  magenta robot				40
+#   &1d  &c3 &50  &4ede handle_robot                  red robot					40
+#   &1e  &c7 &50  &4ee2 handle_robot_blue             blue robot				40
+#   &1f  &bd &50  &4ed8 handle_turret                 green/white turret		40
+#   &20  &bd &50  &4ed8 handle_turret                 cyan/red turret			40
+#   &21  &e9 &49  &4804 handle_hovering_robot         hovering robot			40
+# 6:&22  &04 &4a  &481f handle_clawed_robot           magenta clawed robot		40
+#   &23  &04 &4a  &481f handle_clawed_robot           cyan clawed robot			40
+#   &24  &04 &4a  &481f handle_clawed_robot           green clawed robot		40
+#   &25  &04 &4a  &481f handle_clawed_robot           red clawed robot			40
+#   &26  &e9 &08  &4704 handle_triax                  triax						0
+#   &27  &37 &90  &4e52 handle_maggot                 maggot					80
+#   &28  &55 &c3  &4170 handle_gargoyle               gargoyle					c0
+#   &29  &d4 &86  &44ef handle_imp                    red/magenta imp			80
+#   &2a  &d4 &86  &44ef handle_imp                    red/yellow imp			80
+#   &2b  &d4 &86  &44ef handle_imp                    blue/cyan imp				80
+#   &2c  &d4 &86  &44ef handle_imp                    cyan/yellow imp			80
+#   &2d  &d4 &86  &44ef handle_imp                    red/cyan imp				80
+#   &2e  &16 &88  &4631 handle_bird                   green/yellow bird			80
+#   &2f  &16 &88  &4631 handle_bird                   white/yellow bird			80
+#   &30  &06 &88  &4621 handle_bird_red               red/magenta bird			80
+#   &31  &10 &88  &462b handle_bird_invisible         invisible bird			80
+# 7:&32  &e6 &02  &4000 handle_lightning              lightning					0
+#   &33  &7d &08  &4698 handle_mushroom_ball          red mushroom ball			0
+#   &34  &7d &08  &4698 handle_mushroom_ball          blue mushroom ball		0
+#   &35  &76 &09  &4791 handle_engine_fire            engine fire				0
+#   &36  &7e &c9  &4799 handle_red_drop               red drop					c0
+#   &37  &bb &0c  &4ad6 handle_fireball               fireball					0
+# 8:&38  &a6 &0a  &48c1 handle_chatter_inactive       inactive chatter			0
+#   &39  &0b &0d  &4b26 handle_moving_fireball        moving fireball			0
+#   &3a  &81 &05  &439c handle_giant_wall             giant wall				0
+#   &3b  &fa &0d  &4c15 handle_engine_thruster        engine thruster			0
+#   &3c  &68 &ce  &4c83 handle_door                   horizontal door			c0
+#   &3d  &68 &ce  &4c83 handle_door                   vertical door				c0
+#   &3e  &68 &ce  &4c83 handle_door                   horizontal stone door		c0
+#   &3f  &68 &ce  &4c83 handle_door                   vertical stone door		c0
+#   &40  &8e &0d  &4ba9 handle_bush                   bush						0
+#   &41  &6b &0f  &4d86 handle_teleport_beam          teleport beam				0
+#   &42  &82 &cb  &499d handle_switch                 switch					c0
+#   &43  &92 &05  &43ad (null function)               chest						0
+#   &44  &81 &11  &4f9c handle_explosion              explosion					0
+#   &45  &92 &05  &43ad (null function)               rock						0
+#   &46  &d3 &02  &40ee handle_cannon                 cannon					0
+#   &47  &fb &43  &4216 handle_mysterious_weapon      mysterious weapon			40
+#   &48  &84 &03  &419f handle_maggot_machine         maggot machine			0
+#   &49  &49 &0d  &4b64 handle_placeholder            placeholder				0
+# 9:&4a  &59 &05  &4374 handle_destinator             destinator				0
+#   &4b  &45 &85  &4360 handle_energy_capsule         energy capsule			80
+#   &4c  &8c &05  &43a7 handle_flask                  empty flask				0
+#   &4d  &93 &05  &43ae handle_flask_full             full flask				0
+#   &4e  &36 &05  &4351 handle_remote_control         remote control device		0
+#   &4f  &36 &05  &4351 handle_remote_control         cannon control device		0
+#   &50  &3d &c3  &4158 handle_grenade_inactive       inactive grenade			c0
+#   &51  &6d &0d  &4b88 handle_collectable            cyan/yellow/green key		0
+#   &52  &6d &0d  &4b88 handle_collectable            red/yellow/green key		0
+#   &53  &6d &0d  &4b88 handle_collectable            green/yellow/red key		0
+#   &54  &6d &0d  &4b88 handle_collectable            yellow/white/red key		0
+#   &55  &af &03  &41ca handle_coronium_boulder       coronium boulder			0
+#   &56  &6d &0d  &4b88 handle_collectable            red/magenta/red key		0
+#   &57  &6d &0d  &4b88 handle_collectable            blue/cyan/green key		0
+#   &58  &a7 &03  &41c2 handle_coronium_crystal       coronium crystal			0
+#   &59  &6d &0d  &4b88 handle_collectable            jetpack booster			0
+#   &5a  &6d &0d  &4b88 handle_collectable            pistol					0
+#   &5b  &6d &0d  &4b88 handle_collectable            icer						0
+#   &5c  &6d &0d  &4b88 handle_collectable            discharge device			0
+#   &5d  &6d &0d  &4b88 handle_collectable            plasma gun				0
+#   &5e  &6d &0d  &4b88 handle_collectable            protection suit			0
+#   &5f  &6d &0d  &4b88 handle_collectable            fire immunity device		0
+#   &60  &6d &0d  &4b88 handle_collectable            mushroom immunity pull	0
+#   &61  &6d &0d  &4b88 handle_collectable            whistle 1					0
+#   &62  &6d &0d  &4b88 handle_collectable            whistle 2					0
+#   &63  &6d &0d  &4b88 handle_collectable            radiation immunity pull	0
+#   &64  &92 &05  &43ad (null function)               ?							0
 #
 ###############################################################################
 
@@ -627,6 +655,7 @@ Disassembly
 #03b4: 22 22 22 25 e7                                  ; 60
 
 ; object_handler_table
+; low byte of addresses of handler routines which are stored relative to the address of handlers_start
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0  1  2  3
 #03b9: d7 c8 a4 7d 7a 9c 9c 9c b2 00 00 26 6f 88 fd b7 7b a3 a0 aa ; for background objects / explosions
 #03cd: f6 bc d5 6d 94 94 48 5c 5a ae 0f 4b 6e d2 46 ef ; 00
@@ -638,10 +667,13 @@ Disassembly
 #042d: 6d 6d 6d 6d 92                                  ; 60
 
 ; object_handler_table_h
+; high byte of addresses of handler routines which are stored relative to the address of handlers_start
 # & &c0 = how the object explodes
-;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0  1  2  3
-#0432: 20 b0 91 f0 f0 b1 b1 b1 b1 b0 b0 31 90 31 30 31 02 02 02 02 ; for background objects / explosions
-#0446: 0b 0a 88 84 cd cd 86 86 86 09 04 04 09 0f 89 83 ; 00
+;            0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+#0432:	00:	20 b0 91 f0 f0 b1 b1 b1 b1 b0 b0 31 90 31 30 31		# background objects - top 4 bits indicate background conditions
+#0442:	10:	02 02 02 02											# explosions
+
+#0446: 0b 0a 88 84 cd cd 86 86 86 09 04 04 09 0f 89 83 ; 00		# stack objects - top 2 bits indicate explosion type
 #0456: d1 91 c4 c8 c7 c5 c5 c5 c6 8c 45 45 50 50 50 50 ; 10
 #0466: 50 49 4a 4a 4a 4a 08 90 c3 86 86 86 86 86 88 88 ; 20
 #0476: 88 88 02 08 08 09 c9 0c 0a 0d 05 0d ce ce ce ce ; 30
@@ -732,9 +764,73 @@ Disassembly
 ; & &80 = vertically flipped
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #04ab: c6 ce c6 c6 c6 bb c6 18 2d 70 6a c6 23 39 c6 62
+	0	46 nothing (handle_background_invisible_switch)
+	1	4e teleporter base (handle_background_teleport_beam)
+	2	46 nothing (handle_background_object_from_data)
+	3	46 nothing (handle_background_door)
+	4	46 nothing (handle_background_stone_door)
+	5	3b half a wall (handle_background_object_from_type)
+	6	46 nothing (handle_background_object_from_type)
+	7	18 possibly flames (handle_background_object_from_type)
+	8	2d switch box (handle_background_switch)
+	9	70 sucker/bush (handle_background_object_emerging)
+	a	6a pipe top/plant pot/airlock (handle_background_object_emerging)
+	b	46 nothing (handle_background_object_fixed_wind)
+	c	23 half an engine (handle_background_engine_thruster)
+	d	39 full wall - presumably careful palette choices makes it blue (handle_background_object_water)
+	e	46 nothing (handle_background_object_random_wind)
+	f	62 mushrooms (handle_background_mushrooms)
 #04bb: c0 8e 39 44 47 26 48 49 df c6 99 9a 25 2b 39 3b
+	10	40 wall with grass
+	11	0e grass frond
+	12	39 full wall
+	13	44 part of wall with bottom right corner removed and edged
+	14	47 spaceship pipework
+	15	26 thin strip of spaceship
+	16	48 spaceship 50% wall
+	17	49 spaceship 25% wall
+	18	5f flag/alarm bell
+	19	46 nothing
+	1a	19 shrub
+	1b	1a tree
+	1c	25 small corner of spaceship
+	1d	2b spaceship with corner removed
+	1e	39 full wall
+	1f	3b hall a wall
 #04cb: 3c 55 8e 43 34 35 27 28 29 2a 42 bf 40 3d 38 36
+	20	3c quarter of wall / door
+	21	55 pillar
+	22	4e transporter
+	23	43 half wall as a triangle
+	24	34 wall with corner removed and edged
+	25	35 small triangle of wall
+	26	27 spaceship, full height with corner missing
+	27	28 spaceship, 3/4 height with corner missing
+	28	29 spaceship, 1/2 height with corner missing
+	29	2a spaceship, 1/4 height with corner missing
+	2a	42 thin strip of wall, full height, steeply sloped 
+	2b	3f grass/wall edging
+	2c	40 quarter of wall with grass/edging
+	2d	3d full wall
+	2d	38 half wall as a triangle
+	2f	36 wall, full height with corner missing
 #04db: 37 3e 33 31 2f 30 2c 24 32 41 45 3a 6a 23 60 cc
+	30	37 half wall as a triangle
+	31	3e half of wall with grass/edging
+	32	33 spaceship pipework with a rounded corner
+	33	31 part of pipe, quarter height
+	34	2f corner of pipe
+	35	30 thin strip of pipe
+	36	2c half height wedge of spaceship
+	37	24 spaceship pipework with a rounded corner
+	38	32 half height spaceship pipework with a rounded corner
+	39	41 thin strip of wall
+	3a	45 gargoyle
+	3b	3a three quarter height wall
+	3c	6a pipe top/plant pot/airlock
+	3d	23 half an engine
+	3e	60 computer console
+	3f	4c hydraulic leg
 
 ; background_y_offset_lookup
 #04eb: 00 00 00 00 00 00 00 d0 c5 b0 c7 00 06 00 00 c0
@@ -772,48 +868,83 @@ Disassembly
 
 ; background_objects_range_minus_one
 #05d3: 00
-; background_objects_range 
-#05d4: 19 39 57 7a 9e bc d8 f6 fe
-; background_objects_data_offset
-#05dd: 01 fe fb fa f8 f5 f5 f3 f3
-; background_objects_type_offset
-#05e6: 00 f5 e9 de ce be b1 a1 98
 
-; background_objects_x_lookup
-#05ef: ff ff b0 ec 77 64 9a af da c6 36 9f 2e a9 9c 83
-#05ff: 88 5f 57 bf 9d 4d 45 81 b3 3f cb 40 4c ca 2f a7
-#060f: 56 34 e3 3b e4 80 e0 64 37 47 9f 9c aa 9b 9a 5e
-#061f: c7 8a 60 9d a2 b2 98 a9 db 28 29 3c 98 63 cb 61
-#062f: a3 ce e9 80 2e 4f 79 87 b6 97 2d d6 5c a0 74 6a
-#063f: a1 9f 89 85 6b ae 65 e2 ed 80 cd a8 2b ab 9d 62
-#064f: e5 70 ec 83 c1 c6 67 eb 2d 98 aa cc a5 9e a2 d7
-#065f: e6 e7 94 7c e3 45 9b 9f c2 71 67 4f cf d2 e2 7a
-#066f: 62 da 76 b2 66 d7 83 84 80 87 9b 50 ae 64 a3 63
-#067f: b8 7f 82 e0 9c 61 9d 29 46 9f 9a 74 75 77 b2 e4
-#068f: 62 63 82 61 d4 d3 77 2e 64 86 a5 a0 d1 b4 7f a3
-#069f: 9f 99 80 67 da 89 95 8b ab c4 9d aa bb 47 8a a7
-#06af: 61 9e 2e d6 7e da aa ab 45 67 d4 29 b8 6b 69 9d
-#06bf: 94 63 b4 a1 9f a0 57 e1 7f a6 b4 53 61 d4 82 e3
-#06cf: 75 c3 84 9e c6 64 a2 28 29 9d 83 a8 80 aa d5 a0
-#06df: 9f d6 62 69 2c a5 b8 b9 d9 59 79 39 48 e8 03
+; background_objects_range 
+*** found first range to be 1D rather than 19 ***
+#05d4: 1D  39   57  7a  9e  bc    d8   f6   fe
+range   1   2    3   4   5   6     7    8   
+
+; background_objects_data_offset
+; used in conjunction with background_objects_range to find a value in background_objects_data
+;      +1	-2	-5	-6	-8	-11	 -11  -13	-13
+#05dd: 01	fe	fb	fa	f8	 f5	  f5   f3	 f3
+range   0    1   2   3   4    5    6    7     8
+
+; background_objects_type_offset
+; used in conjunction with background_objects_range and background_objects_data_offset to find a value in background_objects_type
+        0  -11 -23 -34 -50  -66  -79  -95  -104    
+#05e6: 00   f5  e9  de  ce   be   b1   a1    98
+
+combined effect of background_objects_data_offset and background_objects_type_offset
+	   01	F3	E4	d8	c6	 b3	  a6   94	 8b
+
+#05ef; background_objects_x_lookup
+These are a list of square_x values in sections delimited by background_objects_range
+			 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+05ef	00: ff ff b0 ec 77 64 9a af da c6 36 9f 2e a9 9c 83
+05ff	10: 88 5f 57 bf 9d 4d 45 81 b3 3f cb 40 4c 
+												   ca 2f a7
+060f	20: 56 34 e3 3b e4 80 e0 64 37 47 9f 9c aa 9b 9a 5e
+061f	30: c7 8a 60 9d a2 b2 98 a9 db 
+									   28 29 3c 98 63 cb 61
+062f	40: a3 ce e9 80 2e 4f 79 87 b6 97 2d d6 5c a0 74 6a
+063f	50: a1 9f 89 85 6b ae 65 
+								 e2 ed 80 cd a8 2b ab 9d 62
+064f	60: e5 70 ec 83 c1 c6 67 eb 2d 98 aa cc a5 9e a2 d7
+065f	70: e6 e7 94 7c e3 45 9b 9f c2 71 
+										  67 4f cf d2 e2 7a
+066f	80: 62 da 76 b2 66 d7 83 84 80 87 9b 50 ae 64 a3 63
+067f	90: b8 7f 82 e0 9c 61 9d 29 46 9f 9a 74 75 77 
+													  b2 e4
+068f	A0: 62 63 82 61 d4 d3 77 2e 64 86 a5 a0 d1 b4 7f a3
+069f	B0: 9f 99 80 67 da 89 95 8b ab c4 9d aa 
+												bb 47 8a a7
+06af	C0: 61 9e 2e d6 7e da aa ab 45 67 d4 29 b8 6b 69 9d
+06bf	D0: 94 63 b4 a1 9f a0 57 e1 
+									7f a6 b4 53 61 d4 82 e3
+06cf	E0: 75 c3 84 9e c6 64 a2 28 29 9d 83 a8 80 aa d5 a0
+06df	F0: 9f d6 62 69 2c a5 
+							  b8 b9 d9 59 79 39 48 e8 
+													  03
 
 ; background_objects_handler_lookup
-#06ee: 89 89 89 89 89 8a 46 c6 06 06 46 05 05 00 c3 04
-#06fe: 83 84 84 83 88 48 02 02 42 02 7b 22 1e 06 06 c6
-#070e: 06 46 46 85 85 87 89 89 c7 0a 8c 03 84 83 43 84
-#071e: 84 02 01 41 01 01 2e 1e 3b 46 46 06 c6 06 06 06
-#072e: 46 06 09 c9 89 ca 8a 8a 0a 4a 8a 04 44 41 01 c8
-#073e: 48 cc 82 02 02 02 1e 89 09 0a 4a ca 4a 86 46 46
-#074e: 46 86 45 47 00 00 00 00 84 c3 44 43 43 43 44 84
-#075e: 44 04 01 08 08 02 02 82 1e 2d 46 46 45 46 c6 89
-#076e: c9 49 89 ca ca 8a 8a 8a 0a 00 00 c4 43 04 43 84
-#077e: 44 04 44 84 41 01 01 01 c8 42 82 3b 11 3b 89 c9
-#078e: ca 8a c6 06 c6 c6 06 06 85 47 4a ca 8a 00 00 44
-#079e: 43 c3 44 44 04 41 c8 88 c8 c8 02 8c 49 89 0a 0a
-#07ae: 8a c6 06 06 47 87 cc 41 01 08 08 08 08 c4 84 43
-#07be: 43 84 04 83 82 82 0d 0d 46 06 06 06 06 45 45 45
-#07ce: 06 07 89 09 8a 4a 4a ca ca 4a 00 00 00 48 08 82
-#07de: 82 82 02 c4 c4 0b 0b 0b d1 91 d1 d1 91 91 0d
+; format is oossssss orientation in top two bits, sprite/handler in lower 6 bits
+			 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+#06ee:	00:	89 89 89 89 89 8a 46 c6 06 06 46 05 05 00 c3 04
+#06fe:	10:	83 84 84 83 88 48 02 02 42 02 7b 22 1e 
+                                                   06 06 c6
+#070e:	20:	06 46 46 85 85 87 89 89 c7 0a 8c 03 84 83 43 84
+#071e:	30:	84 02 01 41 01 01 2e 1e 3b 
+                                       46 46 06 c6 06 06 06
+#072e:	40:	46 06 09 c9 89 ca 8a 8a 0a 4a 8a 04 44 41 01 c8
+#073e:	50:	48 cc 82 02 02 02 1e 
+                                 89 09 0a 4a ca 4a 86 46 46
+#074e:	60:	46 86 45 47 00 00 00 00 84 c3 44 43 43 43 44 84
+#075e:	70:	44 04 01 08 08 02 02 82 1e 2d 
+                                          46 46 45 46 c6 89
+#076e:	80:	c9 49 89 ca ca 8a 8a 8a 0a 00 00 c4 43 04 43 84
+#077e:	90:	44 04 44 84 41 01 01 01 c8 42 82 3b 11 3b 
+                                                      89 c9
+#078e:	A0:	ca 8a c6 06 c6 c6 06 06 85 47 4a ca 8a 00 00 44
+#079e:	B0:	43 c3 44 44 04 41 c8 88 c8 c8 02 8c 
+                                                49 89 0a 0a
+#07ae:	C0:	8a c6 06 06 47 87 cc 41 01 08 08 08 08 c4 84 43
+#07be:	D0:	43 84 04 83 82 82 0d 0d 
+                                    46 06 06 06 06 45 45 45
+#07ce:	E0:	06 07 89 09 8a 4a 4a ca ca 4a 00 00 00 48 08 82
+#07de:	F0:	82 82 02 c4 c4 0b 
+                              0b 0b d1 91 d1 d1 91 91 
+                                                      0d
 
 ; background_strip_cache_orientation
 #07ed: 2e 2e 2e 2e 2e 2e 2e 2e 2e
@@ -948,7 +1079,11 @@ Disassembly
 #
 #   Background objects
 #   ==================
-#   no    x            handler      data         type            x, y    handler: object
+#   composed from various tables: x = background_objects_x_lookup
+#								  handler = background_objects_handler_lookup
+#								  new_object_data_pointer = no + background_objects_data_offset[r]
+#								  new_object_type_pointer = new_object_data_pointer + background_objects_type_offset[r]
+# r no    x            square s&o   data         type            x, y    handler: object
 # 0:&00 : &05ef = &ff  &06ee = &89  &0987 = &7c  &0a72 = &0f  (&ff, &??) &09: worm (x 31) (unused?)
 #   &01 : &05f0 = &ff  &06ef = &89  &0988 = &60  &0a73 = &27  (&ff, &??) &09: maggot (x 24) (unused?)
 #   &02 : &05f1 = &b0  &06f0 = &89  &0989 = &04  &0a74 = &2e  (&b0, &4e) &09: green/yellow bird
@@ -965,6 +1100,7 @@ Disassembly
 #   &0d : &05fc = &a9  &06fb = &00  &0994 = &ad  &0a7f = &2c  (&a9, &9c) &00: invisible switch
 #   &0e : &05fd = &9c  &06fc = &c3  &0995 = &81  &0a80 = &00  (&9c, &3c) &03: door
 #   &0f : &05fe = &83  &06fd = &04  &0996 = &f7  &0a81 = &0d  (&83, &77) &04: stone door
+
 #   &10 : &05ff = &88  &06fe = &83  &0997 = &a1  &0a82 = &0d  (&88, &72) &03: door
 #   &11 : &0600 = &5f  &06ff = &84  &0998 = &f1  &0a83 = &1f  (&5f, &c0) &04: stone door
 #   &12 : &0601 = &57  &0700 = &84  &0999 = &f7  &0a84 = &0d  (&57, &94) &04: stone door
@@ -973,14 +1109,16 @@ Disassembly
 #   &15 : &0604 = &4d  &0703 = &48  &099c = &ac  &0a87 = &20  (&4d, &80) &08: switch
 #   &16 : &0605 = &45  &0704 = &02  &099d = &d2  &0a88 = &05  (&45, &4e) &02: red/yellow/green key
 #   &17 : &0606 = &81  &0705 = &02  &099e = &df  &0a89 = &04  (&81, &75) &02: fire immunity device
-#   &18 : &0607 = &b3  &0706 = &42  &099f = &d4  &0a8a = &06  (&b3, &80) &02: yellow/white/red key
-# 1:&19 : &0608 = &3f  &0707 = &02  &099d = &d2  &0a7d = &0c  (&3f, &??) &02: red/yellow/green key (unused)
-#   &1a : &0609 = &cb  &0708 = &7b  &099e = &df  &0a7e = &60  (&cb, &??) &3b: brick wall, 3/4 filled bottom (unused)
-#   &1b : &060a = &40  &0709 = &22  &099f = &d4  &0a7f = &2c  (&40, &??) &22: leaf (unused)
-#   &1c : &060b = &4c  &070a = &1e  &09a0 = &a3  &0a80 = &00  (&4c, &??) &1e: brick wall
-#   &1d : &060c = &ca  &070b = &06  &09a1 = &84  &0a81 = &0d  (&ca, &58) &06: deadly sucker
+#   &18 : &0607 = &b3  &0706 = &42  &099f = &d4  &0a8a = &06  (&b3, &??) &02: todo - check! yellow/white/red key
+#   &19 : &0608 = &3f  &0707 = &02  &09a0 = &a3  &0a7d = &31  (&3f, &??) &02: todo - check! red/yellow/green key (unused)
+#   &1a : &0609 = &cb  &0708 = &7b  &09a1 = &84  &0a7e = &05  (&cb, &??) &3b: todo - check! brick wall, 3/4 filled bottom (unused)
+#   &1b : &060a = &40  &0709 = &22  &09a2 = &85  &0a7f = &2a  (&40, &??) &22: todo - check! leaf (unused)
+#   &1c : &060b = &4c  &070a = &1e  &09a3 = &ae  &0a80 = &09  (&4c, &??) &1e: todo - check! brick wall
+
+# 1:&1d : &060c = &ca  &070b = &06  &09a1 = &84  &0a81 = &0d  (&ca, &58) &06: deadly sucker
 #   &1e : &060d = &2f  &070c = &06  &09a2 = &85  &0a82 = &0d  (&2f, &94) &06: deadly sucker
 #   &1f : &060e = &a7  &070d = &c6  &09a3 = &ae  &0a83 = &1f  (&a7, &80) &06: green/white turret
+
 #   &20 : &060f = &56  &070e = &06  &09a4 = &80  &0a84 = &0d  (&56, &94) &06: deadly sucker
 #   &21 : &0610 = &34  &070f = &46  &09a5 = &80  &0a85 = &5c  (&34, &8c) &06: discharge device
 #   &22 : &0611 = &e3  &0710 = &46  &09a6 = &88  &0a86 = &0d  (&e3, &98) &06: deadly sucker
@@ -997,6 +1135,7 @@ Disassembly
 #   &2d : &061c = &9b  &071b = &83  &09b1 = &d1  &0a91 = &1f  (&9b, &80) &03: door
 #   &2e : &061d = &9a  &071c = &43  &09b2 = &91  &0a92 = &20  (&9a, &5c) &03: door
 #   &2f : &061e = &5e  &071d = &84  &09b3 = &f1  &0a93 = &55  (&5e, &c0) &04: stone door
+
 #   &30 : &061f = &c7  &071e = &84  &09b4 = &f1  &0a94 = &55  (&c7, &c0) &04: stone door
 #   &31 : &0620 = &8a  &071f = &02  &09b5 = &da  &0a95 = &0d  (&8a, &71) &02: pistol
 #   &32 : &0621 = &60  &0720 = &01  &09b6 = &f7  &0a96 = &63  (&60, &98) &01: teleport beam
@@ -1006,6 +1145,7 @@ Disassembly
 #   &36 : &0625 = &98  &0724 = &2e  &09ba = &80  &0a9a = &1b  (&98, &80) &2e: stone wall \
 #   &37 : &0626 = &a9  &0725 = &1e  &09bb = &83  &0a9b = &37  (&a9, &80) &1e: brick wall
 #   &38 : &0627 = &db  &0726 = &3b  &09bc = &83  &0a9c = &29  (&db, &80) &3b: brick wall, top quarter empty
+
 # 2:&39 : &0628 = &28  &0727 = &46  &09ba = &80  &0a8e = &09  (&28, &98) &06: red slime
 #   &3a : &0629 = &29  &0728 = &46  &09bb = &83  &0a8f = &0d  (&29, &98) &06: deadly sucker
 #   &3b : &062a = &3c  &0729 = &06  &09bc = &83  &0a90 = &0d  (&3c, &80) &06: deadly sucker
@@ -1013,6 +1153,7 @@ Disassembly
 #   &3d : &062c = &63  &072b = &06  &09be = &aa  &0a92 = &20  (&63, &c0) &06: cyan/red turret
 #   &3e : &062d = &cb  &072c = &06  &09bf = &80  &0a93 = &55  (&cb, &dc) &06: coronium boulder
 #   &3f : &062e = &61  &072d = &06  &09c0 = &80  &0a94 = &55  (&61, &c6) &06: coronium boulder
+
 #   &40 : &062f = &a3  &072e = &46  &09c1 = &87  &0a95 = &0d  (&a3, &c0) &06: deadly sucker
 #   &41 : &0630 = &ce  &072f = &06  &09c2 = &80  &0a96 = &63  (&ce, &d8) &06: radiation immunity pull
 #   &42 : &0631 = &e9  &0730 = &09  &09c3 = &30  &0a97 = &0f  (&e9, &98) &09: worm (x 12)
@@ -1029,6 +1170,7 @@ Disassembly
 #   &4d : &063c = &a0  &073b = &41  &09ce = &e1  &0aa2 = &37  (&a0, &63) &01: teleport beam
 #   &4e : &063d = &74  &073c = &01  &09cf = &95  &0aa3 = &4b  (&74, &54) &01: teleport beam
 #   &4f : &063e = &6a  &073d = &c8  &09d0 = &bc  &0aa4 = &4b  (&6a, &de) &08: switch
+
 #   &50 : &063f = &a1  &073e = &48  &09d1 = &b4  &0aa5 = &2d  (&a1, &58) &08: switch
 #   &51 : &0640 = &9f  &073f = &cc  &09d2 = &fd  &0aa6 = &1f  (&9f, &3b) &0c: engine thruster
 #   &52 : &0641 = &89  &0740 = &82  &09d3 = &a1  &0aa7 = &20  (&89, &72) &02: hovering robot
@@ -1036,6 +1178,7 @@ Disassembly
 #   &54 : &0643 = &6b  &0742 = &02  &09d5 = &dd  &0aa9 = &0d  (&6b, &88) &02: plasma gun
 #   &55 : &0644 = &ae  &0743 = &02  &09d6 = &e2  &0aaa = &28  (&ae, &98) &02: whistle 2
 #   &56 : &0645 = &65  &0744 = &1e  &09d7 = &04  &0aab = &55  (&65, &b4) &1e: brick wall
+
 # 3:&57 : &0646 = &e2  &0745 = &89  &09d7 = &04  &0aa0 = &37  (&e2, &c0) &09: fireball
 #   &58 : &0647 = &ed  &0746 = &09  &09d8 = &0c  &0aa1 = &0a  (&ed, &bc) &09: green slime (x 3)
 #   &59 : &0648 = &80  &0747 = &0a  &09d9 = &04  &0aa2 = &37  (&80, &54) &0a: fireball
@@ -1045,6 +1188,7 @@ Disassembly
 #   &5d : &064c = &ab  &074b = &86  &09dd = &b0  &0aa6 = &1f  (&ab, &80) &06: green/white turret
 #   &5e : &064d = &9d  &074c = &46  &09de = &ac  &0aa7 = &20  (&9d, &6f) &06: cyan/red turret
 #   &5f : &064e = &62  &074d = &46  &09df = &83  &0aa8 = &0d  (&62, &c0) &06: deadly sucker
+
 #   &60 : &064f = &e5  &074e = &46  &09e0 = &81  &0aa9 = &0d  (&e5, &bc) &06: deadly sucker
 #   &61 : &0650 = &70  &074f = &86  &09e1 = &84  &0aaa = &28  (&70, &88) &06: gargoyle
 #   &62 : &0651 = &ec  &0750 = &45  &09e2 = &80  &0aab = &55  (&ec, &bc) &05: coronium boulder
@@ -1061,6 +1205,7 @@ Disassembly
 #   &6d : &065c = &9e  &075b = &43  &09ed = &a0  &0ab6 = &27  (&9e, &6b) &03: door
 #   &6e : &065d = &a2  &075c = &44  &09ee = &c1  &0ab7 = &31  (&a2, &c0) &04: stone door
 #   &6f : &065e = &d7  &075d = &84  &09ef = &f1  &0ab8 = &0e  (&d7, &c0) &04: stone door
+
 #   &70 : &065f = &e6  &075e = &44  &09f0 = &f1  &0ab9 = &08  (&e6, &bc) &04: stone door
 #   &71 : &0660 = &e7  &075f = &04  &09f1 = &c1  &0aba = &11  (&e7, &bc) &04: stone door
 #   &72 : &0661 = &94  &0760 = &01  &09f2 = &8c  &0abb = &39  (&94, &5c) &01: teleport beam
@@ -1071,12 +1216,14 @@ Disassembly
 #   &77 : &0666 = &9f  &0765 = &82  &09f7 = &e1  &0ac0 = &80  (&9f, &73) &02: whistle 1
 #   &78 : &0667 = &c2  &0766 = &1e  &09f8 = &a6  &0ac1 = &4a  (&c2, &7c) &1e: brick wall
 #   &79 : &0668 = &71  &0767 = &2d  &09f9 = &81  &0ac2 = &10  (&71, &88) &2d: stone wall
+
 # 4:&7a : &0669 = &67  &0768 = &46  &09f8 = &a6  &0ab1 = &20  (&67, &c8) &06: cyan/red turret
 #   &7b : &066a = &4f  &0769 = &46  &09f9 = &81  &0ab2 = &28  (&4f, &b8) &06: gargoyle
 #   &7c : &066b = &cf  &076a = &45  &09fa = &85  &0ab3 = &0d  (&cf, &b8) &05: deadly sucker
 #   &7d : &066c = &d2  &076b = &46  &09fb = &83  &0ab4 = &0d  (&d2, &9d) &06: deadly sucker
 #   &7e : &066d = &e2  &076c = &c6  &09fc = &83  &0ab5 = &28  (&e2, &b8) &06: gargoyle
 #   &7f : &066e = &7a  &076d = &89  &09fd = &d0  &0ab6 = &27  (&7a, &94) &09: maggot (x 20)
+
 #   &80 : &066f = &62  &076e = &c9  &09fe = &a8  &0ab7 = &31  (&62, &72) &09: invisible bird (x 10)
 #   &81 : &0670 = &da  &076f = &49  &09ff = &04  &0ab8 = &0e  (&da, &d8) &09: big fish
 #   &82 : &0671 = &76  &0770 = &89  &0a00 = &04  &0ab9 = &08  (&76, &94) &09: cyan frogman
@@ -1093,6 +1240,7 @@ Disassembly
 #   &8d : &067c = &64  &077b = &04  &0a0b = &f1  &0ac4 = &30  (&64, &c8) &04: stone door
 #   &8e : &067d = &a3  &077c = &43  &0a0c = &b1  &0ac5 = &30  (&a3, &69) &03: door
 #   &8f : &067e = &63  &077d = &84  &0a0d = &f1  &0ac6 = &09  (&63, &cc) &04: stone door
+
 #   &90 : &067f = &b8  &077e = &44  &0a0e = &c1  &0ac7 = &0d  (&b8, &c5) &04: stone door
 #   &91 : &0680 = &7f  &077f = &04  &0a0f = &c1  &0ac8 = &09  (&7f, &94) &04: stone door
 #   &92 : &0681 = &82  &0780 = &44  &0a10 = &c1  &0ac9 = &09  (&82, &c3) &04: stone door
@@ -1107,8 +1255,10 @@ Disassembly
 #   &9b : &068a = &74  &0789 = &3b  &0a19 = &a8  &0ad2 = &4c  (&74, &94) &3b: brick wall, top quarter empty
 #   &9c : &068b = &75  &078a = &11  &0a1a = &10  &0ad3 = &0a  (&75, &94) &11: leaf
 #   &9d : &068c = &77  &078b = &3b  &0a1b = &98  &0ad4 = &2f  (&77, &94) &3b: brick wall, top quarter empty
+
 # 5:&9e : &068d = &b2  &078c = &89  &0a19 = &a8  &0ac2 = &10  (&b2, &c2) &09: pirahna (x 10)
 #   &9f : &068e = &e4  &078d = &c9  &0a1a = &10  &0ac3 = &2f  (&e4, &b4) &09: white/yellow bird (x 4)
+
 #   &a0 : &068f = &62  &078e = &ca  &0a1b = &98  &0ac4 = &30  (&62, &a2) &0a: red/magenta bird (x 6)
 #   &a1 : &0690 = &63  &078f = &8a  &0a1c = &a0  &0ac5 = &30  (&63, &b5) &0a: red/magenta bird (x 8)
 #   &a2 : &0691 = &82  &0790 = &c6  &0a1d = &80  &0ac6 = &09  (&82, &bf) &06: red slime
@@ -1125,6 +1275,7 @@ Disassembly
 #   &ad : &069c = &b4  &079b = &00  &0a28 = &75  &0ad1 = &00  (&b4, &c2) &00: invisible switch
 #   &ae : &069d = &7f  &079c = &00  &0a29 = &bc  &0ad2 = &4c  (&7f, &77) &00: invisible switch
 #   &af : &069e = &a3  &079d = &44  &0a2a = &f1  &0ad3 = &0a  (&a3, &63) &04: stone door
+
 #   &b0 : &069f = &9f  &079e = &43  &0a2b = &d1  &0ad4 = &2f  (&9f, &71) &03: door
 #   &b1 : &06a0 = &99  &079f = &c3  &0a2c = &a9  &0ad5 = &29  (&99, &4c) &03: door
 #   &b2 : &06a1 = &80  &07a0 = &44  &0a2d = &f1  &0ad6 = &2c  (&80, &77) &04: stone door
@@ -1137,10 +1288,12 @@ Disassembly
 #   &b9 : &06a8 = &c4  &07a7 = &c8  &0a34 = &fa  &0add = &0d  (&c4, &c4) &08: switch
 #   &ba : &06a9 = &9d  &07a8 = &02  &0a35 = &9c  &0ade = &20  (&9d, &5d) &02: magenta robot
 #   &bb : &06aa = &aa  &07a9 = &8c  &0a36 = &fe  &0adf = &0d  (&aa, &61) &0c: engine thruster
+
 # 6:&bc : &06ab = &bb  &07aa = &49  &0a37 = &10  &0ad3 = &0a  (&bb, &c3) &09: green slime (x 4)
 #   &bd : &06ac = &47  &07ab = &89  &0a38 = &14  &0ad4 = &2f  (&47, &59) &09: white/yellow bird (x 5)
 #   &be : &06ad = &8a  &07ac = &0a  &0a39 = &90  &0ad5 = &29  (&8a, &78) &0a: red/magenta imp (x 4)
 #   &bf : &06ae = &a7  &07ad = &0a  &0a3a = &98  &0ad6 = &2c  (&a7, &9a) &0a: cyan/yellow imp (x 6)
+
 #   &c0 : &06af = &61  &07ae = &8a  &0a3b = &04  &0ad7 = &37  (&61, &d7) &0a: fireball
 #   &c1 : &06b0 = &9e  &07af = &c6  &0a3c = &a4  &0ad8 = &20  (&9e, &51) &06: cyan/red turret
 #   &c2 : &06b1 = &2e  &07b0 = &06  &0a3d = &80  &0ad9 = &3a  (&2e, &c8) &06: giant wall
@@ -1157,6 +1310,7 @@ Disassembly
 #   &cd : &06bc = &6b  &07bb = &c4  &0a48 = &f7  &0ae4 = &55  (&6b, &e1) &04: stone door
 #   &ce : &06bd = &69  &07bc = &84  &0a49 = &f1  &0ae5 = &22  (&69, &de) &04: stone door
 #   &cf : &06be = &9d  &07bd = &43  &0a4a = &f1  &0ae6 = &04  (&9d, &56) &03: door
+
 #   &d0 : &06bf = &94  &07be = &43  &0a4b = &81  &0ae7 = &2e  (&94, &5f) &03: door
 #   &d1 : &06c0 = &63  &07bf = &84  &0a4c = &f1  &0ae8 = &2f  (&63, &ca) &04: stone door
 #   &d2 : &06c1 = &b4  &07c0 = &04  &0a4d = &f1  &0ae9 = &2b  (&b4, &c3) &04: stone door
@@ -1165,49 +1319,56 @@ Disassembly
 #   &d5 : &06c4 = &a0  &07c3 = &82  &0a50 = &9e  &0aec = &02  (&a0, &6b) &02: blue robot
 #   &d6 : &06c5 = &57  &07c4 = &0d  &0a51 = &84  &0aed = &02  (&57, &69) &0d: water
 #   &d7 : &06c6 = &e1  &07c5 = &0d  &0a52 = &ac  &0aee = &1a  (&e1, &73) &0d: water
-# 7:&d8 : &06c7 = &7f  &07c6 = &46  &0a51 = &84  &0add = &0d  (&7f, &c1) &06: deadly sucker
-#   &d9 : &06c8 = &a6  &07c7 = &06  &0a52 = &ac  &0ade = &20  (&a6, &69) &06: cyan/red turret
-#   &da : &06c9 = &b4  &07c8 = &06  &0a53 = &80  &0adf = &0d  (&b4, &c5) &06: deadly sucker
-#   &db : &06ca = &53  &07c9 = &06  &0a54 = &80  &0ae0 = &0d  (&53, &95) &06: deadly sucker
-#   &dc : &06cb = &61  &07ca = &06  &0a55 = &80  &0ae1 = &48  (&61, &d8) &06: maggot machine
-#   &dd : &06cc = &d4  &07cb = &45  &0a56 = &80  &0ae2 = &51  (&d4, &73) &05: cyan/yellow/green key
-#   &de : &06cd = &82  &07cc = &45  &0a57 = &80  &0ae3 = &0c  (&82, &c5) &05: sucker
-#   &df : &06ce = &e3  &07cd = &45  &0a58 = &80  &0ae4 = &55  (&e3, &b5) &05: coronium boulder
-#   &e0 : &06cf = &75  &07ce = &06  &0a59 = &80  &0ae5 = &22  (&75, &87) &06: magenta clawed robot
-#   &e1 : &06d0 = &c3  &07cf = &07  &0a5a = &c0  &0ae6 = &04  (&c3, &c5) &07: small nest
-#   &e2 : &06d1 = &84  &07d0 = &89  &0a5b = &04  &0ae7 = &2e  (&84, &69) &09: green/yellow bird
-#   &e3 : &06d2 = &9e  &07d1 = &09  &0a5c = &08  &0ae8 = &2f  (&9e, &69) &09: white/yellow bird (x 2)
-#   &e4 : &06d3 = &c6  &07d2 = &8a  &0a5d = &90  &0ae9 = &2b  (&c6, &be) &0a: blue/cyan imp (x 4)
-#   &e5 : &06d4 = &64  &07d3 = &4a  &0a5e = &a2  &0aea = &2a  (&64, &c6) &0a: red/yellow imp (x 8)
-#   &e6 : &06d5 = &a2  &07d4 = &4a  &0a5f = &04  &0aeb = &21  (&a2, &5b) &0a: hovering robot
-#   &e7 : &06d6 = &28  &07d5 = &ca  &0a60 = &04  &0aec = &02  (&28, &d8) &0a: pericles crew member
-#   &e8 : &06d7 = &29  &07d6 = &ca  &0a61 = &04  &0aed = &02  (&29, &d8) &0a: pericles crew member
-#   &e9 : &06d8 = &9d  &07d7 = &4a  &0a62 = &20  &0aee = &1a  (&9d, &5b) &0a: hover ball (x 8)
-#   &ea : &06d9 = &83  &07d8 = &00  &0a63 = &bc  &0aef = &80  (&83, &76) &00: invisible switch
-#   &eb : &06da = &a8  &07d9 = &00  &0a64 = &53  &0af0 = &4b  (&a8, &69) &00: invisible switch
-#   &ec : &06db = &80  &07da = &00  &0a65 = &9d  &0af1 = &80  (&80, &c2) &00: invisible switch
-#   &ed : &06dc = &aa  &07db = &48  &0a66 = &84  &0af2 = &00  (&aa, &63) &08: switch
-#   &ee : &06dd = &d5  &07dc = &08  &0a67 = &da  &0af3 = &00  (&d5, &73) &08: switch
-#   &ef : &06de = &a0  &07dd = &82  &0a68 = &cb  &0af4 = &00  (&a0, &67) &02: energy capsule
-#   &f0 : &06df = &9f  &07de = &82  &0a69 = &de  &0af5 = &00  (&9f, &51) &02: protection suit
-#   &f1 : &06e0 = &d6  &07df = &82  &0a6a = &c5  &0af6 = &00  (&d6, &73) &02: rock 
-#   &f2 : &06e1 = &62  &07e0 = &02  &0a6b = &a5  &0af7 = &00  (&62, &cc) &02: red clawed robot
-#   &f3 : &06e2 = &69  &07e1 = &c4  &0a6c = &c1  &0af8 = &00  (&69, &d1) &04: stone door
-#   &f4 : &06e3 = &2c  &07e2 = &c4  &0a6d = &f1  &0af9 = &00  (&2c, &d6) &04: stone door
-#   &f5 : &06e4 = &a5  &07e3 = &0b  &0a6e = &70  &0afa = &00  (&a5, &64) &0b: downdraught
-# 8:&f6 : &06e5 = &b8  &07e4 = &0b  &0a6f = &d0  &0af2 = &00  (&b8, &aa) &0b: updraught
-#   &f7 : &06e6 = &b9  &07e5 = &0b  &0a70 = &80  &0af3 = &00  (&b9, &de) &0b: updraught
-#   &f8 : &06e7 = &d9  &07e6 = &d1  &0a71 = &00  &0af4 = &00  (&d9, &57) &11: leaf
-#   &f9 : &06e8 = &59  &07e7 = &91  &0a72 = &00  &0af5 = &00  (&59, &8c) &11: leaf
-#   &fa : &06e9 = &79  &07e8 = &d1  &0a73 = &00  &0af6 = &00  (&79, &53) &11: leaf
-#   &fb : &06ea = &39  &07e9 = &d1  &0a74 = &00  &0af7 = &00  (&39, &80) &11: leaf
-#   &fc : &06eb = &48  &07ea = &91  &0a75 = &00  &0af8 = &00  (&48, &7d) &11: leaf
-#   &fd : &06ec = &e8  &07eb = &91  &0a76 = &00  &0af9 = &00  (&e8, &80) &11: leaf
+
+# 7:&d8 : &06c7 = &7f  &07c6 = &46  &0a51 = &84  &0adc = &0d  (&7f, &c1) &06: deadly sucker
+#   &d9 : &06c8 = &a6  &07c7 = &06  &0a52 = &ac  &0add = &20  (&a6, &69) &06: cyan/red turret
+#   &da : &06c9 = &b4  &07c8 = &06  &0a53 = &80  &0ade = &0d  (&b4, &c5) &06: deadly sucker
+#   &db : &06ca = &53  &07c9 = &06  &0a54 = &80  &0adf = &0d  (&53, &95) &06: deadly sucker
+#   &dc : &06cb = &61  &07ca = &06  &0a55 = &80  &0ae0 = &48  (&61, &d8) &06: maggot machine
+#   &dd : &06cc = &d4  &07cb = &45  &0a56 = &80  &0ae1 = &51  (&d4, &73) &05: cyan/yellow/green key
+#   &de : &06cd = &82  &07cc = &45  &0a57 = &80  &0ae2 = &0c  (&82, &c5) &05: sucker
+#   &df : &06ce = &e3  &07cd = &45  &0a58 = &80  &0ae3 = &55  (&e3, &b5) &05: coronium boulder
+
+#   &e0 : &06cf = &75  &07ce = &06  &0a59 = &80  &0ae4 = &22  (&75, &87) &06: magenta clawed robot
+#   &e1 : &06d0 = &c3  &07cf = &07  &0a5a = &c0  &0ae5 = &04  (&c3, &c5) &07: small nest
+#   &e2 : &06d1 = &84  &07d0 = &89  &0a5b = &04  &0ae6 = &2e  (&84, &69) &09: green/yellow bird
+#   &e3 : &06d2 = &9e  &07d1 = &09  &0a5c = &08  &0ae7 = &2f  (&9e, &69) &09: white/yellow bird (x 2)
+#   &e4 : &06d3 = &c6  &07d2 = &8a  &0a5d = &90  &0ae8 = &2b  (&c6, &be) &0a: blue/cyan imp (x 4)
+#   &e5 : &06d4 = &64  &07d3 = &4a  &0a5e = &a2  &0ae9 = &2a  (&64, &c6) &0a: red/yellow imp (x 8)
+#   &e6 : &06d5 = &a2  &07d4 = &4a  &0a5f = &04  &0aea = &21  (&a2, &5b) &0a: hovering robot
+#   &e7 : &06d6 = &28  &07d5 = &ca  &0a60 = &04  &0aeb = &02  (&28, &d8) &0a: pericles crew member
+#   &e8 : &06d7 = &29  &07d6 = &ca  &0a61 = &04  &0aec = &02  (&29, &d8) &0a: pericles crew member
+#   &e9 : &06d8 = &9d  &07d7 = &4a  &0a62 = &20  &0aed = &1a  (&9d, &5b) &0a: hover ball (x 8)
+#   &ea : &06d9 = &83  &07d8 = &00  &0a63 = &bc  &0aee = &80  (&83, &76) &00: invisible switch
+#   &eb : &06da = &a8  &07d9 = &00  &0a64 = &53  &0aef = &4b  (&a8, &69) &00: invisible switch
+#   &ec : &06db = &80  &07da = &00  &0a65 = &9d  &0af0 = &80  (&80, &c2) &00: invisible switch
+									all the following entries have types off the end of the background_objects_type table...
+#   &ed : &06dc = &aa  &07db = &48  &0a66 = &84  &0af2 = &??  (&aa, &63) &08: ???? switch
+#   &ee : &06dd = &d5  &07dc = &08  &0a67 = &da  &0af3 = &??  (&d5, &73) &08: ???? switch
+#   &ef : &06de = &a0  &07dd = &82  &0a68 = &cb  &0af4 = &??  (&a0, &67) &02: ???? energy capsule
+
+#   &f0 : &06df = &9f  &07de = &82  &0a69 = &de  &0af5 = &??  (&9f, &51) &02: ???? protection suit
+#   &f1 : &06e0 = &d6  &07df = &82  &0a6a = &c5  &0af6 = &??  (&d6, &73) &02: ???? rock 
+#   &f2 : &06e1 = &62  &07e0 = &02  &0a6b = &a5  &0af7 = &??  (&62, &cc) &02: ???? red clawed robot
+#   &f3 : &06e2 = &69  &07e1 = &c4  &0a6c = &c1  &0af8 = &??  (&69, &d1) &04: ???? stone door
+#   &f4 : &06e3 = &2c  &07e2 = &c4  &0a6d = &f1  &0af9 = &??  (&2c, &d6) &04: ???? stone door
+#   &f5 : &06e4 = &a5  &07e3 = &0b  &0a6e = &70  &0afa = &??  (&a5, &64) &0b: ???? downdraught
+
+# 8:&f6 : &06e5 = &b8  &07e4 = &0b  &0a6f = &d0  &0af2 = &??  (&b8, &aa) &0b: updraught
+#   &f7 : &06e6 = &b9  &07e5 = &0b  &0a70 = &80  &0af3 = &??  (&b9, &de) &0b: updraught
+									all the following entries have data off the end of the background_objects_data table...
+#   &f8 : &06e7 = &d9  &07e6 = &d1  &0a71 = &00?  &0af4 = &??  (&d9, &57) &11: ???? leaf
+#   &f9 : &06e8 = &59  &07e7 = &91  &0a72 = &0f?  &0af5 = &??  (&59, &8c) &11: ???? leaf
+#   &fa : &06e9 = &79  &07e8 = &d1  &0a73 = &27?  &0af6 = &??  (&79, &53) &11: ???? leaf
+#   &fb : &06ea = &39  &07e9 = &d1  &0a74 = &2e?  &0af7 = &??  (&39, &80) &11: ???? leaf
+#   &fc : &06eb = &48  &07ea = &91  &0a75 = &07?  &0af8 = &??  (&48, &7d) &11: ???? leaf
+#   &fd : &06ec = &e8  &07eb = &91  &0a76 = &2f?  &0af9 = &??  (&e8, &80) &11: ???? leaf
 #
 ###############################################################################
 
 ; background_objects_data
 ; &80 set = not in current stack
+		0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #0986: 00 7c 60 04 88 88 a0 a6 ae 83 86 82 80 80 ad 81
 #0996: f7 a1 f1 f7 81 8a ac d2 df d4 a3 84 85 ae 80 80
 #09a6: 88 ac c4 c0 04 a8 c4 bc fd 81 c1 d1 91 f1 f1 da
@@ -1224,7 +1385,37 @@ Disassembly
 #0a56: 80 80 80 80 c0 04 08 90 a2 04 04 04 20 bc 53 9d
 #0a66: 84 da cb de c5 a5 c1 f1 70 d0 80
 
+...and in expanded form, corresponding to background_objects_x_lookup
+				 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+Range 0: 00		7c 60 04 88 88 a0 a6 ae 83 86 82 80 80 ad 81 f7
+         10		a1 f1 f7 81 8a ac d2 df d4 a3 84 85 ae
+Range 1:			                                   84 85 ae 
+         20		80 80 88 ac c4 c0 04 a8 c4 bc fd 81 c1 d1 91 f1 
+		 30		f1 da f7 f3 d8 88 80 83 83 
+Range 2:								   80 83 83 b0 aa 80 80 
+         40     87 80 30 08 10 7c 04 10 a8 90 04 c1 f1 e1 95 bc 
+		 50     b4 fd a1 d6 dd e2 04
+Range 3:                             04 0c 04 20 21 a0 b0 ac 83 
+         60     81 84 80 c4 85 95 a3 b5 f1 ad c1 81 89 a0 c1 f1 
+		 70     f1 c1 8c a4 e4 d7 9d e1 a6 81 
+Range 4:                                      a6 81 85 83 83 d0 
+         80     a8 04 04 d0 88 04 04 04 08 bd 8a f1 d1 f1 b1 f1 
+		 90     c1 c1 c1 c1 e2 e4 dc a0 c2 cb b8 a8 10 98 
+Range 5:                                                  a8 10 
+         A0     98 a0 80 83 80 80 80 80 00 c4 40 84 28 75 bc f1 
+		 B0     d1 a9 f1 c0 c1 8f 94 c2 ca fa 9c fe 
+Range 6:                                            10 14 90 98 
+         C0     04 a4 80 83 c6 c4 fe aa 90 ec dc 9e f4 f7 f1 f1 
+		 D0		81 f1 f1 b1 db 9e 84 ac 
+Range 7:                                84 ac 80 80 80 80 80 80 
+         E0		80 c0 04 08 90 a2 04 04 04 20 bc 53 9d 84 da cb 
+		 F0     de c5 a5 c1 f1 70
+Range 8:                          d0 80 ?? ?? ?? ?? ?? ??
+
+
 ; background_objects_type
+; bit 7 set if off-screen?
+        0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #0a71: 00 0f 27 2e 07 2f 2d 1f 1f 0d 0d 0d 0c 60 2c 00
 #0a81: 0d 0d 1f 0d 5c 0d 20 05 04 06 31 05 2a 09 0d 0d
 #0a91: 1f 20 55 55 0d 63 0f 2e 0a 1b 37 29 1a 1a 37 37
@@ -1234,6 +1425,33 @@ Disassembly
 #0ad1: 00 4c 0a 2f 29 2c 37 20 3a 0d 05 05 0d 20 0d 0d
 #0ae1: 48 51 0c 55 22 04 2e 2f 2b 2a 21 02 02 1a 80 4b
 #0af1: 80
+
+...and in expanded form, corresponding to background_objects_x_lookup
+				 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
+Range 0: 00		0f 27 2e 07 2f 2d 1f 1f 0d 0d 0d 0c 60 2c 00 0d 
+         10     0d 1f 0d 5c 0d 20 05 04 06 31 05 2a 09 
+Range 1:                                               0d 0d 1f 
+         20     0d 5c 0d 20 05 04 06 31 05 2a 09 0d 0d 1f 20 55 
+		 30		55 0d 63 0f 2e 0a 1b 37 29 
+Range 2:                                   09 0d 0d 1f 20 55 55 
+         40     0d 63 0f 2e 0a 1b 37 29 1a 1a 37 37 0a 37 4b 4b 
+		 50     2d 1f 20 0d 0d 28 55 
+Range 3:                             37 0a 37 4b 4b 2d 1f 20 0d 
+         60     0d 28 55 05 80 00 80 80 20 28 0d 0d 28 27 31 0e 
+		 70     08 11 39 37 37 37 2a 80 4a 10 
+Range 4:                                      20 28 0d 0d 28 27 
+         80     31 0e 08 11 39 37 37 37 2a 80 4a 10 2f 30 30 09 
+		 90     0d 09 09 4f 24 4a 04 1a 39 10 00 4c 0a 2f 
+Range 5:                                                  10 2f 
+         A0     30 30 09 0d 09 09 4f 24 4a 04 1a 39 10 00 4c 0a 
+		 B0     2f 29 2c 37 20 3a 0d 05 05 0d 20 0d 
+Range 6:                                            0a 2f 29 2c 
+         C0     37 20 3a 0d 05 05 0d 20 0d 0d 48 51 0c 55 22 04 
+		 D0     2e 2f 2b 2a 21 02 02 1a  
+Range 7:                                0d 20 0d 0d 48 51 0c 55
+         E0     22 04 2e 2f 2b 2a 21 02 02 1a 80 4b 80 ?? ??
+		 F0     ?? ?? ?? ?? ?? ??
+Range 8:                          ?? ?? ?? ?? ?? ?? ?? ?? ??
 
 ###############################################################################
 #
@@ -2169,7 +2387,18 @@ Disassembly
 #1170: 1a 21 09 9b 12 10 60 2b 0f 4f 04 0a
 
 ; lookup_for_unmatched_hash
-#117c: 1b 5a 19 19 1e 13 24 2c 19
+; relates back to background_objects_range, 
+; used to set square_sprite (bottom 6 bits)
+; and square_orientation (top 2 bits)
+#117c:	1b		tree
+		5a		half a tree
+		19		nothing
+		19		nothing
+		1e		full wall 
+		13		partial wall
+		24		partial wall
+		2c		stone edging
+		19		nothing
 
 ; lookup table for Y -> palette for background
 #1185: 8d 82 8b 8f 84 89 8d 81 82 81 85 ; wall_palette_zero_lookup
@@ -2196,10 +2425,12 @@ Disassembly
 
 #11e4: 00 ; palette_register_updating
 #11e5: 07 16 25 34 43 52 61 70 87 96 a5 b4 c3 d2 e1 f0 ; palette_register_data
+# original settings
 #      0:black 1:red 2:green 3:yellow 4:blue 5:magenta 6:cyan 7:white
 #      8:black 9:red a:green b:yellow c:blue d:magenta e:cyan f:white
 
-#11f5: 00 ; keys_processed
+#11f5: 00 ; keys_processed - the player_object_handler runs the keyboard commands and sets this flag to 1
+							 the horizontal refresh interrupt resets it to zero
 
 ; function_table
 #11f6: 75 e1 e1 e1 e1 e1 e1 e1 e1 e1 e1 d5 f7 32 1f 1c 1c 1c 1c 28 25 80 79 18 98 ab c0 3b d8 c7 b5 b0 99 6c 69 72 92 6f 9b
@@ -2285,60 +2516,77 @@ Disassembly
 &12ad: 10 f4            BPL &12a3	                                        # has the VIA caused an interrupt? if not, leave
 &12af: a9 7f            LDA #&7f
 &12b1: 8d 4d fe         STA &fe4d                                               # set system VIA interrupt flag register
-&12b4: 50 12            BVC &12c8
-&12b6: a9 01            LDA #&01                                                # colour 0 = cyan
+&12b4: 50 12            BVC &12c8												# overflow will be set if bit 6 of &fe4d was set, indicating timer 1 running at 100Hz
+
+		; set the palette for the water - top of water is cyan, then blue from then on down
+&12b6: a9 01            LDA #&01                                                # colour 0 = cyan (1 eor 7 = 6)
 &12b8: 8d 21 fe         STA &fe21                                               # video ULA palette register
 &12bb: a0 18            LDY #&18
 &12bd: 88               DEY
 &12be: d0 fd            BNE &12bd
-&12c0: a9 03            LDA #&03                                                # colour 0 = blue
+&12c0: a9 03            LDA #&03                                                # colour 0 = blue (3 eor 7 = 4)
 &12c2: 8d 21 fe         STA &fe21                                               # video ULA palette register
 &12c5: 4c 92 13         JMP &1392 ; leave_interrupt
 
+		
 &12c8: ad cf 14         LDA &14cf ; water_level_on_screen
 &12cb: f0 09            BEQ &12d6
 &12cd: ac ce 14         LDY &14ce ; water_level_interrupt
-&12d0: 8c 44 fe         STY &fe44	                                        # interrupt to change colour for water
-&12d3: 8d 45 fe         STA &fe45
+&12d0: 8c 44 fe         STY &fe44 ; T1C-L                                       # interrupt to change colour for water - sets Timer 1 low order latch
+&12d3: 8d 45 fe         STA &fe45 ; T1C-H										# set Timer 1 high order counter
 
-&12d6: a9 07            LDA #&07                                                # colour 0 = black
+&12d6: a9 07            LDA #&07                                                # colour 0 = black (7 eor 7 = 0 black)
 &12d8: 8d 21 fe         STA &fe21                                               # video ULA palette register
 &12db: ee e4 11         INC &11e4 ; palette_register_updating
-&12de: ad be 14         LDA &14be ; palette_register_data_updated	        # has the palette register data changed?
+&12de: ad be 14         LDA &14be ; palette_register_data_updated	        # has the palette register data changed to flash the screen?
 &12e1: f0 06            BEQ &12e9 ; no_update_to_palette		
-&12e3: 20 0f 3e         JSR &3e0f ; push_palette_register_data		        # if so, push it to the video chip
-&12e6: 8c be 14         STY &14be ; palette_register_data_updated	        # and mark it as having been updated
+&12e3: 20 0f 3e         JSR &3e0f ; push_palette_register_data		        # update palette
+&12e6: 8c be 14         STY &14be ; palette_register_data_updated	        # and mark it as having been updated (set to 0)
+
 ; no_update_to_palette
-&12e9: a9 7f            LDA #&7f                                                # set port A for input on bit 7 others outputs
-&12eb: 8d 43 fe         STA &fe43
-&12ee: a9 03            LDA #&03                                                # stop auto scan
-&12f0: 8d 40 fe         STA &fe40
-&12f3: ae f5 11         LDX &11f5 ; keys_processed	                        # have we processed the last lot of keys?
-&12f6: f0 02            BEQ &12fa			                        # don't check again unless we have
-&12f8: a2 26            LDX #&26
+&12e9: a9 7f            LDA #&7f                                                # input on bit 7, all others outputs
+&12eb: 8d 43 fe         STA &fe43												# set port A direction register
+
+&12ee: a9 03            LDA #&03                                                # stop keyboard auto scan
+&12f0: 8d 40 fe         STA &fe40												# port b - addressable latch is bits 0 to 2, value to write is bit 3
+
+&12f3: ae f5 11         LDX &11f5 ; keys_processed								# have we processed the last lot of keys?
+&12f6: f0 02            BEQ &12fa												# don't check again unless we have
+&12f8: a2 26            LDX #&26												# init loop counter
+
+		; process keys loop (if &11f5 is 0, then loop counter X starts at 0 so that only COPY for pause/unpause) 
+
 &12fa: bd 44 12         LDA &1244,X ; keys_to_check                             # has a key been pressed?
-&12fd: 8d 4f fe         STA &fe4f                                               # store the key sym
-&1300: ad 4f fe         LDA &fe4f	                                        # read the result
-&1303: 2a               ROL
-&1304: 7e 6b 12         ROR &126b,X ; keys_pressed                              # and store in keys_pressed
-&1307: ca               DEX
-&1308: 10 f0            BPL &12fa
-&130a: a9 0b            LDA #&0b                                                # select auto scan of keyboard
-&130c: 8d 40 fe         STA &fe40
-&130f: e8               INX
-&1310: 8e f5 11         STX &11f5 ; keys_processed
-&1313: 2c bd 14         BIT &14bd ; game_paused                                 # is the game paused?
+&12fd: 8d 4f fe         STA &fe4f                                               # output the key sym of interest
+&1300: ad 4f fe         LDA &fe4f												# read the result into bit 7
+&1303: 2a               ROL														# move bit 7 to C
+&1304: 7e 6b 12         ROR &126b,X ; keys_pressed                              # and store the bit in keys_pressed
+&1307: ca               DEX														# decrement loop counter
+&1308: 10 f0            BPL &12fa												# and loop around
+
+&130a: a9 0b            LDA #&0b                                                # restart auto scan of keyboard
+&130c: 8d 40 fe         STA &fe40												# port b - addressable latch
+
+&130f: e8               INX														# x := 0
+&1310: 8e f5 11         STX &11f5 ; keys_processed								# set flag to 0
+
+&1313: 2c bd 14         BIT &14bd ; game_paused                                 # bit 7 is clear if the game is paused
 &1316: 10 7a            BPL &1392 ; leave_interrupt                             # if so, leave interrupt
+
 &1318: 20 94 12         JSR &1294 ; increment_game_time_X
-&131b: a9 ff            LDA #&ff
-&131d: 8d 43 fe         STA &fe43
+
+&131b: a9 ff            LDA #&ff												# all bits will be for output
+&131d: 8d 43 fe         STA &fe43												# set sysvia data direction register A
+
 &1320: ae 9a 11         LDX &119a ; sound_max_channels                          # handle sounds
 &1323: 20 99 13         JSR &1399 ; process_sound
 &1326: b0 0a            BCS &1332
+
 &1328: bd ac 11         LDA &11ac,X ; sound_duration
 &132b: e9 01            SBC #&01
 &132d: 90 47            BCC &1376 ; sound_run_out
 &132f: 9d ac 11         STA &11ac,X ; sound_duration
+
 &1332: e8               INX
 &1333: e8               INX
 &1334: e8               INX
@@ -2569,7 +2817,7 @@ Disassembly
 #14b8: 33 03 2d 84
 &14bc: 60		RTS
 
-#14bd: 92 ; game_paused
+#14bd: 92 ; game_paused							# game is paused whilst bit 7 is 0
 #14be: 01 ; palette_register_data_updated
 
 #14bf: bf 80 c0 ff 40 7f 3f 00 ; angle_modification_table
@@ -2581,8 +2829,8 @@ Disassembly
 #14cb: 00 ; player_object_number
 #14cc: 00 ; always_zero
 #14cd: 00 ; call_object_handlers_when_redrawing_screen
-#14ce: 00 ; water_level_interrupt
-#14cf: 00 ; water_level_on_screen
+#14ce: 00 ; water_level_interrupt				# used to set the sysvia timer 1 low counter in microseconds
+#14cf: 00 ; water_level_on_screen				# when not zero, sets sysvia timer 1 high counter
 #14d0: 00 ; water_level_low
 #14d1: 00 ; water_level
 
@@ -2649,17 +2897,20 @@ Disassembly
 &1548: a5 c7            LDA &c7 ; screen_start_square_x_low
 &154a: 29 7f            AND #&7f
 &154c: f0 09            BEQ &1557
+
 &154e: a0 02            LDY #&02
 &1550: a5 c7            LDA &c7 ; screen_start_square_x_low
 &1552: 29 20            AND #&20
 &1554: f0 01            BEQ &1557
 &1556: 88               DEY
+
 &1557: 98               TYA
+
 &1558: 24 a2            BIT &a2
 &155a: 20 56 32         JSR &3256 ; make_positive
 &155d: 85 cf            STA &cf ; scroll_x_direction
 &155f: a2 02            LDX #&02
-&1561: 20 d2 15         JSR &15d2 ; do_someting_in_one_direction_scrolls        # then y direction
+&1561: 20 d2 15         JSR &15d2 ; do_something_in_one_direction_scrolls        # then y direction
 &1564: a8               TAY
 &1565: 20 56 32         JSR &3256 ; make_positive
 &1568: c5 9d            CMP &9d
@@ -2682,6 +2933,7 @@ Disassembly
 &1589: a9 00            LDA #&00
 &158b: 85 d1            STA &d1 ; scroll_y_direction
 &158d: 60               RTS
+
 &158e: a9 80            LDA #&80
 &1590: 85 c7            STA &c7 ; screen_start_square_x_low
 &1592: 85 c9            STA &c9 ; screen_start_square_y_low
@@ -2762,6 +3014,7 @@ Disassembly
 ; refocus_on_player
 &161f: a0 00            LDY #&00
 &1621: a2 02            LDX #&02                                                # first X = 2, y direction, then X = 0, x direction
+
 &1623: b5 cf            LDA &cf,X ; scroll_x_direction
 &1625: f0 05            BEQ &162c                                               # are we scrolling?
 &1627: b5 c7            LDA &c7,X ; screen_start_square_x_low
@@ -2770,8 +3023,10 @@ Disassembly
 &162c: ca               DEX
 &162d: ca               DEX
 &162e: f0 f3            BEQ &1623                                               # repeat for the x direction
+
 &1630: 8c cd 14         STY &14cd ; call_object_handlers_when_redrawing_screen  # note whether background object handlers are needed
 &1633: a2 02            LDX #&02                                                # first X = 2, y direction, then X = 0, x direction
+
 &1635: b5 cf            LDA &cf,X ; scroll_x_direction                          # use the scroll direction to:
 &1637: 0a               ASL
 &1638: a0 00            LDY #&00
@@ -2795,6 +3050,7 @@ Disassembly
 &1654: ca               DEX
 &1655: ca               DEX
 &1656: 10 dd            BPL &1635                                               # repeat for the x direction
+
 &1658: a5 c7            LDA &c7 ; screen_start_square_x_low
 &165a: 85 b2            STA &b2 ; screen_start_square_x_low_copy
 &165c: 85 b0            STA &b0 ; screen_offset
@@ -2827,6 +3083,7 @@ Disassembly
 &168a: 66 b0            ROR &b0 ; screen_offset
 &168c: 85 b1            STA &b1 ; screen_offset_h
 &168e: a2 02            LDX #&02
+
 &1690: a9 00            LDA #&00
 &1692: 38               SEC
 &1693: f5 cb            SBC &cb,X ; scroll_square_x_velocity_low
@@ -2863,38 +3120,43 @@ Disassembly
 &16d5: ca               DEX
 &16d6: ca               DEX
 &16d7: 10 b7            BPL &1690
-&16d9: a5 c8            LDA &c8 ; screen_start_square_x
-&16db: 20 bc 2c         JSR &2cbc ; get_water_level_for_x
-&16de: a0 01            LDY #&01
+
+&16d9: a5 c8            LDA &c8 ; screen_start_square_x						# get high byte of left of screen 
+&16db: 20 bc 2c         JSR &2cbc ; get_water_level_for_x					# get the water level
+&16de: a0 01            LDY #&01											# prepare for water level being fully on or off
 &16e0: ad d0 14         LDA &14d0 ; water_level_low
 &16e3: e5 c9            SBC &c9 ; screen_start_square_y_low
-&16e5: 85 9c            STA &9c
+&16e5: 85 9c            STA &9c												# store low byte comparison
 &16e7: ad d1 14         LDA &14d1 ; water_level
-&16ea: e5 ca            SBC &ca ; screen_start_square_y
-&16ec: 90 23            BCC &1711
-&16ee: c9 04            CMP #&04
-&16f0: b0 1e            BCS &1710
-&16f2: 85 9d            STA &9d
-&16f4: a5 9c            LDA &9c
+&16ea: e5 ca            SBC &ca ; screen_start_square_y						# get high byte position
+&16ec: 90 23            BCC &1711											# branch if water level is above the top of screen, so palette change is virtually immediate
+
+&16ee: c9 04            CMP #&04											# is water level below the bottom of the screen?
+&16f0: b0 1e            BCS &1710											# branch if so to prevent water level interrupt occuring
+
+&16f2: 85 9d            STA &9d												# store high byte
+&16f4: a5 9c            LDA &9c	
 &16f6: 0a               ASL
 &16f7: 26 9d            ROL &9d
 &16f9: 0a               ASL
 &16fa: 26 9d            ROL &9d
 &16fc: 0a               ASL
-&16fd: 26 9d            ROL &9d
-&16ff: 29 c0            AND #&c0
-&1701: 69 70            ADC #&70
+&16fd: 26 9d            ROL &9d												# multiply the water level by 8 (so each y pixel is 64 microseconds delay)
+&16ff: 29 c0            AND #&c0											# only the top two bits are relevant for display purposes
+&1701: 69 70            ADC #&70											# add a constant delay to the result
+
 &1703: 78               SEI
-&1704: 8d ce 14         STA &14ce ; water_level_interrupt
+&1704: 8d ce 14         STA &14ce ; water_level_interrupt - sysvia T1 low counter
 &1707: a5 9d            LDA &9d
-&1709: 69 17            ADC #&17
-&170b: 8d cf 14         STA &14cf ; water_level_on_screen
+&1709: 69 17            ADC #&17											# adds 5888 microseconds to the counter
+&170b: 8d cf 14         STA &14cf ; water_level_on_screen - sysvia T1 high counter
 &170e: 58               CLI
 &170f: 60               RTS
 
-&1710: 88               DEY
-&1711: 8c cf 14         STY &14cf ; water_level_on_screen
-&1714: 60               RTS
+&1710: 88               DEY			; sets Y = 0 - prevents the sysvia timer1 being set
+									; to change the palette when the water level is on screen
+&1711: 8c cf 14         STY &14cf	; water_level_on_screen 
+&1714: 60               RTS			; 
 
 ; determine_background
 ; returns A = background type for square
@@ -2902,60 +3164,93 @@ Disassembly
 &1717: 86 bd            STX &bd ; new_object_data_pointer
 &1719: 86 00            STX &00 ; square_is_mapped_data
 &171b: 20 8d 17         JSR &178d ; calculate_background
-&171e: 85 08            STA &08 ; square_sprite
-&1720: 29 c0            AND #&c0
-&1722: 85 09            STA &09 ; square_orientation
-&1724: 45 08            EOR &08 # = calculate_background &3f
-&1726: c9 09            CMP #&09
-&1728: b0 48            BCS &1772 ; no_background_object                        # is there a hash table point in this square?
-&172a: 85 9d            STA &9d ; background_object_number
-&172c: a8               TAY		# a = 0 - 8
+
+&171e: 85 08            STA &08 ; square_sprite								# store full 8 bit result 
+&1720: 29 c0            AND #&c0											# get top two bits which indicate orientation
+&1722: 85 09            STA &09 ; square_orientation						# store orientation
+&1724: 45 08            EOR &08												# get the low six bits which indicate the background itself
+&1726: c9 09            CMP #&09											# set carry if bottom six bits >= 9
+&1728: b0 48            BCS &1772 ; no_background_object					# is there a hash table point in this square?
+
+&172a: 85 9d            STA &9d ; background_object_number					# store the low six bits which will be in the range 0 to 8
+&172c: a8               TAY													# 
 &172d: be d4 05         LDX &05d4,Y ; background_objects_range		        # use background_objects_range to determine where to look
-&1730: bd ef 05         LDA &05ef,X ; background_objects_x_lookup		# in background_objects_x_lookup
-&1733: 48               PHA						        # backup value of background_objects_x_lookup
+&1730: bd ef 05         LDA &05ef,X ; background_objects_x_lookup			# in background_objects_x_lookup
+
+; Try to find square_x in the table. The range to search is from
+; (background_objects_range-1)[X] (inclusive) to
+; background_objects_range[X] (exclusive). To simplify the loop
+; condition, use a sentinel: set background_objects_range[X] to
+; square_x. Check after the loop whether it was an actual entry that
+; was found, or the sentinel.
+
+&1733: 48               PHA													# backup value of background_objects_x_lookup
 &1734: a5 95            LDA &95 ; square_x
-&1736: 9d ef 05         STA &05ef,X ; background_objects_x_lookup		# push square_x at the end of this range
+&1736: 9d ef 05         STA &05ef,X ; background_objects_x_lookup			# push square_x at the end of this range
 &1739: be d3 05         LDX &05d3,Y ; background_objects_range_minus_one
-&173c: ca               DEX
+&173c: ca               DEX													# loop cludge
+
 &173d: e8               INX
-&173e: dd ef 05         CMP &05ef,X ; background_objects_x_lookup
-&1741: d0 fa            BNE &173d					        # X contains entry in background_objects_x_lookup with square_x
+&173e: dd ef 05         CMP &05ef,X ; compare background_objects_x_lookup[X] with square_x
+&1741: d0 fa            BNE &173d											# X contains entry in background_objects_x_lookup with square_x
+
 &1743: 8a               TXA						
 &1744: d9 d4 05         CMP &05d4,Y ; background_objects_range
-&1747: b0 11            BCS &175a ; no_background_object_in_hash		# if we found it beyond the end of the range, there's no entry 
+&1747: b0 11            BCS &175a ; no_background_object_in_hash			# if we found it beyond the end of the range, there's no entry 
+
+; entry was found - A contains the index into background_objects_x_lookup
+; new_object_data_pointer = index + background_objects_data_offset[background_object_number]
+
 &1749: 79 dd 05         ADC &05dd,Y ; background_objects_data_offset		# data_pointer = X + background_objects_data_offset
 &174c: 85 bd            STA &bd ; new_object_data_pointer
+
+; new_object_type_pointer = new_object_data_pointer + background_objects_type_offset[background_object_number]
+
 &174e: 18               CLC
 &174f: 79 e6 05         ADC &05e6,Y ; background_objects_type_offset		# type_pointer = X + background_objects_data_offset + background_objects_type_offset
 &1752: 85 be            STA &be ; new_object_type_pointer
-&1754: bd ee 06         LDA &06ee,X ; background_objects_handler_lookup
+
+&1754: bd ee 06         LDA &06ee,X ; background_objects_handler_lookup[index into background_objects_x_lookup]
 &1757: 4c 61 17         JMP &1761 ; use_background_object_from_hash
+
 ; no_background_object_in_hash
-&175a: a6 9d            LDX &9d ; background_object_number
-&175c: bd 7c 11         LDA &117c,X ; lookup_for_unmatched_hash
-&175f: 45 09            EOR &09 ; square_orientation
-; use_background_object_from_hash                                               # A = handler_lookup if in hash, square_sprite if not
+; so where no entry has been found in background_objects_x_lookup
+&175a: a6 9d            LDX &9d ; background_object_number  (will be from 0 to 8)
+&175c: bd 7c 11         LDA &117c,X ; lookup_for_unmatched_hash         # gets a value which uses the bottom 6 bits
+&175f: 45 09            EOR &09 ; square_orientation					# add the top two bits into the mix
+
+; use_background_object_from_hash											# A = handler_lookup if in hash, square_sprite if not
 &1761: 85 08            STA &08 ; square_sprite
+
+		; restores the original value that was replaced by the sentinel
 &1763: be d4 05         LDX &05d4,Y ; background_objects_range
 &1766: 68               PLA
 &1767: 9d ef 05         STA &05ef,X ; background_objects_x_lookup		# restore value of background_objects_x_hash
+
+		; Separate out orientation and sprite.
 &176a: a5 08            LDA &08 ; square_sprite
 &176c: 29 c0            AND #&c0
 &176e: 85 09            STA &09 ; square_orientation
 &1770: 45 08            EOR &08 ; square_sprite
+
 ; no_background_object
 &1772: 85 08            STA &08 ; square_sprite
 &1774: c9 10            CMP #&10
-&1776: b0 14            BCS &178c ; no_objects_to_create                        # do we need to create a background object?
+&1776: b0 14            BCS &178c ; no_objects_to_create            # if A is 10 or more then there's nothing to create
+
 &1778: ba               TSX	
 &1779: 86 26            STX &26 ; copy_of_stack_pointer                         # store the stack pointer
+
 &177b: aa               TAX
-&177c: bd 32 04         LDA &0432,X ; object_handler_table_h
+&177c: bd 32 04         LDA &0432,X ; object_handler_table_h					# get high byte of background object handler address
+																				# top 4 bits indicate background conditions that apply to the object
 &177f: 24 2d            BIT &2d ; background_processing_flag                    # does background_processing_flag match the background object?
-&1781: f0 07            BEQ &178a                                               # if set, call background object handlers
-&1783: 29 0f            AND #&0f
+&1781: f0 07            BEQ &178a                                               # if no match, branch over calling background object handlers
+
+&1783: 29 0f            AND #&0f												# mask to get high byte of handler address
 &1785: a4 bd            LDY &bd ; new_object_data_pointer
-&1787: 20 ea 19         JSR &19ea ; handle_background_object
+&1787: 20 ea 19         JSR &19ea ; handle_background_object					# use 
+
 &178a: a5 08            LDA &08 ; square_sprite
 ; no_objects_to_create
 &178c: 60               RTS
@@ -3349,10 +3644,11 @@ Disassembly
 ; handle_current_object
 &19f1: aa               TAX
 &19f2: bd 32 04         LDA &0432,X ; object_handler_table_h		        # Calculate address of object handler
+
 &19f5: 48               PHA
 &19f6: bd b9 03         LDA &03b9,X ; object_handler_table		
 &19f9: 18               CLC
-&19fa: 69 1a            ADC #&1a
+&19fa: 69 1a            ADC #&1a     ;
 &19fc: aa               TAX
 &19fd: 68               PLA
 &19fe: 29 3f            AND #&3f
@@ -3360,6 +3656,7 @@ Disassembly
 &1a02: 48               PHA						        # high = ((&0432, type + &14)) & 3f) + &3e
 &1a03: 8a               TXA
 &1a04: 48               PHA						        # low = (&03b9, type + &14) + &1a
+
 &1a05: a6 bc            LDX &bc ; this_object_data
 &1a07: 8a               TXA
 &1a08: c0 00            CPY #&00
@@ -3468,6 +3765,7 @@ Disassembly
 &1adf: 86 05            STX &05 ; something_about_player_angle
 &1ae1: 86 2b            STX &2b ; object_is_invisible                           # objects are not invisible by default
 &1ae3: 20 31 2a         JSR &2a31 ; move_object				        # move object using current velocities
+
 &1ae6: a6 aa            LDX &aa ; current_object        
 &1ae8: d0 0f            BNE &1af9 ; not_player 				        # is this the player?
 &1aea: a4 dd            LDY &dd ; object_held				        # if so, are we holding something?
@@ -3480,6 +3778,7 @@ Disassembly
 ; not_player
 &1af9: e4 dd            CPX &dd ; object_held
 &1afb: d0 50            BNE &1b4d ; not_held_object                             # is this object being held? if so, put next to us
+
 &1afd: ae 70 08         LDX &0870 ; object_stack_sprite                         # player sprite
 &1b00: bd 89 5e         LDA &5e89,X ; sprite_height_lookup
 &1b03: 38               SEC
@@ -3690,15 +3989,18 @@ Disassembly
 &1c8c: ca               DEX
 &1c8d: f0 ca            BEQ &1c59 ; wind_loop
 &1c8f: 20 73 3f         JSR &3f73 ; do_wind_motion
+
 ; no_wind
 &1c92: a6 3d            LDX &3d ; ; this_object_data_pointer
 &1c94: bd 86 09         LDA &0986,X ; object_data
 &1c97: 85 bc            STA &bc ; this_object_data
+
 &1c99: a5 41            LDA &41 ; this_object_type
 &1c9b: 18               CLC
-&1c9c: 69 14            ADC #&14
+&1c9c: 69 14            ADC #&14												# skip the background object handler entries in the table
 &1c9e: a4 3b            LDY &3b ; this_object_supporting
 &1ca0: 20 f1 19         JSR &19f1 ; handle_current_object                       # call object handler
+
 &1ca3: a6 aa            LDX &aa ; current_object
 &1ca5: e4 dd            CPX &dd ; object_held
 &1ca7: d0 3a            BNE &1ce3 ; not_held_object2                            # is this object being held?
@@ -3735,13 +4037,13 @@ Disassembly
 &1ce3: a5 15            LDA &15 ; this_object_energy		                # has it got energy
 &1ce5: d0 0f            BNE &1cf6 ; not_exploding
 &1ce7: a4 41            LDY &41 ; this_object_type  		                # explosion time!
-&1ce9: b9 46 04         LDA &0446,Y ; object_handler_table_h 	                # object_handler_table_h &c0 determines explosion type
-&1cec: 29 c0            AND #&c0				
-&1cee: 0a               ASL
-&1cef: 2a               ROL
-&1cf0: 2a               ROL
-&1cf1: 69 10            ADC #&10                                
-&1cf3: 20 f1 19         JSR &19f1 ; handle_current_object                       # call explosion handler
+&1ce9: b9 46 04         LDA &0446,Y ; object_handler_table_h 	            # object_handler_table_h &c0 determines explosion type
+&1cec: 29 c0            AND #&c0											# get top two bits
+&1cee: 0a               ASL													# bit 7 to C, bit 6 to bit 7, 0 to bit 0
+&1cef: 2a               ROL													# C to bit 0, bit 7 to C
+&1cf0: 2a               ROL													# C to bit 0, bit 7 to C
+&1cf1: 69 10            ADC #&10											# add &10 to bring to range &10 to &13, the 4 explosion types
+&1cf3: 20 f1 19         JSR &19f1 ; handle_current_object                   # call explosion handler
 ; not_exploding
 &1cf6: 20 87 25         JSR &2587 ; increment_timers
 &1cf9: 4a               LSR
@@ -4065,28 +4367,35 @@ Disassembly
 &1f60: ad e4 11         LDA &11e4 ; palette_register_updating
 &1f63: c9 02            CMP #&02
 &1f65: 90 f9            BCC &1f60
+
 &1f67: a9 00            LDA #&00
 &1f69: 8d e4 11         STA &11e4 ; palette_register_updating
+
 &1f6c: 08               PHP
 &1f6d: 78               SEI
 &1f6e: a5 b0            LDA &b0 ; screen_offset
 &1f70: 85 9c            STA &9c
 &1f72: a5 b1            LDA &b1 ; screen_offset_h
-&1f74: 4a               LSR
-&1f75: 66 9c            ROR &9c
-&1f77: 4a               LSR
-&1f78: 66 9c            ROR &9c
-&1f7a: 4a               LSR
-&1f7b: 66 9c            ROR &9c
-&1f7d: 69 0c            ADC #&0c
-&1f7f: a0 0c            LDY #&0c	                                        # do hardware scrolling
+
+&1f74: 4a               LSR A										# address must be divided by 8 before sending to 6845
+&1f75: 66 9c            ROR &9c	; low
+&1f77: 4a               LSR A
+&1f78: 66 9c            ROR &9c	; low
+&1f7a: 4a               LSR A
+&1f7b: 66 9c            ROR &9c	; low
+
+&1f7d: 69 0c            ADC #&0c								# add C00 * 8 to address to take it into the &6000-&7FFF range
+
+&1f7f: a0 0c            LDY #&0c	                                        # 6845 r12 - screen start address register low
 &1f81: 8c 00 fe         STY &fe00 	                                        # write to video controller
 &1f84: 8d 01 fe         STA &fe01 	                                        # write to video controller
+
 &1f87: a5 9c            LDA &9c
-&1f89: c8               INY
+&1f89: c8               INY													# 6845 r13 - screen start address register high 
 &1f8a: 8c 00 fe         STY &fe00 	                                        # write to video controller
 &1f8d: 8d 01 fe         STA &fe01 	                                        # write to video controller
-&1f90: 28               PLP
+
+&1f90: 28               PLP													# includes CLI
 &1f91: 60               RTS
 
 ; flash_screen_background
@@ -4136,18 +4445,21 @@ Disassembly
 &1fda: 60               RTS                                                     # if so, no collision
 
 ; plot_pixel
-&1fdb: a5 93            LDA &93 ; pixel_y_low                                   # calculate the screen address for the pixel
-&1fdd: 46 94            LSR &94 ; pixel_y
+# start with calculating the screen address for the pixel
+&1fdb: a5 93            LDA &93 ; pixel_y_low                                   # throw away non-display part of y co-ordinate
+&1fdd: 46 94            LSR &94 ; pixel_y										# to give the screen co-ordinate
 &1fdf: 6a               ROR
 &1fe0: 46 94            LSR &94 ; pixel_y
 &1fe2: 6a               ROR
 &1fe3: 46 94            LSR &94 ; pixel_y
 &1fe5: 6a               ROR
-&1fe6: aa               TAX
-&1fe7: 29 07            AND #&07
-&1fe9: a8               TAY
+&1fe6: aa               TAX														# save result
+
+&1fe7: 29 07            AND #&07												# get low 3 bits
+&1fe9: a8               TAY														# save
+
 &1fea: a5 91            LDA &91 ; pixel_x_low
-&1fec: 29 e0            AND #&e0
+&1fec: 29 e0            AND #&e0												# get top 3 bits
 &1fee: 65 b2            ADC &b2 ; screen_start_square_x_low_copy
 &1ff0: 85 8f            STA &8f ; screen_address
 &1ff2: 8a               TXA
@@ -4488,28 +4800,36 @@ Disassembly
 &2285: d0 84            BNE &220b
 &2287: 60               RTS
 
-; get_object_centre
+; get_object_centre for current object
+; sets 87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d this_object_y_center
+; on exit, A will be the same value placed in 8b (this_object_x_center)
+; the value of X is maintained
 &2288: 86 9d            STX &9d ; temp
 &228a: a2 02            LDX #&02
+
 &228c: b5 3a            LDA &3a,X	# X = 2, &3c this_object_height; X = 0, &3a this_object_width
-&228e: 4a               LSR		# halve it
-&228f: 75 4f            ADC (&4f,X)	
+&228e: 4a               LSR		# halve it - sets carry to bit 0
+&228f: 75 4f            ADC (&4f,X)	# X = 2: this_object_y_low; X = 0: this_object_x_low
 &2291: 95 87            STA &87,X	# X = 2, &89 this_object_y_centre_low; X = 0, &87 this_object_x_centre_low
+
 &2293: b5 53            LDA &53,X	# X = 2, &55 this_object_y ; X = 0, &53 this_object_x
-&2295: 69 00            ADC #&00
-&2297: 95 8b            STA &8b,X	# X = 2, &8c this_object_y_centre; X = 0, &8b this_object_x_centre
+&2295: 69 00            ADC #&00	# add any carry from the low byte
+&2297: 95 8b            STA &8b,X	# X = 2, &8d this_object_y_centre; X = 0, &8b this_object_x_centre
+
 &2299: ca               DEX
 &229a: ca               DEX
 &229b: f0 ef            BEQ &228c
+
 &229d: a6 9d            LDX &9d ; temp
 &229f: 60               RTS
 
 ; get_angle_between_objects
 # compare two object centres
-# returns angle
+# returns angle in &b5
 # this_object
 # X = other object
 &22a0: 20 88 22         JSR &2288 ; get_object_centre
+
 &22a3: bc 70 08         LDY &0870,X ; object_stack_sprite
 &22a6: b9 0c 5e         LDA &5e0c,Y ; sprite_width_lookup
 &22a9: 4a               LSR					# add half the width
@@ -4525,6 +4845,7 @@ Disassembly
 &22bf: bd b4 08         LDA &08b4,X ; object_stack_y
 &22c2: 69 00            ADC #&00
 &22c4: 85 8e            STA &8e ; stack_object_y_centre
+
 &22c6: 20 fe 22         JSR &22fe ; calculate_object_centre_deltas
 &22c9: 4c d7 22         JMP &22d7 ; calculate_angle
 
@@ -4556,6 +4877,7 @@ Disassembly
 &22eb: e5 b7            SBC &b7 ; oppositite_velocity_y
 &22ed: 26 b5            ROL &b5 ; angle
 &22ef: 90 f5            BCC &22e6 ; calc_angle_loop
+
 &22f1: a5 99            LDA &99 ; velocity_signs
 &22f3: 29 07            AND #&07
 &22f5: a8               TAY
@@ -4567,6 +4889,13 @@ Disassembly
 ; calculate_object_centre_deltas
 # leaves with A = support_delta_x_low, &b7 = support_delta_y_low, &b8 = delta_magnitude
 &22fe: a0 04            LDY #&04        # first y direction (Y = 4), then x direction (Y = 2)
+
+# &7d support_delta_y_low = &8a stack_object_y_centre_low - &89 this_object_y_centre_low
+# &7e support_delta_y = &8e stack_object_y_centre - &8d this_object_y_centre
+# &7b support_delta_x_low = &88 stack_object_x_centre_low - &87 this_object_x_centre_low
+# &7c support_delta_x = &8c stack_object_x_centre - &8b this_object_x_centre
+# &99 has bit 0 set if the X delta is +ve, bit 1 set if the Y delta is +ve.
+
 &2300: 85 b7            STA &b7 ; tmp
 &2302: b9 86 00         LDA &0086,Y     # Y = 4, &8a stack_object_y_centre_low; Y = 2, &88 stack_object_x_centre_low
 &2305: f9 85 00         SBC &0085,Y     # Y = 4, &89 this_object_y_centre_low; Y = 2, &87 this_object_x_centre_low
@@ -4576,21 +4905,24 @@ Disassembly
 &2311: 99 7a 00         STA &007a,Y     # Y = 4, &7e support_delta_y; Y = 2, &7c support_delta_x
 &2314: 38               SEC
 &2315: 10 03            BPL &231a
-&2317: 20 56 32         JSR &3256 ; make_positive
-&231a: 26 99            ROL &99 ; velocity-signs
+&2317: 20 56 32         JSR &3256 ; make_positive (as part of operation bit 7 will be set to 0)
+&231a: 26 99            ROL &99 ; velocity-signs	carry flag introduced at bit 0
 &231c: 88               DEY
 &231d: 88               DEY
 &231e: d0 e0            BNE &2300       # now do it again for the x direction
-&2320: 05 b7            ORA &b7 ; tmp                   # A = support_delta_y | support_delta_x, ie largest of the two
-&2322: 0a               ASL
-&2323: 46 7c            LSR &7c
-&2325: 66 7b            ROR &7b                         # halve support_delta_x
-&2327: 46 7e            LSR &7e
-&2329: 66 7d            ROR &7d                         # halve support_delta_y
+
+&2320: 05 b7            ORA &b7 ; tmp                   # A = abs(support_delta_y) | abs(support_delta_x), ie largest of the two
+&2322: 0a               ASL A							# double (bit 7 goes to C but it should always be 0 anyway, bit 0 set to 0)
+
+&2323: 46 7c            LSR &7c							# halve (sets bit 7 to 0, bit 0 goes to C)
+&2325: 66 7b            ROR &7b                         # halve support_delta_x (sets bit 7 to C)
+&2327: 46 7e            LSR &7e							# halve (sets bit 7 to 0, bit 0 goes to C)
+&2329: 66 7d            ROR &7d                         # halve support_delta_y (sets bit 7 to C)
 &232b: c8               INY                             # for each halving, increase Y
-&232c: 4a               LSR
-&232d: d0 f4            BNE &2323                       # keep having A until zero
-&232f: 84 b8            STY &b8 ; delta_magnitude
+&232c: 4a               LSR A
+&232d: d0 f4            BNE &2323                       # keep halving A until zero
+
+&232f: 84 b8            STY &b8 ; delta_magnitude		# should be 1 to 7
 &2331: a5 7d            LDA &7d                         # support_delta_y_low
 &2333: 20 56 32         JSR &3256 ; make_positive
 &2336: 85 b7            STA &b7 ; some_kind_of_velocity
@@ -4731,7 +5063,8 @@ Disassembly
 ; palette_not_six
 &240c: 85 73            STA &73 ; this_object_palette                           # set the palette for this square
 &240e: 85 74            STA &74 ; this_object_palette_old
-&2410: a5 09            LDA &09                                                 
+
+&2410: a5 09            LDA &09 ; square_orientation                                                
 &2412: 85 71            STA &71 ; this_object_flipping_flags                    # set the orientation for this square
 &2414: 85 72            STA &72 ; this_object_flipping_flags_old
 &2416: b9 ab 04         LDA &04ab,Y ; background_sprite_lookup
@@ -4739,13 +5072,15 @@ Disassembly
 &241b: aa               TAX
 &241c: 85 75            STA &75 ; this_object_sprite                            # set the sprite for this square
 &241e: 85 76            STA &76 ; this_object_sprite_old
+
 &2420: b9 eb 04         LDA &04eb,Y ; background_y_offset_lookup
 &2423: 29 f0            AND #&f0
 &2425: 24 09            BIT &09 ; square_orientation
-&2427: 50 07            BVC &2430                                       
+&2427: 50 07            BVC &2430                                       # branch if not upside down???
 &2429: 7d 89 5e         ADC &5e89,X ; sprite_height_lookup
 &242c: 09 07            ORA #&07
 &242e: 49 ff            EOR #&ff
+
 &2430: 85 51            STA &51 ; this_object_y_low                             # y position of start of square sprite
 &2432: 85 52            STA &52 ; this_object_y_low_old
 &2434: a9 00            LDA #&00
@@ -4782,15 +5117,18 @@ Disassembly
 &2467: 0a               ASL
 &2468: 0a               ASL
 &2469: 0a               ASL
+
 &246a: 29 f0            AND #&f0                                                # otherwise use highest nibble
 &246c: f0 02            BEQ &2470
 &246e: 09 0f            ORA #&0f
 &2470: 95 7e            STA &7e,X       # X = 0, &7e wall_y_start_base; X = 4, &82 wall_y_start_base_4
+
 &2472: a5 09            LDA &09 ; square_orientation
 &2474: 0a               ASL                                                     # carry set if horizontally flipped
 &2475: 85 9c            STA &9c ; v_flipped                       
 &2477: 59 ab 04         EOR &04ab,Y ; background_sprite_lookup                  # sprite_lookup ^ &80 if vertically flipped
 &247a: 95 7f            STA &7f,X       # X = 0, &7f wall_sprite; X = 4, &83 wall_sprite_4
+
 &247c: b9 eb 04         LDA &04eb,Y ; background_y_offset_lookup                # offset_lookup * 4
 &247f: 2a               ROL                                                     # + h_flipped * 2
 &2480: 06 9c            ASL &9c ; v_flipped
@@ -5047,6 +5385,7 @@ Disassembly
 &261d: 10 07            BPL &2626                                               # every 8 cycles,
 &261f: 20 f8 13         JSR &13f8 ; play_sound2                                 # make a noise if it's close enough
 #2622: 70 c2 6e a3 ; sound data
+
 ; no_waterfall_sound
 &2626: a2 fe            LDX #&fe
 &2728: a5 c0            LDA &c0 ; loop_counter
@@ -5793,7 +6132,7 @@ Disassembly
 #2c37: 3d 04 11 d4 ; sound data
 &2c3b: 60               RTS
 
-; store_teleport
+; store_teleport (only the high bytes though)
 &2c3c: a5 15            LDA &15 ; this_object_energy	
 &2c3e: c9 08            CMP #&08			                        # have we got enough energy to teleport?
 &2c40: 90 27            BCC &2c69                                               # if not, leave
@@ -5802,11 +6141,13 @@ Disassembly
 &2c47: b0 01            BCS &2c4a
 &2c49: c8               INY                                                     # increase the number of stored positions
 &2c4a: 8c 22 08         STY &0822 ; teleports_used                              # to a maximum of 4
+
 &2c4d: 20 88 22         JSR &2288 ; get_object_centre
 &2c50: ac 21 08         LDY &0821 ; teleport_last                               # A = this_object_x_centre
-&2c53: 99 23 08         STA &0823,Y ; teleports_x
+&2c53: 99 23 08         STA &0823,Y ; teleports_x								# # store teleport position x
+
 &2c56: a5 8d            LDA &8d ; this_object_y_centre                          
-&2c58: 99 28 08         STA &0828,Y ; teleports_y                               # store teleport position
+&2c58: 99 28 08         STA &0828,Y ; teleports_y                               # store teleport position y
 &2c5b: 20 9d 14         JSR &149d ; play_middle_beep
 &2c5e: ee 21 08         INC &0821 ; teleport_last
 ; fix_teleport_last
@@ -5872,19 +6213,24 @@ Disassembly
 &2cbb: 60               RTS
 
 ; get_water_level_for_x
-&2cbc: a2 04            LDX #&04
-&2cbe: ca               DEX
-&2cbf: dd d2 14         CMP &14d2,X ; x_ranges
-&2cc2: 90 fa            BCC &2cbe
-&2cc4: bd 2e 08         LDA &082e,X ; water_level_low_by_x_range                # the water level depends on where we are
-&2cc7: 8d d0 14         STA &14d0 ; water_level_low
+; on entry, A specifies the screen_start_square_x
+&2cbc: a2 04            LDX #&04												# init loop counter (range is 3 to 0)
+
+&2cbe: ca               DEX														# decrement loop counter
+&2cbf: dd d2 14         CMP &14d2,X ; x_ranges									# check where range starts
+&2cc2: 90 fa            BCC &2cbe												# loop around until x_ranges value is equal or higher to screen_start_square_x
+
+&2cc4: bd 2e 08         LDA &082e,X ; water_level_low_by_x_range                # get low byte
+&2cc7: 8d d0 14         STA &14d0 ; water_level_low								# and store it
+
 &2cca: 18               CLC
-&2ccb: ed 2f 08         SBC &082f
-&2cce: bd 32 08         LDA &0832,X ; water_level_by_x_range
-&2cd1: 8d d1 14         STA &14d1 ; water_level
-&2cd4: ed 33 08         SBC &0833 ; water_level_by_x_range_range1               # unless range 1 (the endgame water level)
-&2cd7: a2 01            LDX #&01                                                # is above, in which case we use that
-&2cd9: b0 e9            BCS &2cc4
+&2ccb: ed 2f 08         SBC &082f ; water_level_low_by_x_range[1]				# set carry if water_level_low_by_x_range - water_level_low_by_x_range[1] - 1 >= 0
+
+&2cce: bd 32 08         LDA &0832,X ; water_level_by_x_range					# get high byte
+&2cd1: 8d d1 14         STA &14d1 ; water_level									# and store it
+&2cd4: ed 33 08         SBC &0833 ; water_level_by_x_range[1]					# compare against the endgame water level
+&2cd7: a2 01            LDX #&01                                                # prepare to use the level 1 range instead
+&2cd9: b0 e9            BCS &2cc4												# if level 1 range (the endgame water level) is above the standard range then branch to use it instead
 &2cdb: 60               RTS
 
 # bullet types
@@ -7064,14 +7410,19 @@ e336d: 90 02            BCC &3371
 &3575: 60               RTS
 
 ; pause
-&3576: 4e bd 14         LSR &14bd ; game_paused
-&3579: 20 81 35         JSR &3581		                                # wait for COPY to be released
-&357c: 2c 6b 12         BIT &126b ; keys_pressed
-&357f: 10 fb            BPL &357c                                               # then pressed
-&3581: 2c 6b 12         BIT &126b ; keys_pressed
-&3584: 30 fb            BMI &3581                                               # then released again
-&3586: 6e bd 14         ROR &14bd ; game_paused
-&3589: 60               RTS
+&3576: 4e bd 14         LSR &14bd ; game_paused									# set bit 7 to 0, C to bit 0 = 0, &14bd = 01001001
+
+&3579: 20 81 35         JSR &3581												# wait for COPY to be released
+																				# &14bd now equals 00100100, C = 1
+
+&357c: 2c 6b 12         BIT &126b ; keys_pressed								# (carry flag not affected)
+&357f: 10 fb            BPL &357c                                               # loop whilst bit 7 clear (so whilst key is not pressed)
+
+&3581: 2c 6b 12         BIT &126b ; keys_pressed								# (carry flag not affected)
+&3584: 30 fb            BMI &3581                                               # loop whilst bit 7 set (so whilst key remains pressed)
+
+&3586: 6e bd 14         ROR &14bd ; game_paused									# on 2nd pass, &14bd is set to &92 or 10010010 again
+&3589: 60               RTS														# which unpauses the game
 
 #358a: ff ; player_can_move
 
@@ -7256,21 +7607,26 @@ e336d: 90 02            BCC &3371
 &36c3: 24 cc            BIT &cc ; scroll_square_x_velocity_high
 &36c5: 30 0d            BMI &36d4
 &36c7: 10 0d            BPL &36d6
+
 &36c9: a9 00            LDA #&00
 &36cb: a4 9c            LDY &9c ; scroll_width
+
 &36cd: 91 8f            STA (&8f),Y		                                # clear the screen memory for the edge
 &36cf: 88               DEY
 &36d0: 10 fb            BPL &36cd
+
 &36d2: a5 90            LDA &90 ; screen_address_h
 &36d4: e9 02            SBC #&02
 &36d6: 09 60            ORA #&60
 &36d8: 85 90            STA &90	; screen_address_h
 &36da: ca               DEX
 &36db: d0 ec            BNE &36c9                                               # repeat until we've cleared the edge
+
 &36dd: a0 04            LDY #&04                                                # strip length = 4 squares
 &36df: a9 97            LDA #&97                                                # when redrawing strip, increase &97 square_y
 &36e1: a2 02            LDX #&02
 &36e3: d0 76            BNE &375b ; done_scrolling
+
 ; not_scrolling_x
 &36e5: a6 d1            LDX &d1 ; scroll_y_direction
 &36e7: f0 72            BEQ &375b ; done_scrolling                              # are we scrolling up or down? if so:
@@ -7351,6 +7707,7 @@ e336d: 90 02            BCC &3371
 &3772: ad cd 14         LDA &14cd ; call_object_handlers_when_redrawing_screen  # should we call background object handlers?
 &3775: 29 80            AND #&80                                      
 &3777: 85 2d            STA &2d ; background_processing_flag                    # note this in background_processing_flag
+
 &3779: c6 ae            DEC &ae ; strip_length_two
 &377b: 30 12            BMI &378f ; done_strip_plotting
 &377d: 20 15 17         JSR &1715 ; determine_background			# this actually plots for movement and teleporting
@@ -7945,18 +8302,19 @@ maggot x = &06 a = &08
 
 ; can_we_pick_up_object
 &3bd5: a6 3b            LDX &3b ; this_object_supporting		        # are we touching anything?
-&3bd7: 30 07            BMI &3be0					        # if not, leave
+&3bd7: 30 07            BMI &3be0										# if not, leave
 &3bd9: 20 a0 22         JSR &22a0 ; get_angle_between_objects                   # get the angle between us and it
-&3bdc: 69 40            ADC #&40                                                # ninety degrees
+&3bdc: 69 40            ADC #&40                                                # add ninety degrees clockwise
 &3bde: 45 37            EOR &37 ; this_object_angle                             # are we facing it?
 &3be0: 60               RTS
 
 ; absorb_object
+; on entry, A is the object type that the current object is interested in absorbing
 &3be1: a4 3b            LDY &3b ; this_object_supporting
 &3be3: d9 60 08         CMP &0860,Y ; object_stack_type			        # consider the object we're supporting
-&3be6: d0 0f            BNE &3bf7					        # is it what we want? if not, leave
+&3be6: d0 0f            BNE &3bf7										# is it what we want? if not, leave
 &3be8: 20 d5 3b         JSR &3bd5 ; can_we_pick_up_object
-&3beb: 30 0a            BMI &3bf7					        # if we're not supporting anything, leave
+&3beb: 30 0a            BMI &3bf7										# RTS if bit 7 set
 &3bed: a4 3b            LDY &3b ; this_object_supporting
 &3bef: 20 16 25         JSR &2516 ; mark_stack_object_for_removal
 &3bf2: 20 ad 14         JSR &14ad ; play_low_beep
@@ -8014,7 +8372,7 @@ maggot x = &06 a = &08
 # if carry clear, find the nearest matching object and return number in X
 &3c2a: 18               CLC
 &3c2b: 24 38            BIT &38 ; this_object_weight
-&3c2d: 66 9b            ROR &9b ; weight_bit    
+&3c2d: 66 9b            ROR &9b ; weight_bit									# set bit 7 to 0
 &3c2f: 18               CLC
 ; in_find_nearest_object
 &3c30: 66 a1            ROR &a1 ; find_carry                                    # note whether we're finding or counting
@@ -8082,6 +8440,7 @@ maggot x = &06 a = &08
 &3cab: cd 28 3c         CMP &3c28 ; nearest_distance                            # is it nearer than earlier finds?
 &3cae: 90 11            BCC &3cc1 ; find_object_store_distance                  # if nearer, store it
 &3cb0: b0 17            BCS &3cc9 ; find_object_next_object                     # if further away, ignore it
+
 &3cb2: 20 87 25         JSR &2587 ; increment_timers
 &3cb5: 29 4f            AND #&4f
 &3cb7: 4d 28 3c         EOR &3c28 ; nearest_distance
@@ -8096,6 +8455,7 @@ maggot x = &06 a = &08
 &3cc9: a4 9e            LDY &9e ; y_store                                       # move on to considering the next object
 &3ccb: 88               DEY
 &3ccc: 10 85            BPL &3c53 ; find_object_object_loop                     # until we've done all sixteen
+
 &3cce: 46 a0            LSR &a0 ; result
 &3cd0: 46 a0            LSR &a0 ; result                                        # carry set to be result & &02
 &3cd2: ae 25 3c         LDX &3c25 ; nearest_object
@@ -8287,6 +8647,9 @@ maggot x = &06 a = &08
 &3e18: d0 f7            BNE &3e11
 &3e1a: 60               RTS
 
+*** handlers_start ***
+; routine addresses in object_handler_table are stored relative to this point.
+
 ; handle_background_object_emerging
 # called with:
 # A, X = &bc this_object_data
@@ -8298,8 +8661,9 @@ maggot x = &06 a = &08
 &3e23: f0 23            BEQ &3e48
 &3e25: 10 02            BPL &3e29
 &3e27: a2 00            LDX #&00
+
 &3e29: a5 09            LDA &09 ; square_orientation
-&3e2b: 0a               ASL
+&3e2b: 0a               ASL								# move left/right flip into Carry
 &3e2c: b9 86 09         LDA &0986,Y ; background_objects_data
 &3e2f: 10 1c            BPL &3e4d						# is the object already present?
 &3e31: 08               PHP
@@ -8315,9 +8679,11 @@ maggot x = &06 a = &08
 &3e44: aa               TAX
 &3e45: 28               PLP
 &3e46: 30 05            BMI &3e4d
+
 &3e48: 20 87 25         JSR &2587 ; increment_timers
 &3e4b: c9 f7            CMP #&f7
-&3e4d: 90 39            BCC &3e88
+
+&3e4d: 90 39            BCC &3e88						# branch to RTS
 ; into_tertiary_pull_in
 &3e4f: 86 a2            STX &a2
 &3e51: b9 86 09         LDA &0986,Y ; background_objects_data
@@ -8432,8 +8798,9 @@ maggot x = &06 a = &08
 &3ef2: a6 be            LDX &be ; new_object_type_pointer
 &3ef4: bd 71 0a         LDA &0a71,X ; background_objects_type
 &3ef7: 30 04            BMI &3efd					        # is it offscreen?
-&3ef9: c5 41            CMP &41 ; this_object_type			        # if not, is it the current object?
+&3ef9: c5 41            CMP &41 ; this_object_type			# if not, is it the current object?
 &3efb: d0 f4            BNE &3ef1					        # if not, leave
+
 &3efd: a4 aa            LDY &aa ; current_object
 &3eff: 20 c5 49         JSR &49c5 ; can_object_trigger_switch
 &3f02: 90 ed            BCC &3ef1					        # if not, leave
@@ -8897,7 +9264,9 @@ maggot x = &06 a = &08
 &41e2: 0a               ASL                                                     # boulder weight = 5, crystal weight = 2
 &41e3: 69 03            ADC #&03                                                # (combined weights * 2) + 3
 &41e5: 20 92 1f         JSR &1f92 ; flash_screen_background
+
 &41e8: 4c db 40         JMP &40db ; explode_object
+
 ; no_explosion
 &41eb: a5 da            LDA &da ; timer_2
 &41ed: 29 c0            AND #&c0                                                # a one in four chance
@@ -9197,8 +9566,10 @@ maggot x = &06 a = &08
 &43b7: a5 1d            LDA &1d ; some_kind_of_velocity                        
 &43b9: c9 14            CMP #&14                                                # have we collided violently?
 &43bb: 90 04            BCC &43c1                                               # if not, leave flask undisturbed
+
 &43bd: a9 10            LDA #&10                                                # disturb flask
 &43bf: 85 12            STA &12 ; this_object_timer
+
 &43c1: a5 12            LDA &12 ; this_object_timer                             # has the flask been disturbed?
 &43c3: f0 e8            BEQ &43ad                                               # if not, leave
 &43c5: a4 3b            LDY &3b ; this_object_supporting
@@ -10338,13 +10709,14 @@ maggot x = &06 a = &08
 &4b93: 20 fa 13         JSR &13fa ; play_sound
 #4b96: 72 a5 7b 85 ; sound data
 &4b9a: 4c 29 25		JMP &2529; mark_this_object_for_removal                 # and remove it
+
 ; keep_object_floating_until_disturbed
 &4b9d: a4 3b            LDY &3b ; this_object_supporting                        # otherwise, is it touching anything?
 &4b9f: 30 04            BMI &4ba5
 &4ba1: 06 15            ASL &15 ; this_object_energy                            # if so, mark it as disturbed
-&4ba3: 46 15            LSR &15 ; this_object_energy
-&4ba5: 24 15            BIT &15 ; this_object_energy                            # has it been disturbed?
-&4ba7: 10 6b            BPL &4c14				                # if not, keep it stationary
+&4ba3: 46 15            LSR &15 ; this_object_energy							# by clearing bit 7
+&4ba5: 24 15            BIT &15 ; this_object_energy                            # has it been disturbed? set N flag from bit 7
+&4ba7: 10 6b            BPL &4c14												# rts if bit 7 clear, otherwise keep stationary
 ; handle_bush
 # called with:
 # X = this_object_data
@@ -11352,40 +11724,71 @@ maggot x = &06 a = &08
 &60a5: 99 c6 08         STA &08c6,Y ; object_stack_flags
 &60a8: 88               DEY
 &60a9: d0 f5            BNE &60a0
+
+; set start of screen memory to be &6000 by setting the addressable latch on the system via
 &60ab: a9 0f            LDA #&0f
-&60ad: 8d 42 fe         STA &fe42					        # system via
+&60ad: 8d 42 fe         STA &fe42					        # system via DDRB - set for input top on nibble, output on bottom nibble
 &60b0: a9 0c            LDA #&0c
-&60b2: 8d 40 fe         STA &fe40					        # system via
+&60b2: 8d 40 fe         STA &fe40					        # system via Input/Output B - 0000 1 100 set latch bit 4 to 1 
 &60b5: a9 05            LDA #&05
-&60b7: 8d 40 fe         STA &fe40					        # system via
+&60b7: 8d 40 fe         STA &fe40					        # system via Input/Output B - 0000 0 101 set latch bit 5 to 0
+
 &60ba: a9 00            LDA #&00
-&60bc: 8d 4b fe         STA &fe4b					        # system via
+&60bc: 8d 4b fe         STA &fe4b					        # system via ACR 
+															# bit 0 turns off latch enable port A
+															# bit 1 turns off latch enable for port B
+															# bits 2 to 4 disable the shift register
+															# bit 5 sets T2 to act as an interval timer in one-shot mode
+															# bits 6 and 7 sets T1 to one-shot mode with PB7 disabled
 &60bf: a9 00            LDA #&00
 &60c1: 8d 6b fe         STA &fe6b					        # user via Auxiliary Control Register
-&60c4: a9 04            LDA #&04
-&60c6: 8d 4c fe         STA &fe4c					        # system via
+
+&60c4: a9 04            LDA #&04							# 000 0 010 0
+&60c6: 8d 4c fe         STA &fe4c					        # system via PCR
+															# bit 0 sets CA1 to interrupt when going high to low
+															# bits 1 to 3 sets CA2 control to interrupt when CA2 goes low to high, interrupt flag register bit 0 can be cleared with a read or write of Peripheral A output register 
+
 &60c9: a9 0e            LDA #&0e
 &60cb: 8d 6c fe         STA &fe6c					        # user via Peripheral Control Register
-&60ce: a9 7f            LDA #&7f
-&60d0: 8d 4e fe         STA &fe4e					        # system VIA interrupt enable register
-&60d3: 8d 6e fe         STA &fe6e					        # user VIA interrupt enable register
-&60d6: a9 c2            LDA #&c2
-&60d8: 8d 4e fe         STA &fe4e					        # system VIA interrupt enable register
+
+&60ce: a9 7f            LDA #&7f							# 0 1111111 (bit 7 used to clear bits, a 1 in other bits will therefore set that bit off)
+&60d0: 8d 4e fe         STA &fe4e					        # system VIA interrupt enable register - all turned off
+&60d3: 8d 6e fe         STA &fe6e					        # user VIA interrupt enable register - all turned off
+
+&60d6: a9 c2            LDA #&c2							# 1 1000010 (bit 7 used to set bits, so bits 6 and 1 will be turned on)
+&60d8: 8d 4e fe         STA &fe4e					        # system VIA interrupt enable register -
+															# bit 6 is for time-out of Timer 1
+															# bit 1 is for CA1 transition - this is the vertical sync signal from the 6845 
+
 &60db: a2 0a            LDX #&0a
 &60dd: a0 09            LDY #&09
 ; video_controller_write_loop
 &60df: bd f5 60         LDA &60f5,X
-&60e2: 8c 00 fe         STY &fe00 					        # write to video controller
-&60e5: 8d 01 fe         STA &fe01 					        # write to video controller
+&60e2: 8c 00 fe         STY &fe00 					        # sets the 6845 register address
+&60e5: 8d 01 fe         STA &fe01 					        # write to the selected 6845 register
 &60e8: ca               DEX
 &60e9: 88               DEY
 &60ea: 10 f3            BPL &60df ; video_controller_write_loop
+
 &60ec: bd f5 60         LDA &60f5,X                                             # push &14 to 
 &60ef: 8d 20 fe         STA &fe20					        # video ULA control register (20 columns, 2Mhz)
 &60f2: 4c d0 01         JMP &01d0 ; intro2
+
 # data written to video controller
      ;  0  1  2  3  4  5  6  7  8  9  a
 #60f5: 14 7f 00 5b 28 26 00 10 1b 00 07
+
+register	value	meaning
+9			07		scan lines per character (7 is the same as modes 0, 1, 2, 4, 5)
+8			00		interlace and delay
+7			1b		vertical sync position (27 is the same as modes 3, 6, 7)
+6			10		vertical displayed register - the number of character rows
+5			00		vertical total adjust - moves display up or down
+4			26		vertical sync frequency 
+3			28		sync width register - sync pulse width 8 is standard for modes 0 to 3, vertical sync pulse width 2 is normal
+2			5b		horizontal sync position 
+1			00		horizontal displayed register - presumably blanks the screen until initialisation is complete
+0			7f		horizontal total register - 127 is normal for modes 0 to 3
 
 ; intro
 &7200: 78               SEI
