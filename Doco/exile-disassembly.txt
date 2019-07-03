@@ -5093,7 +5093,7 @@ $FE                        ; white bg, cyan bg
 ; setup_background_sprite_values_from_08_09
 &239b: a8               TAY                                                     # Y = square_sprite
 &239c: b9 2b 05         LDA &052b,Y ; background_palette_lookup                 # what's the palette for this sprite?
-&239f: d0 0d            BNE &23ae ; palette_defined
+&239f: d0 0d            BNE &23ae ; palette_not_zero
 &23a1: a5 97            LDA &97 ; square_y                                      # if 0, it depends on square_y / 16
 &23a3: 38               SEC
 &23a4: e9 54            SBC #&54
@@ -11631,7 +11631,7 @@ maggot x = &06 a = &08
 #   &7b energy capsule
 #   &7c whistle
 #
-#   Sprite data is 128 x 128, 20 bytes per row.
+#   Sprite data is 128 x 128, 0x20 bytes per row.
 #
 ###############################################################################
 

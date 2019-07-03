@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
 
 namespace ExileMappedBackground
     {
@@ -10,6 +12,12 @@ namespace ExileMappedBackground
         private static readonly byte[] LookupForUnmatchedHash = BuildLookupForUnmatchedHash();
         private static readonly Dictionary<int, byte[]> BackgroundObjectsHandlerLookup = BuildBackgroundObjectsHandlerLookup();
         private static readonly byte[] BackgroundLookup = BuildBackgroundLookupTable();
+        private static readonly byte[] _backgroundPaletteLookup = BuildBackgroundPaletteLookup();
+        private static readonly byte[] _wallPaletteZeroLookup = BuildWallPaletteZeroLookup();
+        private static readonly byte[] _wallPaletteThreeLookup = BuildWallPaletteThreeLookup();
+        private static readonly byte[] _wallPaletteFourLookup = BuildWallPaletteFourLookup();
+        private static readonly (Color leftColour, Color rightColour)[] _colourPairs = BuildColourPairs();
+        private static readonly Color[] _colourMap = BuildColourMap();
 
         public MapResult GetBackground(byte squareX, byte squareY)
             {
@@ -19,17 +27,17 @@ namespace ExileMappedBackground
             Flags f = new Flags();
             MapResult result = new MapResult();
 
-            accumulator = squareY;                              // LDA square_y
-            xreg = accumulator;                                 // TAX
+            Load(out accumulator, squareY, ref f);  // LDA square_y
+            Transfer(accumulator, out xreg, ref f);      // TAX
             LogicalShiftRight(ref accumulator, ref f);       // LSR A
-            accumulator = (byte) (accumulator ^ squareX);       // EOR square_x
-            accumulator = (byte) (accumulator & 0xF8);          // AND #$F8
+            Eor(ref accumulator, squareX, ref f);       // EOR square_x
+            And(ref accumulator, 0xF8, ref f);          // AND #$F8
             LogicalShiftRight(ref accumulator, ref f);       // LSR A
             AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
             LogicalShiftRight(ref accumulator, ref f);       // LSR A
             AddWithCarry(ref accumulator, squareY, ref f);  // ADC square_y
-            byte zp_various_9d = accumulator;                   // zp_various_9d    ; f_xy is a function of square_x and square_y
-            accumulator = xreg;                                 // TXA              ; A = square_y
+            byte zp_various_9d = accumulator;                   // STA zp_various_9d    ; f_xy is a function of square_x and square_y
+            Transfer(xreg, out accumulator, ref f);     // TXA              ; A = square_y
             Compare(accumulator, 0x79, ref f);// CMP #$79
             if (!f.Carry) goto L17A8;                           // BCC L17A8        ; taken if square_y<0x79
             Compare(accumulator, 0xBF, ref f);// CMP #$BF
@@ -53,18 +61,18 @@ L17A8:
 L17B2:
             byte f2_xy = accumulator;                           // STA f2_xy        ; at this point, a function of square_y
             accumulator = (byte) (accumulator & 0b10101000);    // AND #%10101000                   
-            accumulator = (byte) (accumulator ^ 0b01101111);    // EOR #%01101111
-            LogicalShiftRight(ref accumulator, ref f);   // LSR A
+            Eor(ref accumulator, 0b01101111, ref f);    // EOR #%01101111
+            LogicalShiftRight(ref accumulator, ref f);          // LSR A
             AddWithCarry(ref accumulator, squareX, ref f);      // ADC square_x
-            accumulator = (byte) (accumulator ^ 0b01100000);    // EOR #%01100000
+            Eor(ref accumulator, 0b01100000, ref f);    // EOR #%01100000
             AddWithCarry(ref accumulator, 0b00101000, ref f);   // ADC #%00101000
             byte f3_xy = accumulator;                           // STA f3_xy        ; f3_xy is another function of square_x and square_y
-            accumulator = (byte) (accumulator & 0b00111000);    // AND #%00111000
-            accumulator = (byte) (accumulator ^ 0b10100100);    // EOR #%10100100
+            And(ref accumulator, 0b00111000, ref f);    // AND #%00111000
+            Eor(ref accumulator, 0b10100100, ref f);    // EOR #%10100100
             AddWithCarry(ref accumulator, f2_xy, ref f);        // ADC f2_xy
             f2_xy = accumulator;                                // STA f2_xy        ; f2_xy a function of square_x and square_y
-            yreg = accumulator;                                 // TAY              ; A is f2_xy
-            accumulator = (byte) (accumulator ^ 0b00101100);    // EOR #%00101100
+            Transfer(accumulator, out yreg, ref f);     // TAY              ; A is f2_xy
+            Eor(ref accumulator, 0b00101100, ref f);    // EOR #%00101100
             AddWithCarry(ref accumulator, f3_xy, ref f);     // ADC f3_xy      ; A is a function of f2_xy and f3_xy
             Compare(yreg, 0x20, ref f);        // CPY #$20
             if (f.Carry) goto not_mapped2;                        // BCS not_mapped2        ; taken if f2_xy>=0x20
@@ -72,19 +80,19 @@ L17B2:
             if (f.Carry) goto not_mapped;                         // BCS not_mapped         ; if A >= &20, don't use mapped data
 
             result.IsMappedData = true;                        // DEC square_is_mapped_data
-            yreg = accumulator;                                 // TAY                    ; Y = A = f(f2_xy,f3_xy)
+            Transfer(accumulator, out yreg, ref f);     // TAY                    ; Y = A = f(f2_xy,f3_xy)
             ArithmeticShiftLeft(ref accumulator, ref f);    // ASL A
             ArithmeticShiftLeft(ref accumulator, ref f);    // ASL A
             ArithmeticShiftLeft(ref accumulator, ref f);    // ASL A
-            accumulator = (byte) (accumulator ^ f2_xy);         // EOR f2_xy
+            Eor(ref accumulator, f2_xy, ref f);         // EOR f2_xy
             byte map_address = accumulator;                     // STA map_address        ; &a4 = (A * 8) ^ &10;
     
-            accumulator = yreg;                                 // TYA                    ; A = Y = f(f2_xy,f3_xy)
-            accumulator = (byte) (accumulator & 0x03);          // AND #$03
+            Transfer(yreg, out accumulator, ref f);     // TYA                    ; A = Y = f(f2_xy,f3_xy)
+            And(ref accumulator, 0x03, ref f);          // AND #$03
             AddWithCarry(ref accumulator, 0, ref f);    // ADC #HI(map_data)
             byte map_address_high = accumulator;                // STA map_address_high        ; a5 = (A & 3) + &4f;
     
-            yreg = 0;                                           // LDY #LO(map_data)           ; $EC ; &4fec - &53ec
+            Load(out yreg, 0, ref f);                                           // LDY #LO(map_data)           ; $EC ; &4fec - &53ec
             result.PositionInMappedData = (map_address_high << 8) + map_address;
             result.Result = MapData[result.PositionInMappedData + yreg];            // LDA (map_address),Y         ; use mapped data
             return result;                                      // RTS
@@ -98,18 +106,18 @@ via_return_background_empty:
 //  If not mapped data, are we on or above the surface?
 not_mapped:
 // A = 
-            Compare(accumulator, 0x3d, ref f);                        // CMP #$3D
+            Compare(accumulator, 0x3d, ref f);   // CMP #$3D
             if (!f.Carry) goto via_return_background_empty;       // BCC via_return_background_empty
 not_mapped2:
-            Compare(xreg, 0x4e, ref f);  // CPX #$4E ; if square_y < &4e, return empty space
+            Compare(xreg, 0x4e, ref f);         // CPX #$4E ; if square_y < &4e, return empty space
             if (!f.Carry) goto via_return_background_empty;       // BCC via_return_background_empty
             if (f.Zero) goto L17EC;                               // BEQ L17EC ; if square_y = &4e, return bushes
-            Compare(xreg, 0x4f, ref f);    // CPX #$4F
+            Compare(xreg, 0x4f, ref f);         // CPX #$4F
             if (!f.Zero) goto below_surface;                      // BNE below_surface
-            accumulator = squareX;                              // LDA square_x ; if square_y = &4f, do surface
-            if (accumulator == 0x40)                            // CMP #$40
-                goto return_background_grass_frond;             // BEQ return_background_grass_frond ; force (&40, &4f) to be a grass frond
-            yreg = 1;                                           // LDY #$01
+            Load(out accumulator, squareX, ref f);      // LDA square_x ; if square_y = &4f, do surface
+            Compare(accumulator, 0x40, ref f); // CMP #$40
+            if (f.Zero) goto return_background_grass_frond;      // BEQ return_background_grass_frond ; force (&40, &4f) to be a grass frond
+            Load(out yreg, 1, ref f);                // LDY #$01
             goto via_background_is_114f_lookup_with_y;          // JMP via_background_is_114f_lookup_with_y        ; otherwise, return wall
 
 return_background_grass_frond:
@@ -119,10 +127,10 @@ return_background_grass_frond:
 
 //  Things get rather hairy below the surface...
 below_surface:
-            yreg = zp_various_9d;                               // LDY zp_various_9d ; f_xy
-            accumulator = 0;                                    // LDA #$00
+            Load(out yreg, zp_various_9d, ref f);   // LDY zp_various_9d ; f_xy
+            Load(out accumulator, 0, ref f);        // LDA #$00
             zp_various_9d = accumulator;                        // STA zp_various_9d
-            accumulator = squareX;                              // LDA square_x
+            Load(out accumulator, squareX, ref f);  // LDA square_x
             BitTest(accumulator, squareY, ref f);        // BIT square_y
             if (f.Negative) goto L1821;                         // BMI L1821
             AddWithCarry(ref accumulator, 0x1d, ref f);     // ADC #$1D
@@ -131,16 +139,16 @@ below_surface:
 
 L1821:
             AddWithCarry(ref accumulator, 0x07, ref f);     // ADC #$07
-            Compare(accumulator, 0x2b, ref f); //CMP #$2B
+            Compare(accumulator, 0x2b, ref f); // CMP #$2B
 
 L1825:
             if (!f.Carry) goto L187C;                           // BCC L187C
-            accumulator = yreg;                                 // TYA
+            Transfer(yreg, out accumulator, ref f);     // TYA
             And(ref accumulator, 0xE8, ref f);           // AND #$E8
             Compare(accumulator, squareY, ref f);   // CMP square_y
             if (!f.Carry) goto L187C;                           // BCC L187C
             zp_various_9d = yreg;                               // STY zp_various_9d
-            accumulator = xreg;                                 // TXA
+            Transfer(xreg, out accumulator, ref f);     // TXA
             ArithmeticShiftLeft(ref accumulator, ref f);        // ASL A
             AddWithCarry(ref accumulator, squareY, ref f);  // ADC square_y
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
@@ -148,43 +156,42 @@ L1825:
             And(ref accumulator, 0xE0, ref f);            // AND #$E0
             AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
             And(ref accumulator, 0xE8, ref f);            // AND #$E8
-            if (accumulator != 0) goto no_mushrooms;            // BNE no_mushrooms
-            accumulator = squareY;                              // LDA square_y
-            if ((accumulator & 0x80) == 0) goto via_return_background_empty;  // BPL via_return_background_empty ; no mushrooms if square_y < &80
-            accumulator = squareX;                              // LDA square_x
+            if (!f.Zero) goto no_mushrooms;                     // BNE no_mushrooms
+            Load(out accumulator, squareY, ref f);  // LDA square_y
+            if (!f.Negative) goto via_return_background_empty;  // BPL via_return_background_empty ; no mushrooms if square_y < &80
+            Load(out accumulator, squareX, ref f);  // LDA square_x
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
-            xreg = accumulator;                                 // TAX
+            Transfer(accumulator, out xreg, ref f);      // TAX
             
-
 return_background_mushrooms:
-            accumulator = 0x0E;                                 // LDA #$0E ; &0e = mushrooms (on floor)
+            Load(out accumulator, 0x0E, ref f);     // LDA #$0E ; &0e = mushrooms (on floor)
             Compare(xreg, 0x0A, ref f);       // CPX #$0A
             if (!f.Zero) goto L1851;                            // BNE L1851
-            accumulator = 0x8E;                                 // LDA #$8E ; &8e = mushrooms (on ceiling)
+            Load(out accumulator, 0x8E, ref f);     // LDA #$8E ; &8e = mushrooms (on ceiling)
 
 L1851:
             result.Result = accumulator;
             return result;                                      // RTS
 
 no_mushrooms:
-            accumulator = yreg;                                 // TYA ; Y = f_xy
+            Transfer(yreg, out accumulator, ref f);     // TYA ; Y = f_xy
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             And(ref accumulator, 0x30, ref f);           // AND #$30
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
-            accumulator ^= squareX;                             // EOR square_x
+            Eor(ref accumulator, squareX, ref f);         // EOR square_x
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
-            accumulator ^= squareX;                             // EOR square_x
+            Eor(ref accumulator, squareX, ref f);         // EOR square_x
             AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
             And(ref accumulator, 0xFD, ref f);           // AND #$FD
-            accumulator ^= squareX;                             // EOR square_x
+            Eor(ref accumulator, squareX, ref f);        // EOR square_x
             And(ref accumulator, 0x07, ref f);           // AND #$07
             if (!f.Zero) goto L1878;                            // BNE L1878
-            accumulator = squareX;                              // LDA square_x
+            Load(out accumulator, squareX, ref f);  // LDA square_x
             if (f.Negative) goto L1875;                         // BMI L1875
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             AddWithCarry(ref accumulator, squareY, ref f);  // ADC square_y
@@ -203,7 +210,7 @@ L187C:
             goto background_is_114f_lookup_with_top_of_9d;      // JMP background_is_114f_lookup_with_top_of_9d
 
 L187F:
-            accumulator = yreg;                                 // TYA
+            Transfer(yreg, out accumulator, ref f);     // TYA
             And(ref accumulator, 0x68, ref f);           // AND #$68
             AddWithCarry(ref accumulator, squareY, ref f); // ADC square_y
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
@@ -211,10 +218,10 @@ L187F:
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             AddWithCarry(ref accumulator, squareY, ref f);  // ADC square_y
             And(ref accumulator, 0xFC, ref f);          // AND #$FC
-            accumulator ^= squareY;                            // EOR square_y
+            Eor(ref accumulator, squareY, ref f);        // EOR square_y
             And(ref accumulator, 0x17, ref f);          // AND #$17
             if (!f.Zero) goto L18DF;                            // BNE L18DF
-            accumulator = yreg;                                 // TYA
+            Transfer(yreg, out accumulator, ref f);         // TYA
             AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
             And(ref accumulator, 0x50, ref f);              // AND #$50
             if (f.Zero) goto return_background_empty;           // BEQ return_background_empty
@@ -229,19 +236,19 @@ L187F:
             if (!f.Carry) goto L18AF;                            // BCC L18AF
             BitTest(accumulator, zp_various_9d, ref f);     // BIT zp_various_9d
             if (!f.Overflow) goto L18C1;                            // BVC L18C1
-            Or(ref accumulator, 0x04, ref f);                       // ORA #$04
+            Or(ref accumulator, 0x04, ref f);                // ORA #$04
             if (!f.Zero) goto L18C1;                                // BNE L18C1
 
 L18AF:
             zp_various_9d = accumulator;                        // STA zp_various_9c
-            accumulator ^= 0x5;                                 // EOR #$05
+            Eor(ref accumulator, 0x5, ref f);            // EOR #$05
             Compare(accumulator, 0x06, ref f);  // CMP #$06
-            accumulator = zp_various_9d;                        // LDA zp_various_9c
+            Load(out accumulator, zp_various_9d, ref f);    // LDA zp_various_9c
             if (f.Carry) goto L18C1;                            // BCS L18C1
-            accumulator = yreg;                                 // TYA
+            Transfer(yreg, out accumulator, ref f);     // TYA
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             AddWithCarry(ref accumulator, squareY, ref f);  // ADC square_y
-            accumulator ^= squareX;                             // EOR square_x
+            Eor(ref accumulator, squareX, ref f);         // EOR square_x
             And(ref accumulator, 0x07, ref f);            // AND #$07
 
 L18C1:
@@ -251,19 +258,19 @@ L18C1:
             some_background_calc_thing();                       // JSR some_background_calc_thing
             accumulator = pushedAccumulator;                    // PLA
             if (!f.Carry) goto return_background_empty;         // BCC return_background_empty
-            yreg = accumulator;                                 // TAY
-            accumulator = BackgroundLookup[yreg];              // LDA background_lookup,Y
-            yreg = squareY;                                     // LDY square_y
+            Transfer(accumulator, out yreg, ref f);     // TAY
+            Load(out accumulator, BackgroundLookup[yreg], ref f); // LDA background_lookup,Y
+            Load(out yreg, squareY, ref f);         // LDY square_y
             Compare(yreg, 0xE0, ref f);       // CPY #$E0
             if (!f.Zero) goto L18D7;                            // BNE L18D7
-            accumulator ^= 0x40;                                // EOR #$40
+            Eor(ref accumulator, 0x40, ref f);           // EOR #$40
 
 L18D7:
             result.Result = accumulator;
             return result;                                      // RTS
 
 return_background_empty:
-            yreg = 0;                                           // LDY #$00
+            Load(out yreg, 0, ref f);               // LDY #$00
 
 background_is_114f_lookup_with_y:
             f.Carry = true;                                     // SEC
@@ -275,7 +282,7 @@ L18DF:
             if (f.Carry) goto background_is_114f_lookup_with_top_of_9d;    // BCS background_is_114f_lookup_with_top_of_9d
             Compare(yreg, 0x0, ref f);      // CPY #$00
             if (f.Zero) goto background_is_114f_lookup_with_y;  // BEQ background_is_114f_lookup_with_y                ; empty space
-            accumulator = zp_various_9d;                        // LDA zp_various_9d
+            Load(out accumulator, zp_various_9d, ref f);    // LDA zp_various_9d
             pushedAccumulator = accumulator;                    // PHA
             zp_various_9d = yreg;                               // STY zp_various_9c
             RotateLeft(ref accumulator, ref f);                 // ROL A
@@ -287,38 +294,38 @@ L18DF:
             accumulator = pushedAccumulator;                    // PLA
             AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
             RotateLeft(ref accumulator, ref f);                 // ROL A
-            accumulator ^= squareY;                             // EOR square_y
+            Eor(ref accumulator, squareY, ref f);                             // EOR square_y
             And(ref accumulator, 0x1a, ref f);          // AND #$1A
             if (!f.Zero) goto L1913;                            // BNE L1913
-            accumulator = yreg;                                 // TYA
-            yreg = zp_various_9d;                               // LDY zp_various_9c
-            accumulator ^= BackgroundLookup[yreg + 7];         // EOR background_lookup+7,Y
+            Transfer(yreg, out accumulator, ref f);     // TYA
+            Load(out yreg, zp_various_9d, ref f);   // LDY zp_various_9c
+            Eor(ref accumulator, BackgroundLookup[yreg + 7], ref f);  // EOR background_lookup+7,Y
             And(ref accumulator, 0x7f, ref f);          // AND #$7F
             Compare(accumulator, 0x40, ref f);  // CMP #$40
             RotateLeft(ref accumulator, ref f);                 // ROL A
             And(ref accumulator, 0x07, ref f);          // AND #$07
-            xreg = accumulator;                                 // TAX
-            accumulator = BackgroundLookup[xreg + 17];         // LDA background_lookup+17,X
-            accumulator ^= BackgroundLookup[yreg + 7];         // EOR background_lookup+7,Y
+            Transfer(accumulator, out xreg, ref f);     // TAX
+            Load(out accumulator, BackgroundLookup[xreg + 17], ref f); // LDA background_lookup+17,X
+            Eor(ref accumulator, BackgroundLookup[yreg + 7], ref f ); // EOR background_lookup+7,Y
             result.Result = accumulator;
             return result;                                     // RTS
 
 L1913:
-            accumulator = BackgroundLookup[13 + yreg];         // LDA background_lookup+13,Y
-            yreg = zp_various_9d;                               // LDY zp_various_9c
-            accumulator ^= BackgroundLookup[7 + yreg];         // EOR background_lookup+7,Y
+            Load(out accumulator, BackgroundLookup[13 + yreg], ref f); // LDA background_lookup+13,Y
+            Load(out yreg, zp_various_9d, ref f);   // LDY zp_various_9c
+            Eor(ref accumulator, BackgroundLookup[7 + yreg], ref f); // EOR background_lookup+7,Y
             result.Result = accumulator;
             return result;                                      // RTS
 
 background_is_114f_lookup_with_top_of_9d:
-            accumulator = zp_various_9d;                        // LDA zp_various_9d
+            Load(out accumulator, zp_various_9d, ref f); // LDA zp_various_9d
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             And(ref accumulator, 0x0E, ref f);           // AND #$0E
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             AddWithCarry(ref accumulator, 0x01, ref f);     // ADC #$01
-            yreg = accumulator;                                 // TAY
+            Transfer(accumulator, out yreg, ref f);     // TAY
 
 via_background_is_114f_lookup_with_y:
             goto background_is_114f_lookup_with_y;              // JMP background_is_114f_lookup_with_y
@@ -330,12 +337,12 @@ L192A:
             RotateLeft(ref accumulator, ref f);                 // ROL A
             And(ref accumulator, 0x02, ref f);            // AND #$02
             AddWithCarry(ref accumulator, 0x19, ref f);     // ADC #$19
-            yreg = accumulator;                                 // TAY
+            Transfer(accumulator, out yreg, ref f);     // TAY
             goto background_is_114f_lookup_with_y;              // JMP background_is_114f_lookup_with_y
 
 L1937:
-            yreg = 0x19;                                        // LDY #$19
-            accumulator = squareX;                              // LDA square_x
+            Load(out yreg, 0x19, ref f);            // LDY #$19
+            Load(out accumulator, squareX, ref f);  // LDA square_x
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
             And(ref accumulator, 0x17, ref f);            // AND #$17
@@ -347,23 +354,23 @@ L1937:
 
 void some_background_calc_thing()
     {
-    accumulator = xreg;                             // TXA
+    Transfer(xreg, out accumulator, ref f);  // TXA
     LogicalShiftRight(ref accumulator, ref f);      // LSR A
-    accumulator ^= squareY;                         // EOR square_y
+    Eor(ref accumulator, squareY, ref f);    // EOR square_y
     And(ref accumulator, 0x06, ref f);       // AND #$06
     if (!f.Zero) goto L1971;                        // BNE L1971
-    accumulator = yreg;                             // TYA
-    yreg = 0x02;                                    // LDY #$02
+    Transfer(yreg, out accumulator, ref f); // TYA
+    Load(out yreg, 0x02, ref f);        // LDY #$02
     And(ref accumulator, 0x20, ref f);          // AND #$20
     ArithmeticShiftLeft(ref accumulator, ref f);    // ASL A
     ArithmeticShiftLeft(ref accumulator, ref f);    // ASL A
-    accumulator ^= 0xE5;                            // EOR #$E5
+    Eor(ref accumulator, 0xE5, ref f);       // EOR #$E5
     byte opcode = accumulator;                      // STA L1961 ; self modifying code
     if (f.Negative) goto L195E;                     // BMI L195E
-    yreg = 0x4;                                     // LDY #$04
+    Load(out yreg, 0x4, ref f);         // LDY #$04
 
 L195E:
-    accumulator = xreg;                             // TXA
+    Transfer(xreg, out accumulator, ref f);     // TXA
     AddWithCarry(ref accumulator, 0x16, ref f); // ADC #$16
 switch (opcode)                                                             // modified above
         {
@@ -376,8 +383,8 @@ switch (opcode)                                                             // m
         default: throw new InvalidOperationException("no handler for opcode " + opcode.ToString("X"));
         }
     And(ref accumulator, 0x5F, ref f);          // AND #$5F
-    xreg = accumulator;                             // TAX
-    xreg -=1;                                       // DEX
+    Transfer(accumulator, out xreg, ref f);     // TAX
+    xreg -= 1;                                       // DEX
     Compare(xreg, 0x0C, ref f);     // CPX #$0C
     if (!f.Carry) goto L19A3;                       // BCC L19A3
     if (f.Zero) goto L19A5;                         // BEQ L19A5
@@ -386,26 +393,26 @@ switch (opcode)                                                             // m
     if (xreg == 0) goto L19A5;                      // BEQ L19A5
 
 L1971:
-    accumulator = squareX;                             // LDA square_x
+    Load(out accumulator, squareX, ref f);  // LDA square_x
     LogicalShiftRight(ref accumulator, ref f);          // LSR A
     LogicalShiftRight(ref accumulator, ref f);          // LSR A
     LogicalShiftRight(ref accumulator, ref f);          // LSR A
     LogicalShiftRight(ref accumulator, ref f);          // LSR A
-    if (f.Carry) goto L19A2;                        // BCS L19A2
-    accumulator = 0x01;                             // LDA #$01
+    if (f.Carry) goto L19A2;                            // BCS L19A2
+    Load(out accumulator, 0x01, ref f);     // LDA #$01
     AddWithCarry(ref accumulator, squareX, ref f);  // ADC square_x
     AddWithCarry(ref accumulator, squareY, ref f);  // ADC square_y
     And(ref accumulator, 0x8F, ref f);          // AND #$8F
     Compare(accumulator, 0x01, ref f);  // CMP #$01
     if (f.Zero) goto L19A3;                             // BEQ L19A3
-    xreg = accumulator;                                 // TAX
+    Transfer(accumulator, out xreg, ref f);     // TAX
     f.Carry = true;                                     // SEC
-    accumulator = squareY;                              // LDA square_y
+    Load(out accumulator, squareY, ref f);  // LDA square_y
     SubtractWithBorrow(ref accumulator, squareX, ref f);    // SBC square_x
     And(ref accumulator, 0x2F, ref f);          // AND #$2F
     Compare(accumulator, 0x01, ref f);  // CMP #$01
     if (f.Zero) goto L19A3;                             // BEQ L19A3
-    yreg = 2;                                           // LDY #$02
+    Load(out yreg, 2, ref f);               // LDY #$02
     Compare(accumulator, 0x02, ref f);  // CMP #$02
     if (f.Zero) goto L19A5;                             // BEQ L19A5
     yreg += 1;                                          // INY
@@ -420,7 +427,7 @@ L19A2:
     return;                                             // RTS
 
 L19A3:
-    yreg = 0;                                           // LDY #$00
+    Load(out yreg, 0, ref f);               // LDY #$00
 
 L19A5:
     f.Carry = false;                                    // CLC
@@ -443,7 +450,7 @@ L19A5:
             if (positionInHash == -1)
                 {
                 byte defaultBackground = LookupForUnmatchedHash[spriteOrHash];
-                defaultBackground ^= (byte) (spriteOrHash & 0xc0);
+                defaultBackground ^= (byte) (calculatedBackground & 0xc0);
                 return (background: defaultBackground, backgroundObjectId: null, isHashDefault: true);
                 }
 
@@ -498,6 +505,121 @@ L19A5:
                 }
 
             return null;
+            }
+
+        private byte GetPalette(ref byte background, ref byte orientation, byte squareX, byte squareY)
+            {
+            if (background > 3f)
+                throw new ArgumentOutOfRangeException();
+            if ((orientation & 0x3f) != 0)
+                throw new ArgumentOutOfRangeException();
+
+            byte accumulator;
+            Flags flags = new Flags();
+
+            Load(out accumulator, _backgroundPaletteLookup[background], ref flags);
+            if (!flags.Zero) goto palette_not_zero;
+
+            Load(out accumulator, squareY, ref flags);
+            flags.Carry = true;
+            SubtractWithBorrow(ref accumulator, 0x54, ref flags);
+            LogicalShiftRight(ref accumulator, ref flags);
+            LogicalShiftRight(ref accumulator, ref flags);
+            LogicalShiftRight(ref accumulator, ref flags);
+            LogicalShiftRight(ref accumulator, ref flags);
+            byte index = accumulator;
+            Load(out accumulator, _wallPaletteZeroLookup[index], ref flags);
+                
+palette_not_zero:
+            Compare(accumulator, 0x03, ref flags);
+            if (flags.Carry) goto palette_not_one_or_two;
+
+            AddWithCarry(ref accumulator, 0xb1, ref flags);
+            BitTest(accumulator, squareY, ref flags);
+            if (!flags.Negative) goto palette_not_six;
+            ArithmeticShiftLeft(ref accumulator, ref flags);
+            AddWithCarry(ref accumulator, 0x90, ref flags);
+
+palette_not_one_or_two:
+            Compare(accumulator, 0x03, ref flags);
+            if (!flags.Zero) goto palette_not_three;
+
+            Load(out accumulator, orientation, ref flags);
+            RotateLeft(ref accumulator, ref flags);
+            RotateLeft(ref accumulator, ref flags);
+            RotateLeft(ref accumulator, ref flags);
+            SubtractWithBorrow(ref accumulator, squareY, ref flags);
+            RotateRight(ref accumulator, ref flags);
+            flags.Carry = false;
+            AddWithCarry(ref accumulator, squareX, ref flags);
+            And(ref accumulator, 0x03, ref flags);
+            index = accumulator;
+            accumulator = _wallPaletteThreeLookup[index];
+
+palette_not_three:
+            Compare(accumulator, 0x04, ref flags);
+            if (!flags.Zero) goto palette_not_four;
+
+            Load(out accumulator, squareY, ref flags);
+            RotateLeft(ref accumulator, ref flags);
+            RotateLeft(ref accumulator, ref flags);
+            RotateLeft(ref accumulator, ref flags);
+            RotateLeft(ref accumulator, ref flags);
+            And(ref accumulator, 0x7, ref flags);
+            index = accumulator;
+            accumulator = _wallPaletteFourLookup[index];
+
+palette_not_four:
+            Compare(accumulator, 0x05, ref flags);
+            if (!flags.Zero) goto palette_not_five;
+
+            Load(out accumulator, squareY, ref flags);
+            RotateRight(ref accumulator, ref flags);
+            RotateRight(ref accumulator, ref flags);
+            Eor(ref accumulator, squareY, ref flags);
+            RotateRight(ref accumulator, ref flags);
+            if (flags.Carry) 
+                background = 0x19;
+            RotateRight(ref accumulator, ref flags);
+            SubtractWithBorrow(ref accumulator, squareY, ref flags);
+            And(ref accumulator, 0x40, ref flags);
+            Eor(ref accumulator, orientation, ref flags);
+            BitTest(accumulator,orientation, ref flags);
+            orientation = accumulator;
+            Load(out accumulator, 0xB1, ref flags);
+            if (!flags.Overflow) goto palette_not_six;
+            AddWithCarry(ref accumulator, 0x0a, ref flags);
+
+palette_not_five:
+            Compare(accumulator, 0x06, ref flags);
+            if (!flags.Zero) goto palette_not_six;
+
+            Load(out accumulator, 0x9c, ref flags);
+            BitTest(accumulator, orientation, ref flags);
+            if (!flags.Overflow) goto palette_not_six;
+            Load(out accumulator, 0xcf, ref flags);
+
+        palette_not_six:
+            return accumulator;
+            }
+
+        private (Color colour1, Color colour2, Color colour3) GetPaletteColours(byte palette)
+            {
+            Color colour3 = _colourMap[(byte) ((palette & 0b01110000) >> 4)];
+            var colourPair = _colourPairs[palette & 0xf];
+            return (colour1: colourPair.rightColour, colour2: colourPair.leftColour, colour3: colour3);
+            }
+
+        private static void Load(out byte register, byte data, ref Flags flags)
+            {
+            register = data;
+            flags.Zero = (register == 0);
+            flags.Negative = (register & 0x80) != 0;
+            }
+
+        private static void Transfer(byte from, out byte to, ref Flags flags)
+            {
+            Load(out to, from, ref flags);
             }
 
         private static void AddWithCarry(ref byte accumulator, byte data, ref Flags flags)
@@ -574,6 +696,13 @@ L19A5:
         private static void Or(ref byte accumulator, byte operand, ref Flags flags)
             {
             accumulator |= operand;
+            flags.Zero = (accumulator == 0);
+            flags.Negative = (accumulator & 0x80) != 0;
+            }
+
+        private static void Eor(ref byte accumulator, byte operand, ref Flags flags)
+            {
+            accumulator ^= operand;
             flags.Zero = (accumulator == 0);
             flags.Negative = (accumulator & 0x80) != 0;
             }
@@ -832,6 +961,69 @@ L19A5:
                 0x06, 0x04, 0x06, 0x04, 0x07, 0x05, 0x05, 0x06, 0x19, 0x2C, 0x19, 0x2B, 0x00, 0x01, 0x02, 0x03,
                 0x1A, 0x21, 0x09, 0x9B, 0x12, 0x10, 0x60, 0x2B, 0x0F, 0x4F, 0x04, 0x0A
                 };
+            }
+
+        private static byte[] BuildBackgroundPaletteLookup()
+            {
+            var result = new byte[]
+                {
+                0x80,0x02,0x91,0x91,0x91,0x00,0x91,0xA8,0xDC,0xB8,0x8C,0x80,0xC9,0x4A,0x80,0x06, // 00
+                0x88,0x05,0x04,0x00,0x02,0x02,0x02,0x02,0x02,0x91,0x03,0x03,0x02,0x02,0x00,0x00, // 10
+                0x00,0xBC,0xB1,0x00,0x00,0x00,0x01,0x01,0x01,0x01,0x00,0x04,0x04,0x04,0x04,0x04, // 20
+                0x04,0x04,0x02,0x01,0x01,0x01,0x02,0x02,0x02,0x00,0x00,0x00,0x82,0x02,0x64,0xEE  // 30
+                };
+            return result;
+            }
+
+        private static byte[] BuildWallPaletteZeroLookup()
+            {
+            return new byte[] {0x8D,0x82,0x8B,0x8F,0x84,0x89,0x8D};
+            }
+
+        private static byte[] BuildWallPaletteThreeLookup()
+            {
+            return new byte[] {0xB1,0x97,0xFD,0xF3};
+            }
+
+        private static byte[] BuildWallPaletteFourLookup()
+            {
+            return new byte[] {0x81,0x82,0x81,0x85,0xB2,0xCD,0x90,0x95};
+// equb $81
+            }
+
+        private static Color[] BuildColourMap()
+            {
+            return new[] {Color.Black, Color.Red, Color.Green, Color.Yellow, Color.Blue, Color.Magenta, Color.Cyan, Color.White};
+            }
+
+        private static (Color leftColour, Color rightColour)[] BuildColourPairs()
+            {
+            var colourMap = new Dictionary<byte, Color>
+                {
+                    {0b00000000, Color.Black},
+                    {0b00000001, Color.Red},
+                    {0b00000100, Color.Green},
+                    {0b00000101, Color.Yellow},
+                    {0b00010000, Color.Blue},
+                    {0b00010001, Color.Magenta},
+                    {0b00010100, Color.Cyan},
+                    {0b00010101, Color.White}
+                };
+            var result = 
+                (
+                from palettePair in BuildPaletteValueToPixelLookup()
+                let leftPixel = (palettePair & 0b00101010) >> 1
+                let rightPixel = (palettePair & 0x00010101)
+                let leftColour = colourMap[(byte) leftPixel]
+                let rightColour = colourMap[(byte) rightPixel]
+                select (leftColour, rightColour)
+                ).ToArray();
+            return result;
+            }
+
+        private static byte[] BuildPaletteValueToPixelLookup()
+            {
+            return new byte[] {0xca, 0xc9, 0xe3, 0xe9, 0xeb, 0xce, 0xf8, 0xe6, 0xcc, 0xee, 0x30, 0xde, 0xef, 0xcb, 0xfb, 0xfe};
             }
 
         private struct Flags

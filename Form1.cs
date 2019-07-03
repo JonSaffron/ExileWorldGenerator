@@ -108,7 +108,7 @@ namespace ExileMappedBackground
 
             bool bottomAlign = (squareProperties.Background & 0x40) != 0;
             bool flipVertically = bottomAlign;
-            flipVertically ^= _flipBackgroundSpriteVertically[background];
+            //flipVertically ^= _flipBackgroundSpriteVertically[background];
             flipVertically ^= _flipSpriteVertically[sprite];
 
             byte offsetAlongY = (byte) (this._backgroundYOffsetLookup[background] & 0xf0);
@@ -231,7 +231,7 @@ namespace ExileMappedBackground
             byte sprite = (byte) (_backgroundSpriteLookup[background & 0x3f] & 0x7f);
             text += $"\r\nSprite: {sprite:x2}";
             text += $"\r\nFlip sprite horizontally: {_flipSpriteHorizontally[sprite]}";
-            text += $"\r\nFlip vertically for background: {_flipBackgroundSpriteVertically[background & 0x3f]}";
+            text += $"\r\n***Flip vertically for background: {_flipBackgroundSpriteVertically[background & 0x3f]}";
             text += $"\r\nFlip sprite vertically: {_flipSpriteVertically[sprite]}";
 
             e.ToolTipText = text;
