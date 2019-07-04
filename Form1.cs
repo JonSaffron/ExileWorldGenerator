@@ -72,17 +72,20 @@ namespace ExileMappedBackground
                 hashOfPositions.Add(mapResult.PositionInMappedData);
                 }
 
-            var background = _mapper.GetMapData(mapResult.Result, x);
-            var data = new SquareProperties();
-            data.X = x;
-            data.Y = y;
-            data.CalculatedBackground = mapResult.Result;
+            var data = new SquareProperties {X = x, Y = y, CalculatedBackground = mapResult.Result};
             if (mapResult.IsMappedData)
                 data.MappedDataPosition = mapResult.PositionInMappedData;
-            data.Background = background.background;
-            data.BackgroundObjectId = background.backgroundObjectId;
-            data.IsHashDefault = background.isHashDefault;
-            data.BackgroundEventTypeName = CalculateBackground.GetBackgroundEventTypeName(background.background);
+
+            var backgroundProperties = _mapper.GetMapData(mapResult.Result, x);
+            data.BackgroundAfterHashing = backgroundProperties.background;
+            data.BackgroundObjectId = backgroundProperties.backgroundObjectId;
+            data.IsHashDefault = backgroundProperties.isHashDefault;
+            data.BackgroundEventTypeName = CalculateBackground.GetBackgroundEventTypeName(backgroundProperties.background);
+
+            byte background = (byte) (data.BackgroundAfterHashing & 0x3f);
+            byte orientation = (byte) (data.BackgroundAfterHashing & 0xc0);
+            data.Palette = _mapper.GetPalette(ref background, ref orientation, x, y);
+            data.BackgroundAfterPalette = (byte) (background ^ orientation);
 
             this._squareProperties[x, y] = data;
             }
@@ -98,18 +101,16 @@ namespace ExileMappedBackground
 
             var squareProperties = this._squareProperties[e.ColumnIndex, e.RowIndex];
 
-            byte background = (byte) (squareProperties.Background & 0x3f);
+            byte background = (byte) (squareProperties.BackgroundAfterPalette & 0x3f);
             byte sprite = (byte) (this._backgroundSpriteLookup[background] & 0x7f);
             if (!this._sourceRectangles.TryGetValue(sprite, out var sourceRectangle))
                 throw new InvalidOperationException($"Required sprite number {sprite:x2}");
 
-            bool rightAlign = (squareProperties.Background & 0x80) != 0;
+            bool rightAlign = (squareProperties.BackgroundAfterPalette & 0x80) != 0;
             bool flipHorizontally = rightAlign ^ _flipSpriteHorizontally[sprite];
 
-            bool bottomAlign = (squareProperties.Background & 0x40) != 0;
-            bool flipVertically = bottomAlign;
-            //flipVertically ^= _flipBackgroundSpriteVertically[background];
-            flipVertically ^= _flipSpriteVertically[sprite];
+            bool bottomAlign = (squareProperties.BackgroundAfterPalette & 0x40) != 0;
+            bool flipVertically = bottomAlign ^ _flipSpriteVertically[sprite];
 
             byte offsetAlongY = (byte) (this._backgroundYOffsetLookup[background] & 0xf0);
             if (bottomAlign)
@@ -183,11 +184,14 @@ namespace ExileMappedBackground
             public byte X;
             public byte Y;
             public byte CalculatedBackground;
-            public byte Background;
+            public byte BackgroundAfterHashing;
+            public byte BackgroundAfterPalette;
+
             public int? MappedDataPosition;
             public bool IsHashDefault;
             public int? BackgroundObjectId;
             public string BackgroundEventTypeName;
+            public byte Palette;
             }
 
         private void dataGridView1_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
@@ -202,11 +206,11 @@ namespace ExileMappedBackground
             if (squareValue.MappedDataPosition.HasValue)
                 text += "Explicitly mapped using position " + squareValue.MappedDataPosition.Value;
             var calculatedBackground = squareValue.CalculatedBackground;
-            var background = squareValue.Background;
+            var backgroundAfterHashing = squareValue.BackgroundAfterHashing;
             if ((calculatedBackground & 0x3f) < 0x9)
                 {
                 text += $"\r\nPre-Hash Result: {calculatedBackground:x2} (range {calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped vertically" : (calculatedBackground & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
-                text += $"\r\nPost-Hash Result: {background:x2} ({background & 0x3f:x2}{((background & 0xC0) == 0xC0 ? " flipped both ways" : (background & 0x40) != 0 ? " flipped vertically" : (background & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
+                text += $"\r\nPost-Hash Result: {backgroundAfterHashing:x2} ({backgroundAfterHashing & 0x3f:x2}{((backgroundAfterHashing & 0xC0) == 0xC0 ? " flipped both ways" : (backgroundAfterHashing & 0x40) != 0 ? " flipped vertically" : (backgroundAfterHashing & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
                 if (squareValue.IsHashDefault)
                     {
                     Debug.Assert(!squareValue.BackgroundObjectId.HasValue);
@@ -220,18 +224,28 @@ namespace ExileMappedBackground
                 }
             else
                 {
-                Debug.Assert(background == calculatedBackground);
+                Debug.Assert(backgroundAfterHashing == calculatedBackground);
                 Debug.Assert(!squareValue.IsHashDefault);
                 Debug.Assert(!squareValue.BackgroundObjectId.HasValue);
                 text += $"\r\nResult: {calculatedBackground:x2} ({calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped vertically" : (calculatedBackground & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
                 }
+
             if (squareValue.BackgroundEventTypeName != null)
                 text += "\r\nBackground event: " + squareValue.BackgroundEventTypeName;
 
-            byte sprite = (byte) (_backgroundSpriteLookup[background & 0x3f] & 0x7f);
+            var colours = _mapper.GetPaletteColours(squareValue.Palette);
+            text += "\r\nPalette: " + colours.colour1 + ", " + colours.colour2 + ", " + colours.colour3;
+
+            if (squareValue.BackgroundAfterHashing != squareValue.BackgroundAfterPalette)
+                {
+                text += "\r\nPalette changed background and/or orientation";
+                text += $"\r\nFinal background: {squareValue.BackgroundAfterPalette:x2} ({squareValue.BackgroundAfterPalette & 0x3f:x2}{((squareValue.BackgroundAfterPalette & 0xC0) == 0xC0 ? " flipped both ways" : (squareValue.BackgroundAfterPalette & 0x40) != 0 ? " flipped vertically" : (squareValue.BackgroundAfterPalette & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
+
+                }
+
+            byte sprite = (byte) (_backgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);
             text += $"\r\nSprite: {sprite:x2}";
             text += $"\r\nFlip sprite horizontally: {_flipSpriteHorizontally[sprite]}";
-            text += $"\r\n***Flip vertically for background: {_flipBackgroundSpriteVertically[background & 0x3f]}";
             text += $"\r\nFlip sprite vertically: {_flipSpriteVertically[sprite]}";
 
             e.ToolTipText = text;

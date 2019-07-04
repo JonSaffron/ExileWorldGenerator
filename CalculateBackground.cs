@@ -7,26 +7,6 @@ namespace ExileMappedBackground
     {
     class CalculateBackground
         {
-        private enum ColourMap
-            {
-            BlackForeground = 0,
-            RedForeground = 1,
-            GreenForeground = 2,
-            YellowForeground = 3,
-            BlueForeground = 4,
-            MagentaForeground = 5,
-            CyanForeground = 6,
-            WhiteForeground = 7,
-            BlackBackground = 8,
-            RedBackground = 9,
-            GreenBackground = 10,
-            YellowBackground = 11,
-            BlueBackground = 12,
-            MagentaBackground = 13,
-            CyanBackground = 14,
-            WhiteBackground = 15
-            }
-
         private static readonly byte[] MapData = BuildMapData();
         private static readonly Dictionary<int, byte[]> BackgroundObjectsXLookup = BuildBackgroundObjectsXLookup();
         private static readonly byte[] LookupForUnmatchedHash = BuildLookupForUnmatchedHash();
@@ -36,7 +16,7 @@ namespace ExileMappedBackground
         private static readonly byte[] _wallPaletteZeroLookup = BuildWallPaletteZeroLookup();
         private static readonly byte[] _wallPaletteThreeLookup = BuildWallPaletteThreeLookup();
         private static readonly byte[] _wallPaletteFourLookup = BuildWallPaletteFourLookup();
-        private static readonly (ColourMap leftColour, ColourMap rightColour)[] _colourPairs = BuildColourPairs();
+        private static readonly (GameColour leftColour, GameColour rightColour)[] _colourPairs = BuildColourPairs();
         private static readonly Color[] _colourMap = BuildColourMap();
 
         public MapResult GetBackground(byte squareX, byte squareY)
@@ -527,9 +507,9 @@ L19A5:
             return null;
             }
 
-        private byte GetPalette(ref byte background, ref byte orientation, byte squareX, byte squareY)
+        public byte GetPalette(ref byte background, ref byte orientation, byte squareX, byte squareY)
             {
-            if (background > 3f)
+            if (background > 0x3f)
                 throw new ArgumentOutOfRangeException();
             if ((orientation & 0x3f) != 0)
                 throw new ArgumentOutOfRangeException();
@@ -629,9 +609,9 @@ palette_not_five:
             return accumulator;
             }
 
-        private (ColourMap colour1, ColourMap colour2, ColourMap colour3) GetPaletteColours(byte palette)
+        public (GameColour colour1, GameColour colour2, GameColour colour3) GetPaletteColours(byte palette)
             {
-            ColourMap colour3 = (ColourMap) (palette >> 4);
+            GameColour colour3 = (GameColour) (palette >> 4);
             var colourPair = _colourPairs[palette & 0xf];
             return (colour1: colourPair.rightColour, colour2: colourPair.leftColour, colour3: colour3);
             }
@@ -1003,7 +983,10 @@ palette_not_five:
 
         private static byte[] BuildWallPaletteZeroLookup()
             {
-            return new byte[] {0x8D,0x82,0x8B,0x8F,0x84,0x89,0x8D};
+            var result = new byte[] {0x8D,0x82,0x8B,0x8F,0x84,0x89,0x8D}
+                .Concat(BuildWallPaletteFourLookup())
+                .Concat(BuildWallPaletteThreeLookup());
+            return result.ToArray();
             }
 
         private static byte[] BuildWallPaletteThreeLookup()
@@ -1022,26 +1005,26 @@ palette_not_five:
             return new[] {Color.Black, Color.Red, Color.Green, Color.Yellow, Color.Blue, Color.Magenta, Color.Cyan, Color.White};
             }
 
-        private static (ColourMap leftColour, ColourMap rightColour)[] BuildColourPairs()
+        private static (GameColour leftColour, GameColour rightColour)[] BuildColourPairs()
             {
-            var colourMap = new Dictionary<byte, ColourMap>
+            var colourMap = new Dictionary<byte, GameColour>
                 {
-                    {0b00000000, ColourMap.BlackForeground},
-                    {0b00000001, ColourMap.RedForeground},
-                    {0b00000100, ColourMap.GreenForeground},
-                    {0b00000101, ColourMap.YellowForeground},
-                    {0b00010000, ColourMap.BlueForeground},
-                    {0b00010001, ColourMap.MagentaForeground},
-                    {0b00010100, ColourMap.CyanForeground},
-                    {0b00010101, ColourMap.WhiteForeground},
-                    {0b01000000, ColourMap.BlackBackground},
-                    {0b01000001, ColourMap.RedBackground},
-                    {0b01000100, ColourMap.GreenBackground},
-                    {0b01000101, ColourMap.YellowBackground},
-                    {0b01010000, ColourMap.BlueBackground},
-                    {0b01010001, ColourMap.MagentaBackground},
-                    {0b01010100, ColourMap.CyanBackground},
-                    {0b01010101, ColourMap.WhiteBackground}
+                    {0b00000000, GameColour.BlackForeground},
+                    {0b00000001, GameColour.RedForeground},
+                    {0b00000100, GameColour.GreenForeground},
+                    {0b00000101, GameColour.YellowForeground},
+                    {0b00010000, GameColour.BlueForeground},
+                    {0b00010001, GameColour.MagentaForeground},
+                    {0b00010100, GameColour.CyanForeground},
+                    {0b00010101, GameColour.WhiteForeground},
+                    {0b01000000, GameColour.BlackBackground},
+                    {0b01000001, GameColour.RedBackground},
+                    {0b01000100, GameColour.GreenBackground},
+                    {0b01000101, GameColour.YellowBackground},
+                    {0b01010000, GameColour.BlueBackground},
+                    {0b01010001, GameColour.MagentaBackground},
+                    {0b01010100, GameColour.CyanBackground},
+                    {0b01010101, GameColour.WhiteBackground}
                 };
             var result = 
                 (
