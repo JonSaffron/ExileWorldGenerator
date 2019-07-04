@@ -7,6 +7,26 @@ namespace ExileMappedBackground
     {
     class CalculateBackground
         {
+        private enum ColourMap
+            {
+            BlackForeground = 0,
+            RedForeground = 1,
+            GreenForeground = 2,
+            YellowForeground = 3,
+            BlueForeground = 4,
+            MagentaForeground = 5,
+            CyanForeground = 6,
+            WhiteForeground = 7,
+            BlackBackground = 8,
+            RedBackground = 9,
+            GreenBackground = 10,
+            YellowBackground = 11,
+            BlueBackground = 12,
+            MagentaBackground = 13,
+            CyanBackground = 14,
+            WhiteBackground = 15
+            }
+
         private static readonly byte[] MapData = BuildMapData();
         private static readonly Dictionary<int, byte[]> BackgroundObjectsXLookup = BuildBackgroundObjectsXLookup();
         private static readonly byte[] LookupForUnmatchedHash = BuildLookupForUnmatchedHash();
@@ -16,7 +36,7 @@ namespace ExileMappedBackground
         private static readonly byte[] _wallPaletteZeroLookup = BuildWallPaletteZeroLookup();
         private static readonly byte[] _wallPaletteThreeLookup = BuildWallPaletteThreeLookup();
         private static readonly byte[] _wallPaletteFourLookup = BuildWallPaletteFourLookup();
-        private static readonly (Color leftColour, Color rightColour)[] _colourPairs = BuildColourPairs();
+        private static readonly (ColourMap leftColour, ColourMap rightColour)[] _colourPairs = BuildColourPairs();
         private static readonly Color[] _colourMap = BuildColourMap();
 
         public MapResult GetBackground(byte squareX, byte squareY)
@@ -520,6 +540,7 @@ L19A5:
             Load(out accumulator, _backgroundPaletteLookup[background], ref flags);
             if (!flags.Zero) goto palette_not_zero;
 
+// palette 0
             Load(out accumulator, squareY, ref flags);
             flags.Carry = true;
             SubtractWithBorrow(ref accumulator, 0x54, ref flags);
@@ -534,6 +555,7 @@ palette_not_zero:
             Compare(accumulator, 0x03, ref flags);
             if (flags.Carry) goto palette_not_one_or_two;
 
+// palette 1 or 2
             AddWithCarry(ref accumulator, 0xb1, ref flags);
             BitTest(accumulator, squareY, ref flags);
             if (!flags.Negative) goto palette_not_six;
@@ -544,6 +566,7 @@ palette_not_one_or_two:
             Compare(accumulator, 0x03, ref flags);
             if (!flags.Zero) goto palette_not_three;
 
+// palette 3
             Load(out accumulator, orientation, ref flags);
             RotateLeft(ref accumulator, ref flags);
             RotateLeft(ref accumulator, ref flags);
@@ -560,6 +583,7 @@ palette_not_three:
             Compare(accumulator, 0x04, ref flags);
             if (!flags.Zero) goto palette_not_four;
 
+// palette 4
             Load(out accumulator, squareY, ref flags);
             RotateLeft(ref accumulator, ref flags);
             RotateLeft(ref accumulator, ref flags);
@@ -573,6 +597,7 @@ palette_not_four:
             Compare(accumulator, 0x05, ref flags);
             if (!flags.Zero) goto palette_not_five;
 
+// palette 5
             Load(out accumulator, squareY, ref flags);
             RotateRight(ref accumulator, ref flags);
             RotateRight(ref accumulator, ref flags);
@@ -594,6 +619,7 @@ palette_not_five:
             Compare(accumulator, 0x06, ref flags);
             if (!flags.Zero) goto palette_not_six;
 
+// palette 6
             Load(out accumulator, 0x9c, ref flags);
             BitTest(accumulator, orientation, ref flags);
             if (!flags.Overflow) goto palette_not_six;
@@ -603,9 +629,9 @@ palette_not_five:
             return accumulator;
             }
 
-        private (Color colour1, Color colour2, Color colour3) GetPaletteColours(byte palette)
+        private (ColourMap colour1, ColourMap colour2, ColourMap colour3) GetPaletteColours(byte palette)
             {
-            Color colour3 = _colourMap[(byte) ((palette & 0b01110000) >> 4)];
+            ColourMap colour3 = (ColourMap) (palette >> 4);
             var colourPair = _colourPairs[palette & 0xf];
             return (colour1: colourPair.rightColour, colour2: colourPair.leftColour, colour3: colour3);
             }
@@ -996,18 +1022,26 @@ palette_not_five:
             return new[] {Color.Black, Color.Red, Color.Green, Color.Yellow, Color.Blue, Color.Magenta, Color.Cyan, Color.White};
             }
 
-        private static (Color leftColour, Color rightColour)[] BuildColourPairs()
+        private static (ColourMap leftColour, ColourMap rightColour)[] BuildColourPairs()
             {
-            var colourMap = new Dictionary<byte, Color>
+            var colourMap = new Dictionary<byte, ColourMap>
                 {
-                    {0b00000000, Color.Black},
-                    {0b00000001, Color.Red},
-                    {0b00000100, Color.Green},
-                    {0b00000101, Color.Yellow},
-                    {0b00010000, Color.Blue},
-                    {0b00010001, Color.Magenta},
-                    {0b00010100, Color.Cyan},
-                    {0b00010101, Color.White}
+                    {0b00000000, ColourMap.BlackForeground},
+                    {0b00000001, ColourMap.RedForeground},
+                    {0b00000100, ColourMap.GreenForeground},
+                    {0b00000101, ColourMap.YellowForeground},
+                    {0b00010000, ColourMap.BlueForeground},
+                    {0b00010001, ColourMap.MagentaForeground},
+                    {0b00010100, ColourMap.CyanForeground},
+                    {0b00010101, ColourMap.WhiteForeground},
+                    {0b01000000, ColourMap.BlackBackground},
+                    {0b01000001, ColourMap.RedBackground},
+                    {0b01000100, ColourMap.GreenBackground},
+                    {0b01000101, ColourMap.YellowBackground},
+                    {0b01010000, ColourMap.BlueBackground},
+                    {0b01010001, ColourMap.MagentaBackground},
+                    {0b01010100, ColourMap.CyanBackground},
+                    {0b01010101, ColourMap.WhiteBackground}
                 };
             var result = 
                 (
