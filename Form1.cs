@@ -84,7 +84,7 @@ namespace ExileMappedBackground
 
             byte background = (byte) (data.BackgroundAfterHashing & 0x3f);
             byte orientation = (byte) (data.BackgroundAfterHashing & 0xc0);
-            data.Palette = _mapper.GetPalette(ref background, ref orientation, x, y);
+            (data.BackgroundPalette, data.DisplayedPalette) = _mapper.GetPalette(ref background, ref orientation, x, y);
             data.BackgroundAfterPalette = (byte) (background ^ orientation);
 
             this._squareProperties[x, y] = data;
@@ -191,7 +191,8 @@ namespace ExileMappedBackground
             public bool IsHashDefault;
             public int? BackgroundObjectId;
             public string BackgroundEventTypeName;
-            public byte Palette;
+            public byte BackgroundPalette;
+            public byte DisplayedPalette;
             }
 
         private void dataGridView1_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
@@ -233,8 +234,9 @@ namespace ExileMappedBackground
             if (squareValue.BackgroundEventTypeName != null)
                 text += "\r\nBackground event: " + squareValue.BackgroundEventTypeName;
 
-            var colours = _mapper.GetPaletteColours(squareValue.Palette);
-            text += "\r\nPalette: " + colours.colour1 + ", " + colours.colour2 + ", " + colours.colour3;
+            text += $"\r\nPalette for background: {squareValue.BackgroundPalette:x2}";
+            var colours = _mapper.GetPaletteColours(squareValue.DisplayedPalette);
+            text += $"\r\nDisplayed Palette: {squareValue.DisplayedPalette:x2} {colours.colour1}, {colours.colour2}, {colours.colour3}";
 
             if (squareValue.BackgroundAfterHashing != squareValue.BackgroundAfterPalette)
                 {

@@ -507,17 +507,17 @@ L19A5:
             return null;
             }
 
-        public byte GetPalette(ref byte background, ref byte orientation, byte squareX, byte squareY)
+        public (byte backgroundPalette, byte displayedPalette) GetPalette(ref byte background, ref byte orientation, byte squareX, byte squareY)
             {
             if (background > 0x3f)
                 throw new ArgumentOutOfRangeException();
             if ((orientation & 0x3f) != 0)
                 throw new ArgumentOutOfRangeException();
 
-            byte accumulator;
             Flags flags = new Flags();
 
-            Load(out accumulator, _backgroundPaletteLookup[background], ref flags);
+            Load(out byte accumulator, _backgroundPaletteLookup[background], ref flags);
+            var backgroundPalette = accumulator;
             if (!flags.Zero) goto palette_not_zero;
 
 // palette 0
@@ -606,7 +606,8 @@ palette_not_five:
             Load(out accumulator, 0xcf, ref flags);
 
         palette_not_six:
-            return accumulator;
+            var displayedPalette = accumulator;
+            return (backgroundPalette, displayedPalette);
             }
 
         public (GameColour colour1, GameColour colour2, GameColour colour3) GetPaletteColours(byte palette)
@@ -1029,8 +1030,8 @@ palette_not_five:
             var result = 
                 (
                 from palettePair in BuildPaletteValueToPixelLookup()
-                let leftPixel = (palettePair & 0b00101010) >> 1
-                let rightPixel = (palettePair & 0x00010101)
+                let leftPixel = (palettePair & 0b10101010) >> 1
+                let rightPixel = (palettePair & 0b01010101)
                 let leftColour = colourMap[(byte) leftPixel]
                 let rightColour = colourMap[(byte) rightPixel]
                 select (leftColour, rightColour)
