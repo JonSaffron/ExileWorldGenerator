@@ -17,7 +17,6 @@ namespace ExileMappedBackground
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
         private readonly byte[] _backgroundSpriteLookup = BuildBackgroundSpriteLookup();
         private readonly Dictionary<int, Rectangle> _sourceRectangles = BuildSourceRectangleKey();
-        private readonly bool[] _flipBackgroundSpriteVertically = BuildFlipBackgroundSpriteVertically();
         private readonly bool[] _flipSpriteHorizontally = BuildFlipSpriteHorizontally();
         private readonly bool[] _flipSpriteVertically = BuildFlipSpriteVertically();
         private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
@@ -62,9 +61,6 @@ namespace ExileMappedBackground
             {
             byte y = (byte) (i >> 8);
             byte x = (byte) (i & 0xFF);
-
-            if (x == 0)
-                System.Diagnostics.Trace.WriteLine(y.ToString());
 
             var mapResult = _mapper.GetBackground(x, y);
             if (mapResult.IsMappedData)
@@ -251,11 +247,6 @@ namespace ExileMappedBackground
             text += $"\r\nFlip sprite vertically: {_flipSpriteVertically[sprite]}";
 
             e.ToolTipText = text;
-            }
-
-        private static bool[] BuildFlipBackgroundSpriteVertically()
-            {
-            return BuildBackgroundSpriteLookup().Select(s => (s & 0x80) != 0).ToArray();
             }
 
         private static byte[] BuildBackgroundSpriteLookup()
