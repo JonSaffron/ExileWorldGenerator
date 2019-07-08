@@ -1,15 +1,168 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 
 namespace ExileMappedBackground
     {
     class SpriteBuilder
         {
-        public Bitmap BuildSprite(byte sprite, GamePalette palette, bool flipHorizontally, bool flipVertically)
-            {
+        private static readonly byte[] SpriteData = BuildSpriteSheet();
+        private static readonly Dictionary<byte, Rectangle> SpritePositions = BuildSpritePositions();
+        private static readonly Dictionary<GameColour, Color> GameColours = BuildGameColours();
 
+        public Bitmap BuildSprite(byte sprite, GamePalette palette, bool flipHorizontallyAndRightAlign, bool flipVerticallyAndBottomAlign)
+            {
+            if (sprite > 0x7f)
+                throw new ArgumentOutOfRangeException(nameof(sprite), "sprite should be in the range 0 to 0x7f");
+            var result = new Bitmap(16,32);
+            // source will always be read left to right, and downwards
+            // destination can be written in any direction
+            var sourceRectangle = SpritePositions[sprite];
+            bool isSourceFlippedHorizontally = BuildFlipSpriteHorizontally()[sprite];
+            bool isSourceFlippedVertically = BuildFlipSpriteVertically()[sprite];
+            Func<int, int> toX;
+            if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
+                {
+                toX = x => x;
+                }
+            else if (!flipHorizontallyAndRightAlign) // && isSourceFlippedHorizontally
+                {
+                int right = sourceRectangle.Right - 1;
+                toX = x => right - x;
+                }
+            else if (!isSourceFlippedHorizontally) // && flipHorizontallyAndRightAlign
+                {
+                int width = result.Width - 1;
+                toX = x => width - x;
+                }
+            else // if flipHorizontallyAndRightAlign && isSourceFlippedHorizontally
+                {
+                var left = result.Width - sourceRectangle.Width;
+                toX = x => left + x;
+                }
+
+            Func<int, int> toY;
+            if (!flipVerticallyAndBottomAlign && !isSourceFlippedVertically)
+                {
+                toY = y => y;
+                }
+            else if (!flipVerticallyAndBottomAlign) // && isSourceFlippedVertically
+                {
+                int bottom = sourceRectangle.Bottom - 1;
+                toY = y => bottom - y;
+                }
+            else if (!isSourceFlippedVertically) // && flipVerticallyAndBottomAlign
+                {
+                int height = result.Height - 1;
+                toY = y => height - y;
+                }
+            else // if flipVerticallyAndBottomAlign && isSourceFlippedVertically
+                {
+                int top = result.Width - sourceRectangle.Height;
+                toY = y => top + y;
+                }
+
+            for (int y = 0; y < sourceRectangle.Height; y++)
+                {
+                for (int x = 0; x < sourceRectangle.Width; x++)
+                    {
+                    int paletteIndex = GetSpriteData(x, y);
+                    Color pixelColour = palette[paletteIndex];
+                    int x2 = toX(x);
+                    int y2 = toY(y);
+                    result.SetPixel(x2, x2, pixelColour);
+                    }
+                }
+
+            return result;
             }
 
+        private static int GetSpriteData(int x, int y)
+            {
+            if (x < 0 || x >= 128)
+                throw new ArgumentOutOfRangeException(nameof(x));
+            if (y < 0 || y >= 82)
+                throw new ArgumentOutOfRangeException(nameof(y));
+
+            int positionOfData = (x >> 2) + (y << 5);
+            byte fourPixels = SpriteData[positionOfData];
+
+            int pixelNumber = x % 4;
+            int result = -1;
+            if (pixelNumber == 0)
+                {
+                result = ((fourPixels & 0x80) >> 6) | ((fourPixels & 0x08) >> 3);
+                }
+            else if (pixelNumber == 1)
+                {
+                result = ((fourPixels & 0x40) >> 5) | ((fourPixels & 0x04) >> 2);
+                }
+            else if (pixelNumber == 2)
+                {
+                result = ((fourPixels & 0x20) >> 4) | ((fourPixels & 0x02) >> 1);
+                }
+            else if (pixelNumber == 3)
+                {
+                result = ((fourPixels & 0x10) >> 3) | (fourPixels & 0x01);
+                }
+            return result;
+            }
+
+        private static Dictionary<byte, Rectangle> BuildSpritePositions()
+            {
+            byte[] spriteOffsetA = BuildSpriteOffsetA();
+            byte[] spriteOffsetB = BuildSpriteOffsetB();
+            byte[] spriteHeightLookup = BuildSpriteHeightLookup();
+            byte[] spriteWidthLookup = BuildSpriteWidthLookup();
+
+            var result = new Dictionary<byte, Rectangle>();
+            for (byte sprite = 0; sprite <= 0x7f; sprite++)
+                {
+                byte offsetAlongX = spriteOffsetA[sprite];
+                int mostSignificantThreeBits = (offsetAlongX & 0b0000_0111) << 4;
+                int leastSignificantFourBits = offsetAlongX >> 4;
+                int left = mostSignificantThreeBits | leastSignificantFourBits;
+
+                byte offsetAlongY = spriteOffsetB[sprite];
+                int mostSignificantTwoBits = (offsetAlongY & 0b0000_0011) << 5;
+                int leastSignificantFiveBits = offsetAlongY >> 3;
+                int top = mostSignificantTwoBits | leastSignificantFiveBits;
+
+                int width = spriteWidthLookup[sprite] >> 4;
+                
+                int height = spriteHeightLookup[sprite] >> 3;
+
+                result.Add(sprite, new Rectangle(left, top, width, height));
+                }
+
+            return result;
+            }
+
+        private static Dictionary<GameColour, Color> BuildGameColours()
+            {
+            var result = new Dictionary<GameColour, Color>
+                {
+                    {GameColour.BlackForeground, Color.Black},
+                    {GameColour.RedForeground, Color.Red},
+                    {GameColour.GreenForeground, Color.Green},
+                    {GameColour.YellowForeground, Color.Yellow},
+                    {GameColour.BlueForeground, Color.Blue},
+                    {GameColour.MagentaForeground, Color.Magenta},
+                    {GameColour.CyanForeground, Color.Cyan},
+                    {GameColour.WhiteForeground, Color.White},
+
+                    {GameColour.BlackBackground, Color.Black},
+                    {GameColour.RedBackground, Color.Red},
+                    {GameColour.GreenBackground, Color.Green},
+                    {GameColour.YellowBackground, Color.Yellow},
+                    {GameColour.BlueBackground, Color.Blue},
+                    {GameColour.MagentaBackground, Color.Magenta},
+                    {GameColour.CyanBackground, Color.Cyan},
+                    {GameColour.WhiteBackground, Color.White}
+                };
+            return result;
+            }
 
 
         private static byte[] BuildSpriteSheet()

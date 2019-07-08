@@ -2164,15 +2164,16 @@ $FE                        ; white bg, cyan bg
 &0f38: a0 00            LDY #&00			                        # (regular vertical orientation)
 &0f3a: 24 65            BIT &65 ; plot_flipping_flags
 &0f3c: 70 03            BVS &0f41
-&0f3e: a9 e0            LDA #&e0			                        # offset between rows is &ffe0
+&0f3e: a9 e0            LDA #&e0			                        # offset between rows is &ffe0 (or -&20)
 &0f40: 88               DEY				                        # (inverse vertical orientation)
 &0f41: 8d 7d 10         STA &107d ; sprite_byte_offset_between_rows             # self modifying code
 &0f44: 8c 85 10         STY &1085 ; sprite_byte_offset_between_rows_h           # self modifying code
 
 # Calculate the sprite address
-&0f47: b5 4d            LDA &4d,X # X = 1, &4e this_sprite_height_old ; X = 0, &4d this_sprite_height
-&0f49: 50 02            BVC &0f4d
-&0f4b: a9 00            LDA #&00
+&0f47: b5 4d            LDA &4d,X # X = 1, &4e this_sprite_height_old ; X = 0, &4d this_sprite_height  // start at bottom of sprite
+&0f49: 50 02            BVC &0f4d						// branch if sprite not upside down
+&0f4b: a9 00            LDA #&00						// start from top of sprite instead
+
 &0f4d: 18               CLC
 &0f4e: 75 61            ADC (&61,X) # X = 1, &62 this_sprite_b_old ; X = 0, &61 this_sprite_b
 &0f50: 69 00            ADC #&00
@@ -2181,13 +2182,14 @@ $FE                        ; white bg, cyan bg
 &0f55: 0a               ASL
 &0f56: 69 00            ADC #&00
 &0f58: 85 9d            STA &9d
+
 &0f5a: 29 e0            AND #&e0
 &0f5c: 05 9c            ORA &9c
-&0f5e: 69 ec            ADC #&ec
+&0f5e: 69 ec            ADC #&ec							// sprite_data starts at &53ec
 &0f60: 8d 23 10         STA &1023 ; sprite_address                              # self modifying code
 &0f63: a5 9d            LDA &9d
 &0f65: 29 0f            AND #&0f
-&0f67: 69 53            ADC #&53
+&0f67: 69 53            ADC #&53							// sprite_data starts at &53ec
 &0f69: 8d 24 10         STA &1024 ; sprite_address_h                            # self modifying code
 
 # Calculate the number of bytes in a line of the sprite
@@ -11739,6 +11741,10 @@ maggot x = &06 a = &08
 #5ef9: 48 08 30 20 28 39 70 38 30 20 20 20 20
 
 ; sprite_offset_a_lookup
+; A = abcd0fgh
+;
+; Byte offset = fghab (32 bytes per line)
+; Pixel offset = cd (4 pixels/byte)
 #5f06: 36 44 c5 04 66 06 91 41 60 43 d0 d4 e4 e4 a4 03
 #5f16: 97 63 03 05 77 97 65 06 06 06 06 e6 c6 d6 e6 f6
 #5f26: 37 d6 65 02 03 12 c2 03 03 03 03 02 02 04 96 c4
@@ -11749,6 +11755,9 @@ maggot x = &06 a = &08
 #5f76: 05 00 16 37 e6 76 04 b6 c4 47 84 b6 a4
 
 ; sprite_offset_b_lookup
+;
+; yyYYY0yy
+; Least significant in YYY, most significant in yyyy
 #5f83: 42 02 e9 81 98 98 e0 e0 7a 00 72 e1 5a 3a 81 00
 #5f93: e1 0a 02 e9 60 68 e9 00 00 49 49 50 68 68 58 50
 #5fa3: d0 d9 a0 00 28 01 01 09 49 89 c9 01 81 41 81 41
