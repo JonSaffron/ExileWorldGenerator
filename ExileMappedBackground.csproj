@@ -54,7 +54,7 @@
       <DependentUpon>Form1.cs</DependentUpon>
     </Compile>
     <Compile Include="GameColour.cs" />
-    <Compile Include="GamePalette.cs" />
+    <Compile Include="SquarePalette.cs" />
     <Compile Include="MapResult.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

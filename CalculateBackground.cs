@@ -16,8 +16,6 @@ namespace ExileMappedBackground
         private static readonly byte[] _wallPaletteZeroLookup = BuildWallPaletteZeroLookup();
         private static readonly byte[] _wallPaletteThreeLookup = BuildWallPaletteThreeLookup();
         private static readonly byte[] _wallPaletteFourLookup = BuildWallPaletteFourLookup();
-        private static readonly (GameColour leftColour, GameColour rightColour)[] _colourPairs = BuildColourPairs();
-        private static readonly Color[] _colourMap = BuildColourMap();
 
         public MapResult GetBackground(byte squareX, byte squareY)
             {
@@ -165,7 +163,7 @@ L1825:
             LogicalShiftRight(ref accumulator, ref f);          // LSR A
             Transfer(accumulator, out xreg, ref f);      // TAX
             
-return_background_mushrooms:
+// return_background_mushrooms
             Load(out accumulator, 0x0E, ref f);     // LDA #$0E ; &0e = mushrooms (on floor)
             Compare(xreg, 0x0A, ref f);       // CPX #$0A
             if (!f.Zero) goto L1851;                            // BNE L1851
@@ -610,13 +608,6 @@ palette_not_five:
             return (backgroundPalette, displayedPalette);
             }
 
-        public (GameColour colour1, GameColour colour2, GameColour colour3) GetPaletteColours(byte palette)
-            {
-            GameColour colour3 = (GameColour) (palette >> 4);
-            var colourPair = _colourPairs[palette & 0xf];
-            return (colour1: colourPair.rightColour, colour2: colourPair.leftColour, colour3: colour3);
-            }
-
         private static void Load(out byte register, byte data, ref Flags flags)
             {
             register = data;
@@ -986,7 +977,8 @@ palette_not_five:
             {
             var result = new byte[] {0x8D,0x82,0x8B,0x8F,0x84,0x89,0x8D}
                 .Concat(BuildWallPaletteFourLookup())
-                .Concat(BuildWallPaletteThreeLookup());
+                .Concat(BuildWallPaletteThreeLookup())
+                .Take(16);
             return result.ToArray();
             }
 
@@ -998,50 +990,6 @@ palette_not_five:
         private static byte[] BuildWallPaletteFourLookup()
             {
             return new byte[] {0x81,0x82,0x81,0x85,0xB2,0xCD,0x90,0x95};
-// equb $81
-            }
-
-        private static Color[] BuildColourMap()
-            {
-            return new[] {Color.Black, Color.Red, Color.Green, Color.Yellow, Color.Blue, Color.Magenta, Color.Cyan, Color.White};
-            }
-
-        private static (GameColour leftColour, GameColour rightColour)[] BuildColourPairs()
-            {
-            var colourMap = new Dictionary<byte, GameColour>
-                {
-                    {0b00000000, GameColour.BlackForeground},
-                    {0b00000001, GameColour.RedForeground},
-                    {0b00000100, GameColour.GreenForeground},
-                    {0b00000101, GameColour.YellowForeground},
-                    {0b00010000, GameColour.BlueForeground},
-                    {0b00010001, GameColour.MagentaForeground},
-                    {0b00010100, GameColour.CyanForeground},
-                    {0b00010101, GameColour.WhiteForeground},
-                    {0b01000000, GameColour.BlackBackground},
-                    {0b01000001, GameColour.RedBackground},
-                    {0b01000100, GameColour.GreenBackground},
-                    {0b01000101, GameColour.YellowBackground},
-                    {0b01010000, GameColour.BlueBackground},
-                    {0b01010001, GameColour.MagentaBackground},
-                    {0b01010100, GameColour.CyanBackground},
-                    {0b01010101, GameColour.WhiteBackground}
-                };
-            var result = 
-                (
-                from palettePair in BuildPaletteValueToPixelLookup()
-                let leftPixel = (palettePair & 0b10101010) >> 1
-                let rightPixel = (palettePair & 0b01010101)
-                let leftColour = colourMap[(byte) leftPixel]
-                let rightColour = colourMap[(byte) rightPixel]
-                select (leftColour, rightColour)
-                ).ToArray();
-            return result;
-            }
-
-        private static byte[] BuildPaletteValueToPixelLookup()
-            {
-            return new byte[] {0xca, 0xc9, 0xe3, 0xe9, 0xeb, 0xce, 0xf8, 0xe6, 0xcc, 0xee, 0x30, 0xde, 0xef, 0xcb, 0xfb, 0xfe};
             }
 
         private struct Flags

@@ -13,6 +13,7 @@ namespace ExileMappedBackground
     public partial class Form1 : Form
         {
         private readonly CalculateBackground _mapper = new CalculateBackground();
+        private readonly SpriteBuilder _spriteBuilder = new SpriteBuilder();
         private readonly Image _spriteSheet;
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
         private readonly byte[] _backgroundSpriteLookup = BuildBackgroundSpriteLookup();
@@ -50,11 +51,8 @@ namespace ExileMappedBackground
                 this.dataGridView1.Rows[i].Height = 32 * zoom;
                 this.dataGridView1.Columns[i].Width = 16 * zoom;
                 }
-
-
-
+            
             this.dataGridView1.ResumeLayout();
-
             }
 
         private void NewMethod(int i, ConcurrentBag<int> hashOfPositions)
@@ -109,14 +107,16 @@ namespace ExileMappedBackground
             bool flipVertically = bottomAlign ^ _flipSpriteVertically[sprite];
 
             byte offsetAlongY = (byte) (this._backgroundYOffsetLookup[background] & 0xf0);
-            if (bottomAlign)
-                {
-                offsetAlongY += this._spriteHeightLookup[sprite];
-                offsetAlongY |= 7;
-                offsetAlongY ^= 0xff;
-                }
+            //if (bottomAlign)
+            //    {
+            //    offsetAlongY += this._spriteHeightLookup[sprite];
+            //    offsetAlongY |= 7;
+            //    offsetAlongY ^= 0xff;
+            //    }
                 
-            var image = FlipImage(this._spriteSheet, sourceRectangle, flipHorizontally, flipVertically, rightAlign, offsetAlongY >> 3);
+            //var image = FlipImage(this._spriteSheet, sourceRectangle, flipHorizontally, flipVertically, rightAlign, offsetAlongY >> 3);
+            var squarePalette = SquarePalette.FromByte(squareProperties.DisplayedPalette);
+            var image = this._spriteBuilder.BuildSprite(sprite, squarePalette, rightAlign, bottomAlign, offsetAlongY);
 
             Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, 16 * zoom, 32 * zoom);
             e.Graphics.DrawImage(image, destinationRectangle);
@@ -231,14 +231,13 @@ namespace ExileMappedBackground
                 text += "\r\nBackground event: " + squareValue.BackgroundEventTypeName;
 
             text += $"\r\nPalette for background: {squareValue.BackgroundPalette:x2}";
-            var colours = _mapper.GetPaletteColours(squareValue.DisplayedPalette);
-            text += $"\r\nDisplayed Palette: {squareValue.DisplayedPalette:x2} {colours.colour1}, {colours.colour2}, {colours.colour3}";
+            var colours = SquarePalette.FromByte(squareValue.DisplayedPalette);
+            text += $"\r\nDisplayed Palette: {squareValue.DisplayedPalette:x2} {colours.Colour1}, {colours.Colour2}, {colours.Colour3}";
 
             if (squareValue.BackgroundAfterHashing != squareValue.BackgroundAfterPalette)
                 {
                 text += "\r\nPalette changed background and/or orientation";
                 text += $"\r\nFinal background: {squareValue.BackgroundAfterPalette:x2} ({squareValue.BackgroundAfterPalette & 0x3f:x2}{((squareValue.BackgroundAfterPalette & 0xC0) == 0xC0 ? " flipped both ways" : (squareValue.BackgroundAfterPalette & 0x40) != 0 ? " flipped vertically" : (squareValue.BackgroundAfterPalette & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
-
                 }
 
             byte sprite = (byte) (_backgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);

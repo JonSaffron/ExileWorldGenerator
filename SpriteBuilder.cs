@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 
@@ -9,18 +10,29 @@ namespace ExileMappedBackground
         {
         private static readonly byte[] SpriteData = BuildSpriteSheet();
         private static readonly Dictionary<byte, Rectangle> SpritePositions = BuildSpritePositions();
-        private static readonly Dictionary<GameColour, Color> GameColours = BuildGameColours();
+        private static readonly byte[] BackgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
 
-        public Bitmap BuildSprite(byte sprite, GamePalette palette, bool flipHorizontallyAndRightAlign, bool flipVerticallyAndBottomAlign)
+        public Bitmap BuildSprite(byte sprite, SquarePalette palette, bool flipHorizontallyAndRightAlign, bool flipVerticallyAndBottomAlign, byte offsetAlongY)
             {
             if (sprite > 0x7f)
                 throw new ArgumentOutOfRangeException(nameof(sprite), "sprite should be in the range 0 to 0x7f");
+            if (sprite == 0x27)
+                Debugger.Break();
             var result = new Bitmap(16,32);
             // source will always be read left to right, and downwards
             // destination can be written in any direction
             var sourceRectangle = SpritePositions[sprite];
             bool isSourceFlippedHorizontally = BuildFlipSpriteHorizontally()[sprite];
             bool isSourceFlippedVertically = BuildFlipSpriteVertically()[sprite];
+
+            if (flipVerticallyAndBottomAlign)
+                {
+                offsetAlongY += (byte) sourceRectangle.Height;
+                offsetAlongY |= 7;
+                offsetAlongY ^= 0xff;
+                }
+            offsetAlongY >>= 3;
+
             Func<int, int> toX;
             if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
                 {
@@ -28,7 +40,7 @@ namespace ExileMappedBackground
                 }
             else if (!flipHorizontallyAndRightAlign) // && isSourceFlippedHorizontally
                 {
-                int right = sourceRectangle.Right - 1;
+                int right = sourceRectangle.Width - 1;
                 toX = x => right - x;
                 }
             else if (!isSourceFlippedHorizontally) // && flipHorizontallyAndRightAlign
@@ -45,33 +57,33 @@ namespace ExileMappedBackground
             Func<int, int> toY;
             if (!flipVerticallyAndBottomAlign && !isSourceFlippedVertically)
                 {
-                toY = y => y;
+                toY = y => y + offsetAlongY;
                 }
             else if (!flipVerticallyAndBottomAlign) // && isSourceFlippedVertically
                 {
-                int bottom = sourceRectangle.Bottom - 1;
+                int bottom = (sourceRectangle.Height - 1) + offsetAlongY;
                 toY = y => bottom - y;
                 }
             else if (!isSourceFlippedVertically) // && flipVerticallyAndBottomAlign
                 {
                 int height = result.Height - 1;
-                toY = y => height - y;
+                toY = y => (height - y) + offsetAlongY;
                 }
             else // if flipVerticallyAndBottomAlign && isSourceFlippedVertically
                 {
-                int top = result.Width - sourceRectangle.Height;
-                toY = y => top + y;
+                int top = result.Height - sourceRectangle.Height;
+                toY = y => offsetAlongY + y;
                 }
 
             for (int y = 0; y < sourceRectangle.Height; y++)
                 {
                 for (int x = 0; x < sourceRectangle.Width; x++)
                     {
-                    int paletteIndex = GetSpriteData(x, y);
+                    int paletteIndex = GetSpriteData(x + sourceRectangle.X, y + sourceRectangle.Y);
                     Color pixelColour = palette[paletteIndex];
                     int x2 = toX(x);
                     int y2 = toY(y);
-                    result.SetPixel(x2, x2, pixelColour);
+                    result.SetPixel(x2, y2, pixelColour);
                     }
                 }
 
@@ -117,7 +129,7 @@ namespace ExileMappedBackground
             byte[] spriteWidthLookup = BuildSpriteWidthLookup();
 
             var result = new Dictionary<byte, Rectangle>();
-            for (byte sprite = 0; sprite <= 0x7f; sprite++)
+            for (byte sprite = 0; sprite <= 0x7c; sprite++)
                 {
                 byte offsetAlongX = spriteOffsetA[sprite];
                 int mostSignificantThreeBits = (offsetAlongX & 0b0000_0111) << 4;
@@ -129,9 +141,9 @@ namespace ExileMappedBackground
                 int leastSignificantFiveBits = offsetAlongY >> 3;
                 int top = mostSignificantTwoBits | leastSignificantFiveBits;
 
-                int width = spriteWidthLookup[sprite] >> 4;
+                int width = (spriteWidthLookup[sprite] >> 4) + 1;
                 
-                int height = spriteHeightLookup[sprite] >> 3;
+                int height = (spriteHeightLookup[sprite] >> 3) + 1;
 
                 result.Add(sprite, new Rectangle(left, top, width, height));
                 }
@@ -349,6 +361,18 @@ namespace ExileMappedBackground
                 0x11,0x19,0x20,0x29,0x41,0xF8,0x70,0x30,0x20,0x20,0x19,0x18,0x28,0x60,0x48,0x80, // 50
                 0x58,0x58,0x39,0x19,0x68,0x68,0x68,0x58,0x68,0x58,0x38,0x38,0x28,0x48,0x48,0x48, // 60
                 0x48,0x08,0x30,0x20,0x28,0x39,0x70,0x38,0x30,0x20,0x20,0x20,0x20                 // 70
+                };
+            return result;
+            }
+
+        private static byte[] BuildBackgroundYOffsetLookup()
+            {
+            var result = new byte[]
+                {
+                0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xD0,0xC5,0xB0,0xC7,0x00,0x06,0x00,0x00,0xC0, // 00
+                0xB0,0xA0,0x07,0x08,0x00,0x04,0x80,0xC0,0x70,0x00,0xB0,0x80,0x99,0x08,0x00,0x80, // 10
+                0xC0,0x00,0xA0,0x03,0x02,0x82,0x01,0x41,0x81,0xC1,0x04,0xF0,0xB0,0x00,0x03,0x02, // 20
+                0x82,0x70,0x06,0xC0,0xC5,0x04,0x80,0x06,0x80,0x04,0x99,0x30,0xC7,0x06,0xA9,0x00  // 30
                 };
             return result;
             }
