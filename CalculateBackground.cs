@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 using System.Linq;
 
 namespace ExileMappedBackground
@@ -12,10 +11,10 @@ namespace ExileMappedBackground
         private static readonly byte[] LookupForUnmatchedHash = BuildLookupForUnmatchedHash();
         private static readonly Dictionary<int, byte[]> BackgroundObjectsHandlerLookup = BuildBackgroundObjectsHandlerLookup();
         private static readonly byte[] BackgroundLookup = BuildBackgroundLookupTable();
-        private static readonly byte[] _backgroundPaletteLookup = BuildBackgroundPaletteLookup();
-        private static readonly byte[] _wallPaletteZeroLookup = BuildWallPaletteZeroLookup();
-        private static readonly byte[] _wallPaletteThreeLookup = BuildWallPaletteThreeLookup();
-        private static readonly byte[] _wallPaletteFourLookup = BuildWallPaletteFourLookup();
+        public static readonly byte[] BackgroundPaletteLookup = BuildBackgroundPaletteLookup();
+        private static readonly byte[] WallPaletteZeroLookup = BuildWallPaletteZeroLookup();
+        private static readonly byte[] WallPaletteThreeLookup = BuildWallPaletteThreeLookup();
+        private static readonly byte[] WallPaletteFourLookup = BuildWallPaletteFourLookup();
 
         public MapResult GetBackground(byte squareX, byte squareY)
             {
@@ -514,7 +513,7 @@ L19A5:
 
             Flags flags = new Flags();
 
-            Load(out byte accumulator, _backgroundPaletteLookup[background], ref flags);
+            Load(out byte accumulator, BackgroundPaletteLookup[background], ref flags);
             var backgroundPalette = accumulator;
             if (!flags.Zero) goto palette_not_zero;
 
@@ -527,7 +526,7 @@ L19A5:
             LogicalShiftRight(ref accumulator, ref flags);
             LogicalShiftRight(ref accumulator, ref flags);
             byte index = accumulator;
-            Load(out accumulator, _wallPaletteZeroLookup[index], ref flags);
+            Load(out accumulator, WallPaletteZeroLookup[index], ref flags);
                 
 palette_not_zero:
             Compare(accumulator, 0x03, ref flags);
@@ -555,7 +554,7 @@ palette_not_one_or_two:
             AddWithCarry(ref accumulator, squareX, ref flags);
             And(ref accumulator, 0x03, ref flags);
             index = accumulator;
-            accumulator = _wallPaletteThreeLookup[index];
+            accumulator = WallPaletteThreeLookup[index];
 
 palette_not_three:
             Compare(accumulator, 0x04, ref flags);
@@ -569,7 +568,7 @@ palette_not_three:
             RotateLeft(ref accumulator, ref flags);
             And(ref accumulator, 0x7, ref flags);
             index = accumulator;
-            accumulator = _wallPaletteFourLookup[index];
+            accumulator = WallPaletteFourLookup[index];
 
 palette_not_four:
             Compare(accumulator, 0x05, ref flags);
@@ -977,8 +976,7 @@ palette_not_five:
             {
             var result = new byte[] {0x8D,0x82,0x8B,0x8F,0x84,0x89,0x8D}
                 .Concat(BuildWallPaletteFourLookup())
-                .Concat(BuildWallPaletteThreeLookup())
-                .Take(16);
+                .Concat(new byte[] { 0x81 });
             return result.ToArray();
             }
 

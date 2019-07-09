@@ -2,6 +2,7 @@
     {
     public enum GameColour
         {
+        // foreground colours
         BlackForeground = 0,
         RedForeground = 1,
         GreenForeground = 2,
@@ -10,6 +11,8 @@
         MagentaForeground = 5,
         CyanForeground = 6,
         WhiteForeground = 7,
+        
+        // background colours
         BlackBackground = 8,
         RedBackground = 9,
         GreenBackground = 10,

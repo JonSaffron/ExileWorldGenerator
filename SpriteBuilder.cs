@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 
@@ -9,30 +8,21 @@ namespace ExileMappedBackground
     class SpriteBuilder
         {
         private static readonly byte[] SpriteData = BuildSpriteSheet();
+        private static readonly byte[] SpriteHeightLookup = BuildSpriteHeightLookup();
         private static readonly Dictionary<byte, Rectangle> SpritePositions = BuildSpritePositions();
         private static readonly byte[] BackgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
+        public readonly bool[] _flipSpriteHorizontally = BuildFlipSpriteHorizontally();
+        public readonly bool[] _flipSpriteVertically = BuildFlipSpriteVertically();
 
         public Bitmap BuildSprite(byte sprite, SquarePalette palette, bool flipHorizontallyAndRightAlign, bool flipVerticallyAndBottomAlign, byte offsetAlongY)
             {
             if (sprite > 0x7f)
                 throw new ArgumentOutOfRangeException(nameof(sprite), "sprite should be in the range 0 to 0x7f");
-            if (sprite == 0x27)
-                Debugger.Break();
             var result = new Bitmap(16,32);
-            // source will always be read left to right, and downwards
-            // destination can be written in any direction
             var sourceRectangle = SpritePositions[sprite];
-            bool isSourceFlippedHorizontally = BuildFlipSpriteHorizontally()[sprite];
-            bool isSourceFlippedVertically = BuildFlipSpriteVertically()[sprite];
-
-            if (flipVerticallyAndBottomAlign)
-                {
-                offsetAlongY += (byte) sourceRectangle.Height;
-                offsetAlongY |= 7;
-                offsetAlongY ^= 0xff;
-                }
-            offsetAlongY >>= 3;
-
+            bool isSourceFlippedHorizontally = _flipSpriteHorizontally[sprite];
+            bool isSourceFlippedVertically = _flipSpriteVertically[sprite];
+            
             Func<int, int> toX;
             if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
                 {
@@ -54,25 +44,23 @@ namespace ExileMappedBackground
                 toX = x => left + x;
                 }
 
+            if (flipVerticallyAndBottomAlign)
+                {
+                offsetAlongY += SpriteHeightLookup[sprite];
+                offsetAlongY |= 7;
+                offsetAlongY ^= 0xff;
+                }
+            offsetAlongY >>= 3;
+
             Func<int, int> toY;
-            if (!flipVerticallyAndBottomAlign && !isSourceFlippedVertically)
+            if (flipVerticallyAndBottomAlign ^ isSourceFlippedVertically)
                 {
-                toY = y => y + offsetAlongY;
-                }
-            else if (!flipVerticallyAndBottomAlign) // && isSourceFlippedVertically
-                {
-                int bottom = (sourceRectangle.Height - 1) + offsetAlongY;
-                toY = y => bottom - y;
-                }
-            else if (!isSourceFlippedVertically) // && flipVerticallyAndBottomAlign
-                {
-                int height = result.Height - 1;
+                int height = sourceRectangle.Height - 1;
                 toY = y => (height - y) + offsetAlongY;
                 }
-            else // if flipVerticallyAndBottomAlign && isSourceFlippedVertically
+            else 
                 {
-                int top = result.Height - sourceRectangle.Height;
-                toY = y => offsetAlongY + y;
+                toY = y => y + offsetAlongY;
                 }
 
             for (int y = 0; y < sourceRectangle.Height; y++)
@@ -150,32 +138,6 @@ namespace ExileMappedBackground
 
             return result;
             }
-
-        private static Dictionary<GameColour, Color> BuildGameColours()
-            {
-            var result = new Dictionary<GameColour, Color>
-                {
-                    {GameColour.BlackForeground, Color.Black},
-                    {GameColour.RedForeground, Color.Red},
-                    {GameColour.GreenForeground, Color.Green},
-                    {GameColour.YellowForeground, Color.Yellow},
-                    {GameColour.BlueForeground, Color.Blue},
-                    {GameColour.MagentaForeground, Color.Magenta},
-                    {GameColour.CyanForeground, Color.Cyan},
-                    {GameColour.WhiteForeground, Color.White},
-
-                    {GameColour.BlackBackground, Color.Black},
-                    {GameColour.RedBackground, Color.Red},
-                    {GameColour.GreenBackground, Color.Green},
-                    {GameColour.YellowBackground, Color.Yellow},
-                    {GameColour.BlueBackground, Color.Blue},
-                    {GameColour.MagentaBackground, Color.Magenta},
-                    {GameColour.CyanBackground, Color.Cyan},
-                    {GameColour.WhiteBackground, Color.White}
-                };
-            return result;
-            }
-
 
         private static byte[] BuildSpriteSheet()
             {
@@ -310,11 +272,6 @@ namespace ExileMappedBackground
             return BuildSpriteWidthLookup().Select(w => (w & 0x1) != 0).ToArray();
             }
 
-        private static int[] BuildSpriteWidthTable()
-            {
-            return BuildSpriteWidthLookup().Select(w => w >> 4).ToArray();
-            }
-
         private static byte[] BuildSpriteWidthLookup()
             {
             var result = new byte[]
@@ -338,11 +295,6 @@ namespace ExileMappedBackground
         private static bool[] BuildFlipSpriteVertically()
             {
             return BuildSpriteHeightLookup().Select(h => (h & 0x1) != 0).ToArray();
-            }
-
-        private static int[] BuildSpriteHeightTable()
-            {
-            return BuildSpriteHeightLookup().Select(h => h >> 3).ToArray();
             }
 
         private static byte[] BuildSpriteHeightLookup()

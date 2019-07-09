@@ -2504,14 +2504,21 @@ $FE                        ; white bg, cyan bg
 		2c		stone edging
 		19		nothing
 
-; lookup table for Y -> palette for background
-#1185: 8d 82 8b 8f 84 89 8d 81 82 81 85 ; wall_palette_zero_lookup
-#118c: ; wall_palette_four_lookup
-#1190: b2 cd 90 95
+; background palettes
 
-#1194: 81
+; wall_palette_zero_lookup (16 entries)
+#1185: 8d 82 8b 8f 84 89 8d  
 
-#1195: b1 97 fd f3 00 ; wall_palette_three_lookup
+; wall_palette_four_lookup (8 entries contained within wall_palette_zero_lookup)
+#118c: 81 82 81 85 b2 cd 90 95 
+
+; last entry in wall_palette_zero_lookup
+#1194: 81  
+
+; wall_palette_three_lookup
+#1195: b1 97 fd f3
+
+#1199: 00 ; unused?
 
 #119a: 03 ; sound_max_channels
 #119b: 01 ; (unused)
@@ -5104,7 +5111,7 @@ $FE                        ; white bg, cyan bg
 &23a8: 4a               LSR
 &23a9: 4a               LSR
 &23aa: aa               TAX
-&23ab: bd 85 11         LDA &1185,X ; wall_palette_lookup
+&23ab: bd 85 11         LDA &1185,X ; wall_palette_zero_lookup
 ; palette_not_zero
 &23ae: c9 03            CMP #&03
 &23b0: b0 09            BCS &23bb ; palette_not_two                             # if 1 or 2, it depends on square_y / &80
