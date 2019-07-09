@@ -15,7 +15,8 @@ namespace ExileMappedBackground
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
         private readonly byte[] _backgroundSpriteLookup = BuildBackgroundSpriteLookup();
         private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
-        private int zoom = 2;
+        private int zoom = 1;
+        private byte lookFor = 0x3c;
 
         public Form1()
             {
@@ -29,6 +30,22 @@ namespace ExileMappedBackground
                 throw new InvalidOperationException("1024 positions are expected to be explicitly mapped, rather than " + hashOfPositions.Count);
             if (hashOfPositions.Distinct().Count() != 1024)
                 throw new InvalidOperationException("All 1024 explicit map positions should be unique.");
+
+            string findResults = string.Empty;
+            for (int y = 0; y < 256; y++)
+                {
+                for (int x = 0; x < 256; x++)
+                    {
+                    var squareProperties = this._squareProperties[x, y];
+                    if ((squareProperties.BackgroundAfterPalette & 0x3f) == lookFor)
+                        {
+                        findResults += $"({x:x2},{y:x2})\r\n";
+                        }
+                    }
+                }
+
+            Trace.WriteLine(findResults);
+            MessageBox.Show(findResults);
             }
 
         private void Form1_Shown(object sender, EventArgs e)
@@ -123,6 +140,14 @@ namespace ExileMappedBackground
                         e.Graphics.DrawLine(pen, bottomRight, bottomLeft);
                         e.Graphics.DrawLine(pen, bottomLeft, topLeft);
                         }
+                    }
+                }
+
+            if ((squareProperties.BackgroundAfterPalette & 0x3f) == lookFor)
+                {
+                using (Brush brush = new SolidBrush(Color.FromArgb(0x80, Color.Orange)))
+                    {
+                    e.Graphics.FillRectangle(brush, e.CellBounds);
                     }
                 }
 
