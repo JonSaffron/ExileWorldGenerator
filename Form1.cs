@@ -45,7 +45,6 @@ namespace ExileMappedBackground
                 }
 
             Trace.WriteLine(findResults);
-            MessageBox.Show(findResults);
             }
 
         private void Form1_Shown(object sender, EventArgs e)
@@ -126,19 +125,13 @@ namespace ExileMappedBackground
 
             if (squareProperties.MappedDataPosition.HasValue)
                 {
-                using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.White)))
+                using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Orange)))
                     {
-                    using (Pen pen = new Pen(brush, 1.0f))
+                    using (Pen pen = new Pen(brush, 2.0f))
                         {
-                        var topLeft = new Point(e.CellBounds.Left + 1, e.CellBounds.Top + 1);
-                        var topRight = new Point(e.CellBounds.Right - 1, e.CellBounds.Top + 1);
-                        var bottomRight = new Point(e.CellBounds.Right - 1, e.CellBounds.Bottom - 1);
-                        var bottomLeft = new Point(e.CellBounds.Left + 1, e.CellBounds.Bottom - 1);
-
-                        e.Graphics.DrawLine(pen, topLeft, topRight);
-                        e.Graphics.DrawLine(pen, topRight, bottomRight);
-                        e.Graphics.DrawLine(pen, bottomRight, bottomLeft);
-                        e.Graphics.DrawLine(pen, bottomLeft, topLeft);
+                        Rectangle r = e.CellBounds;
+                        r.Inflate(-1, -1);
+                        e.Graphics.DrawRectangle(pen, r);
                         }
                     }
                 }
