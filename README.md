@@ -8,3 +8,5 @@ You can therefore explore how everything is put together, from the procedural ge
 This wouldn't exist without the fantasic work by:
 - http://www.level7.org.uk/miscellany/exile-disassembly.txt
 - https://github.com/tom-seddon/exile_disassembly
+
+![screen shot](https://github.com/JonSaffron/ExileMappedBackground/blob/master/Doco/ScreenShot.png?raw=true "Screenshot")
