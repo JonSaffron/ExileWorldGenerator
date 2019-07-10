@@ -16,7 +16,7 @@ namespace ExileMappedBackground
         private readonly byte[] _backgroundSpriteLookup = BuildBackgroundSpriteLookup();
         private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
         private int zoom = 1;
-        private byte lookFor = 0x3c;
+        private byte lookFor = 0xff;
 
         public Form1()
             {
