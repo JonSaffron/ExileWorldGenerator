@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace ExileMappedBackground
     {
@@ -15,6 +16,7 @@ namespace ExileMappedBackground
                 {
                 if (!this.IsMappedData)
                     throw new InvalidOperationException("Not mapped data");
+                Debug.Assert(_positionInMappedData != null, nameof(_positionInMappedData) + " != null");
                 return _positionInMappedData.Value;
                 }
 

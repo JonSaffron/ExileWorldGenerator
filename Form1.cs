@@ -22,8 +22,8 @@ namespace ExileMappedBackground
             {
             InitializeComponent();
 
-            this.dataGridView1.ColumnCount = 256;
-            this.dataGridView1.RowCount = 256;
+            this.map.ColumnCount = 256;
+            this.map.RowCount = 256;
             var hashOfPositions = new ConcurrentBag<int>();
             Parallel.For(0, 0x10000, i => { NewMethod(i, hashOfPositions); });
             if (hashOfPositions.Count != 1024)
@@ -49,18 +49,18 @@ namespace ExileMappedBackground
 
         private void Form1_Shown(object sender, EventArgs e)
             {
-            this.dataGridView1.SuspendLayout();
+            this.map.SuspendLayout();
 
             for (int i = 0; i < 256; i++)
                 {
                 var value = i.ToString("X2");
-                this.dataGridView1.Rows[i].HeaderCell.Value = value;
-                this.dataGridView1.Columns[i].HeaderCell.Value = value;
-                this.dataGridView1.Rows[i].Height = 32 * zoom;
-                this.dataGridView1.Columns[i].Width = 32 * zoom;
+                this.map.Rows[i].HeaderCell.Value = value;
+                this.map.Columns[i].HeaderCell.Value = value;
+                this.map.Rows[i].Height = 32 * zoom;
+                this.map.Columns[i].Width = 32 * zoom;
                 }
             
-            this.dataGridView1.ResumeLayout();
+            this.map.ResumeLayout();
 
             for (int i = 0; i <= 0x3f; i++)
                 {
@@ -214,8 +214,8 @@ namespace ExileMappedBackground
 
             byte sprite = (byte) (_backgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);
             text += $"\r\nSprite: {sprite:x2}";
-            text += $"\r\nFlip sprite horizontally: {this._spriteBuilder._flipSpriteHorizontally[sprite]}";
-            text += $"\r\nFlip sprite vertically: {this._spriteBuilder._flipSpriteVertically[sprite]}";
+            text += $"\r\nFlip sprite horizontally: {this._spriteBuilder.FlipSpriteHorizontally[sprite]}";
+            text += $"\r\nFlip sprite vertically: {this._spriteBuilder.FlipSpriteVertically[sprite]}";
 
             e.ToolTipText = text;
             }
@@ -246,6 +246,190 @@ namespace ExileMappedBackground
                 0x82,0x70,0x06,0xC0,0xC5,0x04,0x80,0x06,0x80,0x04,0x99,0x30,0xC7,0x06,0xA9,0x00  // 30
                 };
             return result;
+            }
+
+        private void dataGridView1_SelectionChanged(object sender, EventArgs e)
+            {
+            var squareValue = this._squareProperties[this.map.CurrentCell.ColumnIndex, this.map.CurrentCell.RowIndex];
+            
+            this.txtCoordinates.Text = $"X:{squareValue.X:X2} Y:{squareValue.Y:X2}";
+
+            SetMappedOrGeneratedInfo(squareValue);
+
+            SetListOverrideInfo(squareValue);
+
+            SetPaletteInfo(squareValue);
+
+            SetSpriteInfo(squareValue);
+
+            SetBackgroundObjectInfo(squareValue);
+            }
+
+        private void SetBackgroundObjectInfo(SquareProperties squareValue)
+            {
+            string backgroundObjectInfo;
+            if ((squareValue.BackgroundAfterPalette & 0x3f)  > 0xf)
+                backgroundObjectInfo = "No background object";
+            else if (!squareValue.BackgroundObjectId.HasValue)
+                backgroundObjectInfo = "Background used as scenery";
+            else
+                {
+                backgroundObjectInfo =
+                    $"Background event: {squareValue.BackgroundEventTypeName}\r\n" +
+                    $"Object type: tbd\r\n" +
+                    $"Data: tbd";
+                }
+
+            this.txtBackgroundObjectInfo.Text = backgroundObjectInfo;
+            SetTextBoxHeight(txtBackgroundObjectInfo);
+            }
+
+        private void SetSpriteInfo(SquareProperties squareValue)
+            {
+            byte sprite = (byte) (_backgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);
+            string spriteInfo =
+                $"Sprite number: {sprite:X2}\r\n" +
+                "Orientation on sprite sheet: ";
+            var isSpriteFlippedHorizontally = this._spriteBuilder.FlipSpriteHorizontally[sprite];
+            var isSpriteFlippedVertically = this._spriteBuilder.FlipSpriteVertically[sprite];
+            if (isSpriteFlippedHorizontally && isSpriteFlippedVertically)
+                spriteInfo += "flipped both ways";
+            else if (isSpriteFlippedHorizontally)
+                spriteInfo += "flipped horizontally";
+            else if (isSpriteFlippedVertically)
+                spriteInfo += "flipped vertically";
+            else
+                spriteInfo += "not flipped";
+            byte offsetAlongY = (byte) (this._backgroundYOffsetLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0xf0);
+            spriteInfo += "\r\n" +
+                          $"Y offset: {offsetAlongY:X2}\r\n";
+
+            bool rightAlign = (squareValue.BackgroundAfterPalette & 0x80) != 0;
+            bool bottomAlign = (squareValue.BackgroundAfterPalette & 0x40) != 0;
+            var isFlippedHorizontally = isSpriteFlippedHorizontally ^ rightAlign;
+            var isFlippedVertically = isSpriteFlippedVertically ^ bottomAlign;
+            spriteInfo +=
+                $"Final orientation: ";
+            if (isFlippedHorizontally && isFlippedVertically)
+                spriteInfo += "flipped both ways";
+            else if (isFlippedHorizontally)
+                spriteInfo += "flipped horizontally";
+            else if (isFlippedVertically)
+                spriteInfo += "flipped vertically";
+            else
+                spriteInfo += "not flipped";
+
+            spriteInfo += "\r\n" +
+                          $"Alignment: {(bottomAlign ? "bottom" : "top")} {(rightAlign ? "right" : "left")}";
+
+            this.txtSpriteInfo.Text = spriteInfo;
+            SetTextBoxHeight(this.txtSpriteInfo);
+            }
+
+        private void SetPaletteInfo(SquareProperties squareValue)
+            {
+            string paletteInfo =
+                $"Palette for background: {squareValue.BackgroundPalette:X2}";
+            if (squareValue.BackgroundPalette > 6)
+                {
+                var colours = SquarePalette.FromByte(squareValue.BackgroundPalette);
+                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.Colour3}";
+                }
+            else
+                {
+                paletteInfo += "\r\n" +
+                               $"Derived palette: {squareValue.DisplayedPalette:X2}";
+                var colours = SquarePalette.FromByte(squareValue.DisplayedPalette);
+                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.Colour3}";
+                }
+
+            if (squareValue.BackgroundAfterHashing != squareValue.BackgroundAfterPalette)
+                {
+                paletteInfo +=
+                    $"\r\nRevised background: {squareValue.BackgroundAfterPalette:x2}\r\n" +
+                    $"Appearance: {squareValue.BackgroundAfterPalette & 0x3f:X2}, " +
+                    $"Orientation: {squareValue.BackgroundAfterPalette & 0xc0:X2} " +
+                    $"({DescribeOrientation(squareValue.BackgroundAfterPalette)})";
+                }
+
+            this.txtPaletteInfo.Text = paletteInfo;
+            SetTextBoxHeight(this.txtPaletteInfo);
+            }
+
+        private void SetListOverrideInfo(SquareProperties squareValue)
+            {
+            if ((squareValue.CalculatedBackground & 0x3f) >= 0x9)
+                {
+                this.txtListOverrideInfo.Text = "No override";
+                }
+            else
+                {
+                var listOverride =
+                    $"Override list: {squareValue.CalculatedBackground & 0x3f}\r\n";
+                if (squareValue.IsHashDefault)
+                    {
+                    listOverride +=
+                        $"Default for list: {squareValue.BackgroundAfterHashing:X2}\r\n";
+                    }
+                else
+                    {
+                    Debug.Assert(squareValue.BackgroundObjectId.HasValue);
+                    listOverride +=
+                        $"Background object index = {squareValue.BackgroundObjectId.Value:X2}\r\n" +
+                        $"Value from list: {squareValue.BackgroundAfterHashing:x2}\r\n";
+                    }
+
+                listOverride +=
+                    $"{((squareValue.BackgroundAfterHashing & 0x3f) <= 0xf ? "Handler" : "Appearance")}: {squareValue.BackgroundAfterHashing & 0x3f:X2}, " +
+                    $"Orientation: {squareValue.BackgroundAfterHashing & 0xc0:X2} " +
+                    $"({DescribeOrientation(squareValue.BackgroundAfterHashing)})";
+                this.txtListOverrideInfo.Text = listOverride;
+                SetTextBoxHeight(this.txtListOverrideInfo);
+                }
+            }
+
+        private void SetMappedOrGeneratedInfo(SquareProperties squareValue)
+            {
+            var mappedGeneratedInfo =
+                squareValue.MappedDataPosition.HasValue
+                    ? $"Mapped location index: {squareValue.MappedDataPosition.Value}\r\n"
+                    : string.Empty;
+            mappedGeneratedInfo +=
+                $"{(squareValue.MappedDataPosition.HasValue ? "Explicit" : "Generated")} background {squareValue.CalculatedBackground:X2}\r\n";
+            mappedGeneratedInfo +=
+                $"Appearance: {squareValue.CalculatedBackground & 0x3f:X2}, " +
+                $"Orientation: {squareValue.CalculatedBackground & 0xc0:X2} " +
+                $"({DescribeOrientation(squareValue.CalculatedBackground)})";
+            this.txtMappedOrGeneratedInfo.Text = mappedGeneratedInfo;
+            SetTextBoxHeight(this.txtMappedOrGeneratedInfo);
+            }
+
+        private string DescribeOrientation(byte background)
+            {
+            var orientation = background & 0xc0;
+            switch (orientation)
+                {
+                case 0: return "no change";
+                case 0x40: return "flipped vertically";
+                case 0x80: return "flipped horizontally";
+                case 0xc0: return "flipped both ways";
+                }
+            throw new InvalidOperationException();
+            }
+
+        private void SetTextBoxHeight(TextBox textBox)
+            {
+            Size sz = new Size(textBox.ClientSize.Width, int.MaxValue);
+            TextFormatFlags flags = TextFormatFlags.WordBreak;
+            int padding = 3;
+            int borders = textBox.Height - textBox.ClientSize.Height;
+            sz = TextRenderer.MeasureText(textBox.Text, textBox.Font, sz, flags);
+            int h = sz.Height + borders + padding;
+            if (textBox.Top + h > this.ClientSize.Height - 10) 
+                {
+                h = this.ClientSize.Height - 10 - textBox.Top;
+                }
+            textBox.Height = h;
             }
         }
     }

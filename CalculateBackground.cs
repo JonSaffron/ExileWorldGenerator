@@ -428,7 +428,7 @@ L19A3:
 
 L19A5:
     f.Carry = false;                                    // CLC
-    return;                                             // RTS
+    //return;                                           // RTS
     }
 
             }

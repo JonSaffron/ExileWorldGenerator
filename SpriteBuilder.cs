@@ -11,8 +11,8 @@ namespace ExileMappedBackground
         private static readonly byte[] SpriteHeightLookup = BuildSpriteHeightLookup();
         private static readonly Dictionary<byte, Rectangle> SpritePositions = BuildSpritePositions();
         private static readonly byte[] BackgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
-        public readonly bool[] _flipSpriteHorizontally = BuildFlipSpriteHorizontally();
-        public readonly bool[] _flipSpriteVertically = BuildFlipSpriteVertically();
+        public readonly bool[] FlipSpriteHorizontally = BuildFlipSpriteHorizontally();
+        public readonly bool[] FlipSpriteVertically = BuildFlipSpriteVertically();
 
         public Bitmap BuildSprite(byte sprite, SquarePalette palette, bool flipHorizontallyAndRightAlign, bool flipVerticallyAndBottomAlign, byte offsetAlongY)
             {
@@ -20,8 +20,8 @@ namespace ExileMappedBackground
                 throw new ArgumentOutOfRangeException(nameof(sprite), "sprite should be in the range 0 to 0x7f");
             var result = new Bitmap(16,32);
             var sourceRectangle = SpritePositions[sprite];
-            bool isSourceFlippedHorizontally = _flipSpriteHorizontally[sprite];
-            bool isSourceFlippedVertically = _flipSpriteVertically[sprite];
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
+            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
             
             Func<int, int> toX;
             if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
@@ -143,6 +143,7 @@ namespace ExileMappedBackground
             {
             var result = new byte[]
                 {
+                // ReSharper disable once CommentTypo
                 // sprite sheet is 128 x 81 pixels
                 // There are 2 bits of colour per pixel, therefore 4 pixels to the byte.
                 // Each byte has the four pixels interlaced in an abcdabcd format like mode 5.
@@ -276,6 +277,7 @@ namespace ExileMappedBackground
             {
             var result = new byte[]
                 {
+                // ReSharper disable once CommentTypo
                 // Format: wwww000h
                 // wwww + 1 is the width of the sprite in pixels
                 // h indicates a horizontal flip is required
@@ -301,6 +303,7 @@ namespace ExileMappedBackground
             {
             var result = new byte[]
                 {
+                // ReSharper disable once CommentTypo
                 // hhhhh00v
                 // hhhhh + 1 is the sprite height in pixels
                 // if v=1, the vertical flip flag is inverted when plotting the sprite
