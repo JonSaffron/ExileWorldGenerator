@@ -94,6 +94,9 @@ namespace ExileMappedBackground
             (data.BackgroundPalette, data.DisplayedPalette) = _mapper.GetPalette(ref background, ref orientation, x, y);
             data.BackgroundAfterPalette = (byte) (background ^ orientation);
 
+            data.BackgroundData = backgroundProperties.data;
+            data.BackgroundType = backgroundProperties.type;
+
             this._squareProperties[x, y] = data;
             }
 
@@ -161,6 +164,9 @@ namespace ExileMappedBackground
             public string BackgroundEventTypeName;
             public byte BackgroundPalette;
             public byte DisplayedPalette;
+
+            public byte? BackgroundData;
+            public byte? BackgroundType;
             }
 
         private void dataGridView1_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
@@ -275,9 +281,14 @@ namespace ExileMappedBackground
             else
                 {
                 backgroundObjectInfo =
-                    $"Background event: {squareValue.BackgroundEventTypeName}\r\n" +
-                    $"Object type: tbd\r\n" +
-                    $"Data: tbd";
+                    $"Background event: {squareValue.BackgroundEventTypeName}";
+                if (squareValue.BackgroundType.HasValue)
+                    {
+                    backgroundObjectInfo += "\r\n" +
+                        $"Object type: {squareValue.BackgroundType:X2}";
+                    }
+                backgroundObjectInfo += "\r\n" +
+                    $"Data: {squareValue.BackgroundData:X2}";
                 }
 
             this.txtBackgroundObjectInfo.Text = backgroundObjectInfo;

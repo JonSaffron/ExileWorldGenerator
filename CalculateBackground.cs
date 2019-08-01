@@ -15,6 +15,9 @@ namespace ExileMappedBackground
         private static readonly byte[] WallPaletteZeroLookup = BuildWallPaletteZeroLookup();
         private static readonly byte[] WallPaletteThreeLookup = BuildWallPaletteThreeLookup();
         private static readonly byte[] WallPaletteFourLookup = BuildWallPaletteFourLookup();
+        private static readonly Dictionary<int, byte[]> BackgroundDataLookup = BuildBackgroundDataLookup();
+        private static readonly Dictionary<int, byte[]> BackgroundTypeLookup = BuildBackgroundTypeLookup();
+        private static readonly string[] ObjectTypeList = BuildObjectTypeList();
 
         public MapResult GetBackground(byte squareX, byte squareY)
             {
@@ -433,12 +436,12 @@ L19A5:
 
             }
 
-        public (byte background, int? backgroundObjectId, bool isHashDefault) GetMapData(byte calculatedBackground, byte squareX)
+        public (byte background, int? backgroundObjectId, bool isHashDefault, byte? data, byte? type) GetMapData(byte calculatedBackground, byte squareX)
             {
             var spriteOrHash = calculatedBackground & 0x3f;
             if (spriteOrHash >= 9)
                 {
-                return (background: calculatedBackground, backgroundObjectId: null, isHashDefault: false);
+                return (background: calculatedBackground, backgroundObjectId: null, isHashDefault: false, data:null, type:null);
                 }
 
             // check the background objects X lookup list
@@ -448,7 +451,7 @@ L19A5:
                 {
                 byte defaultBackground = LookupForUnmatchedHash[spriteOrHash];
                 defaultBackground ^= (byte) (calculatedBackground & 0xc0);
-                return (background: defaultBackground, backgroundObjectId: null, isHashDefault: true);
+                return (background: defaultBackground, backgroundObjectId: null, isHashDefault: true, data:null, type:null);
                 }
 
             var handlerList = BackgroundObjectsHandlerLookup[spriteOrHash];
@@ -459,7 +462,14 @@ L19A5:
                 var countOfItemsInHash = BackgroundObjectsXLookup[i].Length;
                 backgroundObjectId += countOfItemsInHash;
                 }
-            return (background: result, backgroundObjectId: backgroundObjectId, isHashDefault: false);
+
+            var dataList = BackgroundDataLookup[spriteOrHash];
+            byte? data = positionInHash < dataList.Length ? dataList[positionInHash] : new byte?();
+
+            var typeList = BackgroundTypeLookup[spriteOrHash];
+            byte? type = positionInHash < typeList.Length ? typeList[positionInHash] : new byte?();
+
+            return (background: result, backgroundObjectId: backgroundObjectId, isHashDefault: false, data, type);
             }
 
         public static string GetBackgroundEventTypeName(byte background)
@@ -944,6 +954,271 @@ palette_not_five:
                     },
                     {8, new byte[] {0x0b, 0x0b, 0xd1, 0x91, 0xd1, 0xd1, 0x91, 0x91}},
                     {9, new byte[] {0x0d}}
+                };
+            return result;
+            }
+
+        private static Dictionary<int, byte[]> BuildBackgroundDataLookup()
+            {
+            var result = new Dictionary<int, byte[]>
+                {
+                    {
+                    0,
+                    new byte[]
+                        {
+                        0x7c, 0x60, 0x04, 0x88, 0x88, 0xa0, 0xa6, 0xae, 0x83, 0x86, 0x82, 0x80, 0x80, 0xad, 0x81, 0xf7,
+                        0xa1, 0xf1, 0xf7, 0x81, 0x8a, 0xac, 0xd2, 0xdf, 0xd4, 0xa3
+                        }
+                    },
+                    {
+                    1,
+                    new byte[]
+                        {
+                        0x84, 0x85, 0xae,
+                        0x80, 0x80, 0x88, 0xac, 0xc4, 0xc0, 0x04, 0xa8, 0xc4, 0xbc, 0xfd, 0x81, 0xc1, 0xd1, 0x91, 0xf1,
+                        0xf1, 0xda, 0xf7, 0xf3, 0xd8, 0x88
+                        }
+                    },
+                    {
+                    2,
+                    new byte[]
+                        {
+                        0x80, 0x83, 0x83, 0xb0, 0xaa, 0x80, 0x80,
+                        0x87, 0x80, 0x30, 0x08, 0x10, 0x7c, 0x04, 0x10, 0xa8, 0x90, 0x04, 0xc1, 0xf1, 0xe1, 0x95, 0xbc,
+                        0xb4, 0xfd, 0xa1, 0xd6, 0xdd, 0xe2
+                        }
+                    },
+                    {
+                    3,
+                    new byte[]
+                        {
+                        0x04, 0x0c, 0x04, 0x20, 0x21, 0xa0, 0xb0, 0xac, 0x83,
+                        0x81, 0x84, 0x80, 0xc4, 0x85, 0x95, 0xa3, 0xb5, 0xf1, 0xad, 0xc1, 0x81, 0x89, 0xa0, 0xc1, 0xf1,
+                        0xf1, 0xc1, 0x8c, 0xa4, 0xe4, 0xd7, 0x9d, 0xe1
+                        }
+                    },
+                    {
+                    4,
+                    new byte[]
+                        {
+                        0xa6, 0x81, 0x85, 0x83, 0x83, 0xd0,
+                        0xa8, 0x04, 0x04, 0xd0, 0x88, 0x04, 0x04, 0x04, 0x08, 0xbd, 0x8a, 0xf1, 0xd1, 0xf1, 0xb1, 0xf1,
+                        0xc1, 0xc1, 0xc1, 0xc1, 0xe2, 0xe4, 0xdc, 0xa0, 0xc2, 0xcb, 0xb8
+                        }
+                    },
+                    {
+                    5,
+                    new byte[]
+                        {
+                        0xa8, 0x10,
+                        0x98, 0xa0, 0x80, 0x83, 0x80, 0x80, 0x80, 0x80, 0x00, 0xc4, 0x40, 0x84, 0x28, 0x75, 0xbc, 0xf1,
+                        0xd1, 0xa9, 0xf1, 0xc0, 0xc1, 0x8f, 0x94, 0xc2, 0xca, 0xfa, 0x9c, 0xfe
+                        }
+                    },
+                    {
+                    6,
+                    new byte[]
+                        {
+                        0x10, 0x14, 0x90, 0x98,
+                        0x04, 0xa4, 0x80, 0x83, 0xc6, 0xc4, 0xfe, 0xaa, 0x90, 0xec, 0xdc, 0x9e, 0xf4, 0xf7, 0xf1, 0xf1,
+                        0x81, 0xf1, 0xf1, 0xb1, 0xdb, 0x9e
+                        }
+                    },
+                    {
+                    7,
+                    new byte[]
+                        {
+                        0x84, 0xac, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
+                        0x80, 0xc0, 0x04, 0x08, 0x90, 0xa2, 0x04, 0x04, 0x04, 0x20, 0xbc, 0x53, 0x9d, 0x84, 0xda, 0xcb,
+                        0xde, 0xc5, 0xa5, 0xc1, 0xf1, 0x70
+                        }
+                    },
+                    {
+                    8, 
+                    new byte[]
+                        {
+                        0xd0, 0x80
+                        }
+                    }
+                };
+            return result;
+            }
+
+        private static Dictionary<int, byte[]> BuildBackgroundTypeLookup()
+            {
+            var result = new Dictionary<int, byte[]>
+                {
+                    {
+                    0,
+                    new byte[]
+                        {
+                        0x0f, 0x27, 0x2e, 0x07, 0x2f, 0x2d, 0x1f, 0x1f, 0x0d, 0x0d, 0x0d, 0x0c, 0x60, 0x2c
+                        }
+                    },
+                    {
+                    1,
+                    new byte[]
+                        {
+                        0x0d, 0x0d, 0x1f, 0x0d, 0x5c, 0x0d, 0x20, 0x05, 0x04, 0x06, 0x31, 0x05, 0x2a
+                        }
+                    },
+                    {
+                    2,
+                    new byte[]
+                        {
+                        0x09, 0x0d, 0x0d, 0x1f, 0x20, 0x55, 0x55, 0x0d, 0x63, 0x0f, 0x2e, 0x0a, 0x1b, 0x37, 0x29, 0x1a, 0x1a, 0x37
+                        }
+                    },
+                    {
+                    3,
+                    new byte[]
+                        {
+                        0x37, 0x0a, 0x37, 0x4b, 0x4b, 0x2d, 0x1f, 0x20, 0x0d, 0x0d, 0x28, 0x55, 0x05, 0x80, 0x00, 0x80, 0x80
+                        }
+                    },
+                    {
+                    4,
+                    new byte[]
+                        {
+                        0x20, 0x28, 0x0d, 0x0d, 0x28, 0x27, 0x31, 0x0e, 0x08, 0x11, 0x39, 0x37, 0x37, 0x37, 0x2a, 0x80, 0x4a
+                        }
+                    },
+                    {
+                    5,
+                    new byte[]
+                        {
+                        0x10, 0x2f, 0x30, 0x30, 0x09, 0x0d, 0x09, 0x09, 0x4f, 0x24, 0x4a, 0x04, 0x1a, 0x39, 0x10, 0x00, 0x4c
+                        }
+                    },
+                    {
+                    6,
+                    new byte[]
+                        {
+                        0x0a, 0x2f, 0x29, 0x2c, 0x37, 0x20, 0x3a, 0x0d, 0x05, 0x05
+                        }
+                    },
+                    {
+                    7,
+                    new byte[]
+                        {
+                        0x0d, 0x20, 0x0d, 0x0d, 0x48, 0x51, 0x0c, 0x55, 0x22, 0x04, 0x2e, 0x2f, 0x2b, 0x2a, 0x21, 0x02, 0x02, 0x1a, 0x80, 0x4b, 0x80
+                        }
+                    },
+                    {
+                    8,
+                    new byte[]
+                        {
+                        }
+                    }
+                };
+            return result;
+            }
+
+        private static string[] BuildObjectTypeList()
+            {
+            var result = new []
+                {
+                "player",
+                "active chatter",
+                "pericles crew member",
+                "fluffy",
+                "small nest",
+                "big nest",
+                "red frogman",
+                "green frogman",
+                "cyan frogman",
+                "red slime",
+                "green slime",
+                "yellow ball",
+                "sucker",
+                "deadly sucker",
+                "big fish",
+                "worm",
+                "piranha",
+                "wasp",
+                "active grenade",		
+                "icer bullet",				
+                "tracer bullet",				
+                "cannonball",				
+                "blue death ball",			
+                "red bullet",				
+                "pistol bullet",				
+                "plasma ball",				
+                "hover ball",				
+                "invisible hover ball",		
+                "magenta robot",				
+                "red robot",				
+                "blue robot",				
+                "green/white turret",		
+                "cyan/red turret",			
+                "hovering robot",			
+                "magenta clawed robot",		
+                "cyan clawed robot",			
+                "green clawed robot",		
+                "red clawed robot",			
+                "triax",						
+                "maggot",					
+                "gargoyle",					
+                "red/magenta imp",			
+                "red/yellow imp",			
+                "blue/cyan imp",				
+                "cyan/yellow imp",			
+                "red/cyan imp",				
+                "green/yellow bird",			
+                "white/yellow bird",			
+                "red/magenta bird",			
+                "invisible bird",			
+                "lightning",					
+                "red mushroom ball",			
+                "blue mushroom ball",		
+                "engine fire",				
+                "red drop",					
+                "flames",					
+                "inactive chatter",			
+                "moving fireball",			
+                "giant wall",				
+                "engine thruster",			
+                "horizontal door",			
+                "vertical door",				
+                "horizontal stone door",		
+                "vertical stone door",		
+                "bush",						
+                "teleport beam",				
+                "switch",					
+                "chest",					
+                "explosion",					
+                "rock",						
+                "cannon",					
+                "mysterious weapon",			
+                "maggot machine",			
+                "placeholder",				
+                "destinator",				
+                "energy capsule",			
+                "empty flask",				
+                "full flask",				
+                "remote control device",		
+                "cannon control device",		
+                "inactive grenade",			
+                "cyan/yellow/green key",		
+                "red/yellow/green key",		
+                "green/yellow/red key",		
+                "yellow/white/red key",		
+                "coronium boulder",			
+                "red/magenta/red key",		
+                "blue/cyan/green key",		
+                "coronium crystal",			
+                "jetpack booster",			
+                "pistol",					
+                "icer",						
+                "discharge device",			
+                "plasma gun",				
+                "protection suit",			
+                "fire immunity device",		
+                "mushroom immunity pill",	
+                "whistle 1",				
+                "whistle 2",					
+                "radiation immunity pill",	
+                "?"							
                 };
             return result;
             }
