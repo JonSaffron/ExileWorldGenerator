@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -15,8 +17,12 @@ namespace ExileMappedBackground
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
         private readonly byte[] _backgroundSpriteLookup = BuildBackgroundSpriteLookup();
         private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
-        private int zoom = 1;
+        private static readonly string[] BackgroundHandlerTypeList = BuildBackgroundHandlerTypeList();
+        private static readonly string[] ObjectTypeList = BuildObjectTypeList();
+        private decimal zoom;
         private byte lookFor = 0xff;
+        private bool highlightMappedDataSquares = true;
+        private readonly Stopwatch _stopwatch = new Stopwatch();
 
         public Form1()
             {
@@ -24,6 +30,20 @@ namespace ExileMappedBackground
 
             this.map.ColumnCount = 256;
             this.map.RowCount = 256;
+
+            var items = new Dictionary<decimal, string> {{0.5m, "50%"}, {1.0m, "100%"}, {2.0m, "200%"}};
+            cboZoomLevel.DisplayMember = "Value";
+            cboZoomLevel.ValueMember = "Key";
+            cboZoomLevel.DataSource = new BindingSource(items, null);
+            cboZoomLevel.SelectedIndex = 1;
+            this.zoom = 1m;
+
+            var type = map.GetType();
+            var prop = type.GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
+            prop.SetValue(this.map, true);
+
+            this._stopwatch.Start();
+
             var hashOfPositions = new ConcurrentBag<int>();
             Parallel.For(0, 0x10000, i => { NewMethod(i, hashOfPositions); });
             if (hashOfPositions.Count != 1024)
@@ -49,6 +69,16 @@ namespace ExileMappedBackground
 
         private void Form1_Shown(object sender, EventArgs e)
             {
+            ResetGrid();
+
+            for (int i = 0; i <= 0x3f; i++)
+                {
+                Trace.WriteLine($"{i:x2}\t{_backgroundSpriteLookup[i]:x2}\t{_backgroundYOffsetLookup[i]:x2}\t{CalculateBackground.BackgroundPaletteLookup[i]:x2}");
+                }
+            }
+
+        private void ResetGrid()
+            {
             this.map.SuspendLayout();
 
             for (int i = 0; i < 256; i++)
@@ -56,16 +86,11 @@ namespace ExileMappedBackground
                 var value = i.ToString("X2");
                 this.map.Rows[i].HeaderCell.Value = value;
                 this.map.Columns[i].HeaderCell.Value = value;
-                this.map.Rows[i].Height = 32 * zoom;
-                this.map.Columns[i].Width = 32 * zoom;
+                this.map.Rows[i].Height = (int) (32 * zoom);
+                this.map.Columns[i].Width = (int) (32 * zoom);
                 }
             
             this.map.ResumeLayout();
-
-            for (int i = 0; i <= 0x3f; i++)
-                {
-                System.Diagnostics.Trace.WriteLine($"{i:x2}\t{_backgroundSpriteLookup[i]:x2}\t{_backgroundYOffsetLookup[i]:x2}\t{CalculateBackground.BackgroundPaletteLookup[i]:x2}");
-                }
             }
 
         private void NewMethod(int i, ConcurrentBag<int> hashOfPositions)
@@ -87,27 +112,84 @@ namespace ExileMappedBackground
             data.BackgroundAfterHashing = backgroundProperties.background;
             data.BackgroundObjectId = backgroundProperties.backgroundObjectId;
             data.IsHashDefault = backgroundProperties.isHashDefault;
-            data.BackgroundEventTypeName = CalculateBackground.GetBackgroundEventTypeName(backgroundProperties.background);
 
             byte background = (byte) (data.BackgroundAfterHashing & 0x3f);
+            if (background < 0x10)
+                {
+                data.BackgroundHandlerType = BackgroundHandlerTypeList[background];
+                if (backgroundProperties.backgroundObjectId.HasValue)
+                    {
+                    data.BackgroundType = backgroundProperties.type;
+                    data.BackgroundData = backgroundProperties.data;
+                    data.BackgroundDescription = DescribeBackground(background, backgroundProperties.type, backgroundProperties.data);
+                    }
+                }
             byte orientation = (byte) (data.BackgroundAfterHashing & 0xc0);
             (data.BackgroundPalette, data.DisplayedPalette) = _mapper.GetPalette(ref background, ref orientation, x, y);
             data.BackgroundAfterPalette = (byte) (background ^ orientation);
 
-            data.BackgroundData = backgroundProperties.data;
-            data.BackgroundType = backgroundProperties.type;
-
             this._squareProperties[x, y] = data;
+            }
+
+        private string DescribeBackground(byte backgroundHandler, byte? type, byte? data)
+            {
+            switch (backgroundHandler)
+                {
+                case 0:
+                    Debug.Assert(type.HasValue);
+                    return $"Triggered by {(type.Value == 0x80 ? "anything" : ObjectTypeList[type.Value])}";
+                case 1:
+                    return "*** teleport tbd ***";
+                case 2:
+                    Debug.Assert(data.HasValue);
+                    return ObjectTypeList[data.Value & 0x7f];
+                case 3:
+                    return "*** door tbd ***";
+                case 4:
+                    return "*** stone tbd ***";
+                case 5:
+                case 6:
+                case 7:
+                    Debug.Assert(type.HasValue);
+                    return ObjectTypeList[type.Value];
+                case 8:
+                    return "*** switch tbd ***";
+                case 9:
+                case 0xa:
+                    Debug.Assert(data.HasValue);
+                    Debug.Assert(type.HasValue);
+                    int countOfObjects = (data.Value & 0x7c) >> 2;
+                    return $"{countOfObjects} x {ObjectTypeList[type.Value]}";
+                case 0xb:
+                    return "*** fixed wind tbd ***";
+                case 0xc:
+                    return "*** engine tbd ***";
+                case 0xd:
+                    return null;        // water does not have data
+                case 0xe:
+                    return "*** random wind tbd ***";
+                case 0xf:
+                    return "*** mushrooms tbd ***";
+                }
+            throw new InvalidOperationException();
             }
 
         private void dataGridView1_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
             {
+ //           if (e.ColumnIndex == -1)
+   //             Debugger.Break();
+
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 {
+//if (e.ColumnIndex<0)
+//    Debugger.Break();
+
                 return;
                 }
 
-            e.PaintBackground(e.CellBounds, true);
+            var timeElapsed = this._stopwatch.Elapsed;
+
+//            e.PaintBackground(e.CellBounds, false);
 
             var squareProperties = this._squareProperties[e.ColumnIndex, e.RowIndex];
 
@@ -123,19 +205,43 @@ namespace ExileMappedBackground
             var squarePalette = SquarePalette.FromByte(squareProperties.DisplayedPalette);
             var image = this._spriteBuilder.BuildSprite(sprite, squarePalette, rightAlign, bottomAlign, offsetAlongY);
 
-            Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, 32 * zoom, 32 * zoom);
+            Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, (int) (32 * zoom), (int) (32 * zoom));
             e.Graphics.DrawImage(image, destinationRectangle);
 
-            if (squareProperties.MappedDataPosition.HasValue)
+            if (this.highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
                 {
                 using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Orange)))
                     {
-                    using (Pen pen = new Pen(brush, 2.0f))
+                    TimeSpan frameLength = TimeSpan.FromMilliseconds(100);
+
+                    if (squareProperties.NextAnimationFrame.HasValue)
+                        {
+                        TimeSpan elapsed = timeElapsed - squareProperties.NextAnimationFrame.Value;
+                        int framesMoved = (int) elapsed.TotalMilliseconds / (int) frameLength.TotalMilliseconds;
+                        squareProperties.AnimationFrame = (squareProperties.AnimationFrame + framesMoved) % 5;
+                        if (this.highlightMappedDataSquares)
+                            {
+                            TimeSpan timeToNextFrame = TimeSpan.FromMilliseconds(framesMoved * frameLength.TotalMilliseconds);
+                            squareProperties.NextAnimationFrame = squareProperties.NextAnimationFrame.Value + timeToNextFrame;
+                            }
+                        else
+                            {
+                            squareProperties.NextAnimationFrame = null;
+                            }
+                        }
+                    else
+                        {
+                        squareProperties.AnimationFrame = 0;
+                        squareProperties.NextAnimationFrame = timeElapsed + frameLength;
+                        }
+
+                    using (Pen pen = new Pen(brush, squareProperties.AnimationFrame))
                         {
                         Rectangle r = e.CellBounds;
                         r.Inflate(-1, -1);
                         e.Graphics.DrawRectangle(pen, r);
                         }
+
                     }
                 }
 
@@ -161,12 +267,17 @@ namespace ExileMappedBackground
             public int? MappedDataPosition;
             public bool IsHashDefault;
             public int? BackgroundObjectId;
-            public string BackgroundEventTypeName;
+            public string BackgroundHandlerType;
             public byte BackgroundPalette;
             public byte DisplayedPalette;
 
-            public byte? BackgroundData;
             public byte? BackgroundType;
+            public byte? BackgroundData;
+            public string BackgroundDescription;
+
+            //public bool CurrentlyAnimating;
+            public TimeSpan? NextAnimationFrame;
+            public int AnimationFrame;
             }
 
         private void dataGridView1_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
@@ -205,8 +316,8 @@ namespace ExileMappedBackground
                 text += $"\r\nResult: {calculatedBackground:x2} ({calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped vertically" : (calculatedBackground & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
                 }
 
-            if (squareValue.BackgroundEventTypeName != null)
-                text += "\r\nBackground event: " + squareValue.BackgroundEventTypeName;
+            if (squareValue.BackgroundHandlerType != null)
+                text += "\r\nBackground handler type: " + squareValue.BackgroundHandlerType;
 
             text += $"\r\nPalette for background: {squareValue.BackgroundPalette:x2}";
             var colours = SquarePalette.FromByte(squareValue.DisplayedPalette);
@@ -258,6 +369,7 @@ namespace ExileMappedBackground
             {
             var squareValue = this._squareProperties[this.map.CurrentCell.ColumnIndex, this.map.CurrentCell.RowIndex];
             
+            // ReSharper disable once LocalizableElement
             this.txtCoordinates.Text = $"X:{squareValue.X:X2} Y:{squareValue.Y:X2}";
 
             SetMappedOrGeneratedInfo(squareValue);
@@ -276,19 +388,29 @@ namespace ExileMappedBackground
             string backgroundObjectInfo;
             if ((squareValue.BackgroundAfterPalette & 0x3f)  > 0xf)
                 backgroundObjectInfo = "No background object";
-            else if (!squareValue.BackgroundObjectId.HasValue)
-                backgroundObjectInfo = "Background used as scenery";
             else
                 {
                 backgroundObjectInfo =
-                    $"Background event: {squareValue.BackgroundEventTypeName}";
-                if (squareValue.BackgroundType.HasValue)
+                    $"Background handler type: {squareValue.BackgroundHandlerType}";
+
+                if (!squareValue.BackgroundObjectId.HasValue)
                     {
                     backgroundObjectInfo += "\r\n" +
-                        $"Object type: {squareValue.BackgroundType:X2}";
+                        "Not active event - used only as scenery";
                     }
-                backgroundObjectInfo += "\r\n" +
-                    $"Data: {squareValue.BackgroundData:X2}";
+                else if ((squareValue.BackgroundAfterPalette & 0x3f) <= 0xb)
+                    {
+                    if (squareValue.BackgroundType.HasValue)
+                        {
+                        backgroundObjectInfo += "\r\n" +
+                            $"Object type: {squareValue.BackgroundType.Value:X2}";
+                        }
+                    Debug.Assert(squareValue.BackgroundData.HasValue);
+                    backgroundObjectInfo += "\r\n" +
+                        $"Data: {squareValue.BackgroundData.Value:X2}";
+                    backgroundObjectInfo += "\r\n" +
+                        $"Description: {squareValue.BackgroundDescription}";
+                    }
                 }
 
             this.txtBackgroundObjectInfo.Text = backgroundObjectInfo;
@@ -371,6 +493,7 @@ namespace ExileMappedBackground
             {
             if ((squareValue.CalculatedBackground & 0x3f) >= 0x9)
                 {
+                // ReSharper disable once LocalizableElement
                 this.txtListOverrideInfo.Text = "No override";
                 }
             else
@@ -442,5 +565,160 @@ namespace ExileMappedBackground
                 }
             textBox.Height = h;
             }
+
+        private static string[] BuildBackgroundHandlerTypeList()
+            {
+            var result = new[]
+                {
+                "background_invisible_switch",
+                "background_teleport_beam",
+                "background_object_from_data",
+                "background_door",
+                "background_stone_door",
+                "background_object_from_type (half wall)",
+                "background_object_from_type",
+                "background_object_from_type (foliage)",
+                "background_switch",
+                "background_object_emerging (bush)",
+                "background_object_emerging (pipe end)",
+                "background_object_fixed_wind",
+                "background_engine_thruster",
+                "background_object_water",
+                "background_object_random_wind",
+                "background_mushrooms"
+                };
+            return result;
+            }
+
+        private static string[] BuildObjectTypeList()
+            {
+            var result = new []
+                {
+                "player",
+                "active chatter",
+                "pericles crew member",
+                "fluffy",
+                "small nest",
+                "big nest",
+                "red frogman",
+                "green frogman",
+                "cyan frogman",
+                "red slime",
+                "green slime",
+                "yellow ball",
+                "sucker",
+                "deadly sucker",
+                "big fish",
+                "worm",
+                "piranha",
+                "wasp",
+                "active grenade",		
+                "icer bullet",				
+                "tracer bullet",				
+                "cannonball",				
+                "blue death ball",			
+                "red bullet",				
+                "pistol bullet",				
+                "plasma ball",				
+                "hover ball",				
+                "invisible hover ball",		
+                "magenta robot",				
+                "red robot",				
+                "blue robot",				
+                "green/white turret",		
+                "cyan/red turret",			
+                "hovering robot",			
+                "magenta clawed robot",		
+                "cyan clawed robot",			
+                "green clawed robot",		
+                "red clawed robot",			
+                "triax",						
+                "maggot",					
+                "gargoyle",					
+                "red/magenta imp",			
+                "red/yellow imp",			
+                "blue/cyan imp",				
+                "cyan/yellow imp",			
+                "red/cyan imp",				
+                "green/yellow bird",			
+                "white/yellow bird",			
+                "red/magenta bird",			
+                "invisible bird",			
+                "lightning",					
+                "red mushroom ball",			
+                "blue mushroom ball",		
+                "engine fire",				
+                "red drop",					
+                "flames",					
+                "inactive chatter",			
+                "moving fireball",			
+                "giant wall",				
+                "engine thruster",			
+                "horizontal door",			
+                "vertical door",				
+                "horizontal stone door",		
+                "vertical stone door",		
+                "bush",						
+                "teleport beam",				
+                "switch",					
+                "chest",					
+                "explosion",					
+                "rock",						
+                "cannon",					
+                "mysterious weapon",			
+                "maggot machine",			
+                "placeholder",				
+                "destinator",				
+                "energy capsule",			
+                "empty flask",				
+                "full flask",				
+                "remote control device",		
+                "cannon control device",		
+                "inactive grenade",			
+                "cyan/yellow/green key",		
+                "red/yellow/green key",		
+                "green/yellow/red key",		
+                "yellow/white/red key",		
+                "coronium boulder",			
+                "red/magenta/red key",		
+                "blue/cyan/green key",		
+                "coronium crystal",			
+                "jetpack booster",			
+                "pistol",					
+                "icer",						
+                "discharge device",			
+                "plasma gun",				
+                "protection suit",			
+                "fire immunity device",		
+                "mushroom immunity pill",	
+                "whistle 1",				
+                "whistle 2",					
+                "radiation immunity pill",	
+                "?"							
+                };
+            return result;
+            }
+
+        private void animationTimer_Tick(object sender, EventArgs e)
+            {
+            var timeElapsed = this._stopwatch.Elapsed;
+
+            Parallel.ForEach<SquareProperties>(this._squareProperties.Cast<SquareProperties>(), item => 
+                {
+                if (this.highlightMappedDataSquares || item.NextAnimationFrame.HasValue)
+                    {
+                    if (timeElapsed >= item.NextAnimationFrame)
+                        {
+                        this.map.InvalidateCell(item.X, item.Y);
+                        }
+                    }
+                });
+            }
+
+        private void cboZoomLevel_SelectedIndexChanged(object sender, EventArgs e)
+            {
+            this.zoom = (decimal) this.cboZoomLevel.SelectedValue;
+            this.ResetGrid();
+            }   
         }
     }

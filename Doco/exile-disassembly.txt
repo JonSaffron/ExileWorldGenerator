@@ -210,7 +210,7 @@ Disassembly
 ;     &38 this_object_weight
 ;     &39 this_object_flags_lefted
 ;     &3a this_object_width
-;     &3b this_object_supporting
+;     &3b this_object_supporting		# object index on the primary stack, bit 7 set if nothing
 ;     &3c this_object_height
 ;     &3d this_object_data_pointer
 ;     &3e this_object_target
@@ -495,13 +495,32 @@ data byte format: xnnnnnyz
 	where nnnnn is the number of surviving objects that can emerge
 data type indicates the type of the object that is created
 
+handle_background_door:
+data byte format: xkkks??l 
+where kkk is the key required
+      l is set if locked
+	  s is set means the door opens & closes slowly and stays open until touched
+6 when opening or opened
+4 when closing
+
+example for background object id 29:
+	offscreen data is AD		1010 1101
+	onscreen it becomes 29		0010 1001
+	becomes A9 when offscreen	1010 1001
+	destoryed becomes 2D again and remains so
+
+	whilst opening 2E			0010 1110
+	whilst closing 2C			0010 1100
+	closed and unlocked	28		0010 1000
+
+
 handle_background_object_from_type:
 data type indicates the type of the object e.g. nest
 
 
-for a nest, data byte format: xtttttyz
-	where ttttt is the type of the object produced
-	if yz <> 0 then the nest is inactive
+		for a nest, data byte format: xtttttyz
+			where ttttt is the type of the object produced
+			if yz <> 0 then the nest is inactive
 
 ###############################################################################
 #
@@ -516,9 +535,9 @@ for a nest, data byte format: xtttttyz
 #   &04  &7a &f0  3e95 handle_background_stone_door				(none)		stone door				+  +  +  +
 #   &05  &9c &b1  3fb7 handle_background_object_from_type		half wall	(use object_type)		+  -  +  +		used by suckers, mushroom immunity pill, turret, nest, coronium boulder, destinator, key, 
 #   &06  &9c &b1  3fb7 handle_background_object_from_type		(none)		(use object_type)		+  -  +  +		used by turrets, suckers, "discharge device", red slime, RIP, coronium boulders, gargoyle, cannon control device, robot, giant wall
-#   &07  &9c &b1  3fb7 handle_background_object_from_type		foilage		(use object_type)		+  -  +  +		used by nests
+#   &07  &9c &b1  3fb7 handle_background_object_from_type		foliage		(use object_type)		+  -  +  +		used by nests
 #   &08  &b2 &b1  3fcd handle_background_switch       			switch box	switch					+  -  +  +
-#   &09  &00 &b0  3e1b handle_background_object_emerging		sucker/bush	(use object_type)		+  -  +  +		used by worms, maggots, birds, frogmen, green slime, fireball, big fish, piranha
+#   &09  &00 &b0  3e1b handle_background_object_emerging		bush		(use object_type)		+  -  +  +		used by worms, maggots, birds, frogmen, green slime, fireball, big fish, piranha
 #   &0a  &00 &b0  3e1b handle_background_object_emerging		pipe end	(use object_type)		+  -  +  +		used by imps, hover balls, fireballs, energy capsules, birds, piranhas, crew members
 #   &0b  &26 &31  3f41 handle_background_object_fixed_wind		(none)		                        -  -  +  +
 #   &0c  &6f &90  3e8a handle_background_engine_thruster 		half engine	engine thruster			+  -  -  +
@@ -789,7 +808,7 @@ for a nest, data byte format: xtttttyz
 	4	46 nothing (handle_background_stone_door)
 	5	3b half a wall (handle_background_object_from_type)
 	6	46 nothing (handle_background_object_from_type)
-	7	18 foilage (handle_background_object_from_type)
+	7	18 foliage (handle_background_object_from_type)
 	8	2d switch box (handle_background_switch)
 	9	70 sucker/bush (handle_background_object_emerging)
 	a	6a pipe top/plant pot/airlock (handle_background_object_emerging)
@@ -991,6 +1010,7 @@ These are a list of square_x values in sections delimited by background_objects_
 #080b: 00 ; red/magenta/red key
 #080c: 00 ; blue/cyan/green key
 #080d: 00 ; (unused)
+
 #080e: 00 ; booster_collected
 #080f: 00 ; pistol
 #0810: 00 ; icer
@@ -1149,10 +1169,10 @@ These are a list of square_x values in sections delimited by background_objects_
 #   &22 : &0611 = &e3  &0710 = &46  &09a6 = &88  &0a86 = &0d  (&e3, &98) &06 object_from_type : deadly sucker
 #   &23 : &0612 = &3b  &0711 = &85  &09a7 = &ac  &0a87 = &20  (&3b, &c0) &05 object_from_type_half_wall : cyan/red turret
 #   &24 : &0613 = &e4  &0712 = &85  &09a8 = &c4  &0a88 = &05  (&e4, &80) &05 object_from_type_half_wall : big nest
-#   &25 : &0614 = &80  &0713 = &87  &09a9 = &c0  &0a89 = &04  (&80, &c5) &07 object_from_type_foilage : small nest
+#   &25 : &0614 = &80  &0713 = &87  &09a9 = &c0  &0a89 = &04  (&80, &c5) &07 object_from_type_foliage : small nest
 #   &26 : &0615 = &e0  &0714 = &89  &09aa = &04  &0a8a = &06  (&e0, &98) &09 object_emerging_from_sucker/bush : red frogman
 #   &27 : &0616 = &64  &0715 = &89  &09ab = &a8  &0a8b = &31  (&64, &80) &09 object_emerging_from_sucker/bush : invisible bird (x 10)
-#   &28 : &0617 = &37  &0716 = &c7  &09ac = &c4  &0a8c = &05  (&37, &8c) &07 object_from_type_foilage : big nest
+#   &28 : &0617 = &37  &0716 = &c7  &09ac = &c4  &0a8c = &05  (&37, &8c) &07 object_from_type_foliage : big nest
 #   &29 : &0618 = &47  &0717 = &0a  &09ad = &bc  &0a8d = &2a  (&47, &c0) &0a object_emerging_from_pipe_end : red/yellow imp (x 15)
 #   &2a : &0619 = &9f  &0718 = &8c  &09ae = &fd      n/a      (&9f, &3a) &0c: engine thruster
 #   &2b : &061a = &9c  &0719 = &03  &09af = &81      n/a      (&9c, &3d) &03: door
@@ -1217,7 +1237,7 @@ These are a list of square_x values in sections delimited by background_objects_
 #   &60 : &064f = &e5  &074e = &46  &09e0 = &81  &0aa9 = &0d  (&e5, &bc) &06 object_from_type : deadly sucker
 #   &61 : &0650 = &70  &074f = &86  &09e1 = &84  &0aaa = &28  (&70, &88) &06 object_from_type : gargoyle
 #   &62 : &0651 = &ec  &0750 = &45  &09e2 = &80  &0aab = &55  (&ec, &bc) &05 object_from_type_half_wall : coronium boulder
-#   &63 : &0652 = &83  &0751 = &47  &09e3 = &c4  &0aac = &05  (&83, &5c) &07 object_from_type_foilage : big nest
+#   &63 : &0652 = &83  &0751 = &47  &09e3 = &c4  &0aac = &05  (&83, &5c) &07 object_from_type_foliage : big nest
 #   &64 : &0653 = &c1  &0752 = &00  &09e4 = &85  &0aad = &80  (&c1, &7c) &00: invisible switch (triggered by anything)
 #   &65 : &0654 = &c6  &0753 = &00  &09e5 = &95  &0aae = &00  (&c6, &7c) &00: invisible switch (triggered by player)
 #   &66 : &0655 = &67  &0754 = &00  &09e6 = &a3  &0aaf = &80  (&67, &da) &00: invisible switch (triggered by anything)
@@ -1293,7 +1313,7 @@ These are a list of square_x values in sections delimited by background_objects_
 #   &a6 : &0695 = &77  &0794 = &06  &0a21 = &80  &0aca = &4f  (&77, &aa) &06 object_from_type : cannon control device
 #   &a7 : &0696 = &2e  &0795 = &06  &0a22 = &80  &0acb = &24  (&2e, &d6) &06 object_from_type : green clawed robot
 #   &a8 : &0697 = &64  &0796 = &85  &0a23 = &00  &0acc = &4a  (&64, &d6) &05 object_from_type_half_wall : destinator
-#   &a9 : &0698 = &86  &0797 = &47  &0a24 = &c4  &0acd = &04  (&86, &56) &07 object_from_type_foilage : small nest
+#   &a9 : &0698 = &86  &0797 = &47  &0a24 = &c4  &0acd = &04  (&86, &56) &07 object_from_type_foliage : small nest
 #   &aa : &0699 = &a5  &0798 = &4a  &0a25 = &40  &0ace = &1a  (&a5, &e7) &0a object_emerging_from_pipe_end : hover ball (x 16)
 #   &ab : &069a = &a0  &0799 = &ca  &0a26 = &84  &0acf = &39  (&a0, &bf) &0a object_emerging_from_pipe_end : moving fireball
 #   &ac : &069b = &d1  &079a = &8a  &0a27 = &28  &0ad0 = &10  (&d1, &d3) &0a object_emerging_from_pipe_end : pirahna (x 10)
@@ -1323,8 +1343,8 @@ These are a list of square_x values in sections delimited by background_objects_
 #   &c1 : &06b0 = &9e  &07af = &c6  &0a3c = &a4  &0ad8 = &20  (&9e, &51) &06 object_from_type : cyan/red turret
 #   &c2 : &06b1 = &2e  &07b0 = &06  &0a3d = &80  &0ad9 = &3a  (&2e, &c8) &06 object_from_type : giant wall
 #   &c3 : &06b2 = &d6  &07b1 = &06  &0a3e = &83  &0ada = &0d  (&d6, &a1) &06 object_from_type : deadly sucker
-#   &c4 : &06b3 = &7e  &07b2 = &47  &0a3f = &c6  &0adb = &05  (&7e, &76) &07 object_from_type_foilage : big nest
-#   &c5 : &06b4 = &da  &07b3 = &87  &0a40 = &c4  &0adc = &05  (&da, &6e) &07 object_from_type_foilage : big nest
+#   &c4 : &06b3 = &7e  &07b2 = &47  &0a3f = &c6  &0adb = &05  (&7e, &76) &07 object_from_type_foliage : big nest
+#   &c5 : &06b4 = &da  &07b3 = &87  &0a40 = &c4  &0adc = &05  (&da, &6e) &07 object_from_type_foliage : big nest
 #   &c6 : &06b5 = &aa  &07b4 = &cc  &0a41 = &fe      n/a      (&aa, &62) &0c: engine thruster
 #   &c7 : &06b6 = &ab  &07b5 = &41  &0a42 = &aa      n/a      (&ab, &69) &01: teleport beam
 #   &c8 : &06b7 = &45  &07b6 = &01  &0a43 = &90      n/a      (&45, &57) &01: teleport beam
@@ -1355,7 +1375,7 @@ These are a list of square_x values in sections delimited by background_objects_
 #   &df : &06ce = &e3  &07cd = &45  &0a58 = &80  &0ae4 = &55  (&e3, &b5) &05 object_from_type_half_wall : coronium boulder
 
 #   &e0 : &06cf = &75  &07ce = &06  &0a59 = &80  &0ae5 = &22  (&75, &87) &06 object_from_type : magenta clawed robot
-#   &e1 : &06d0 = &c3  &07cf = &07  &0a5a = &c0  &0ae6 = &04  (&c3, &c5) &07 object_from_type_foilage : small nest
+#   &e1 : &06d0 = &c3  &07cf = &07  &0a5a = &c0  &0ae6 = &04  (&c3, &c5) &07 object_from_type_foliage : small nest
 #   &e2 : &06d1 = &84  &07d0 = &89  &0a5b = &04  &0ae7 = &2e  (&84, &69) &09 object_emerging_from_sucker/bush : green/yellow bird
 #   &e3 : &06d2 = &9e  &07d1 = &09  &0a5c = &08  &0ae8 = &2f  (&9e, &69) &09 object_emerging_from_sucker/bush : white/yellow bird (x 2)
 #   &e4 : &06d3 = &c6  &07d2 = &8a  &0a5d = &90  &0ae9 = &2b  (&c6, &be) &0a object_emerging_from_pipe_end : blue/cyan imp (x 4)
@@ -1538,22 +1558,22 @@ Range 8:                          -- -- -- -- -- -- -- --
 ;;  foreground colours:  0:black 1:red 2:green 3:yellow 4:blue 5:magenta 6:cyan 7:white
 ;;  background colours:  8:black 9:red 10:green 11:yellow 12:blue 13:magenta 14:cyan 15:white
 
-$CA                        ; yellow bg, black bg		1011 / 1000		11 / 8
-$C9                        ; green bg, red bg			1010 / 1001		10 / 9
-$E3                        ; magenta bg, red bg			1101 / 1001		13 / 9
-$E9                        ; cyan bg, red bg
-$EB                        ; white bg, red bg
-$CE                        ; yellow bg, green bg
-$F8                        ; cyan bg, blue bg
-$E6                        ; magenta bg, green bg
-$CC                        ; green bg, green bg
-$EE                        ; white bg, green bg
-$30                        ; blue fg, blue fg			0100 / 0100		4 / 4
-$DE                        ; yellow bg, cyan bg
-$EF                        ; white bg, yellow bg
-$CB                        ; yellow bg, red bg
-$FB                        ; white bg, magenta bg
-$FE                        ; white bg, cyan bg
+0 $CA                        ; yellow bg, black bg		1011 / 1000		11 / 8
+1 $C9                        ; green bg, red bg			1010 / 1001		10 / 9
+2 $E3                        ; magenta bg, red bg			1101 / 1001		13 / 9
+3 $E9                        ; cyan bg, red bg
+4 $EB                        ; white bg, red bg
+5 $CE                        ; yellow bg, green bg
+6 $F8                        ; cyan bg, blue bg
+7 $E6                        ; magenta bg, green bg
+8 $CC                        ; green bg, green bg
+9 $EE                        ; white bg, green bg
+a $30                        ; blue fg, blue fg			0100 / 0100		4 / 4
+b $DE                        ; yellow bg, cyan bg
+c $EF                        ; white bg, yellow bg
+d $CB                        ; yellow bg, red bg
+e $FB                        ; white bg, magenta bg
+f $FE                        ; white bg, cyan bg
 
 
 ; plot_sprite_screen_location_offsets_low
@@ -1622,8 +1642,10 @@ $FE                        ; white bg, cyan bg
 &0bc4: 60               RTS
 
 ; has_object_been_hit_by_rcd_beam
+; on exit, carry is clear if it has, carry is set otherwise
 &0bc5: a9 4e            LDA #&4e				                # &4e = remote control device
 ; has_object_been_hit_by_other
+; on exit, carry is clear if it has, carry is set otherwise
 &0bc7: 38               SEC
 &0bc8: ae d7 29         LDX &29d7 ; object_being_fired          
 &0bcb: 30 1a            BMI &0be7			                        # if no control has been fired, leave with carry set
@@ -4326,8 +4348,13 @@ $FE                        ; white bg, cyan bg
 &1e1f: 60               RTS
 
 ; get_object_gravity_flags
+; on entry, Y is the object index on the primary stack
+; on exit, A has the object weight in bits 0 to 2
 &1e20: a9 07            LDA #&07
 ; get_object_gravity_flags_arbitrary_and
+; on entry, Y is the object index on the primary stack
+;           A is the mask to apply to the gravity flags
+; on exit, A has the flags requested
 &1e22: be 60 08         LDX &0860,Y ; object_stack_type				# get object type for object Y
 &1e25: 3d 54 03         AND &0354,X ; object_gravity_flags			# and A with gravity flags
 &1e28: 60               RTS
@@ -6998,27 +7025,32 @@ $FE                        ; white bg, cyan bg
 #31a7: 4b 12 47 47 12 ; imp_gift_lookup
 
 ; toggle_door_locked_state
-&31ac: 69 40            ADC #&40
+; on entry, A = 0x40 if toggling a door or A = 0 if toggling a teleport
+&31ac: 69 40            ADC #&40				# set overflow if toggling door
 &31ae: a5 bc            LDA &bc ; this_object_data
-&31b0: 70 04            BVS &31b6
+&31b0: 70 04            BVS &31b6				# branch if toggling door
 &31b2: 69 60            ADC #&60
-&31b4: 4a               LSR
+&31b4: 4a               LSR A
 &31b5: b8               CLV
-&31b6: 4a               LSR
-&31b7: 4a               LSR
-&31b8: 4a               LSR
-&31b9: 4a               LSR
+
+&31b6: 4a               LSR A
+&31b7: 4a               LSR A
+&31b8: 4a               LSR A
+&31b9: 4a               LSR A
 &31ba: aa               TAX
 &31bb: bd 06 08         LDA &0806,X ; keys_collected	                        # have we got the right key?
-&31be: 10 17            BPL &31d7			                        # if not, leave
+&31be: 10 17            BPL &31d7			                        # if not, rts
+
 &31c0: a5 bc            LDA &bc ; this_object_data	
 &31c2: 49 01            EOR #&01                                                # toggle its state
-&31c4: 50 08            BVC &31ce
-&31c6: 4a               LSR
-&31c7: 29 fe            AND #&fe
-&31c9: b0 02            BCS &31cd               
-&31cb: 09 01            ORA #&01
-&31cd: 2a               ROL
+&31c4: 50 08            BVC &31ce						# branch if toggling teleport
+&31c6: 4a               LSR A							# bit 0 to carry
+&31c7: 29 fe            AND #&fe						# mask bits 1 to 7
+&31c9: b0 02            BCS &31cd						# branch if carry set
+&31cb: 09 01            ORA #&01						# set bit 0
+
+&31cd: 2a               ROL								# shift left, carry to bit 0
+
 &31ce: 85 bc            STA &bc ; this_object_data
 &31d0: 20 fa 13         JSR &13fa ; play_sound
 #31d3: 94 64 ba c6 ; sound_data
@@ -7144,9 +7176,9 @@ $FE                        ; white bg, cyan bg
 &327e: 60               RTS
 
 ; prevent_overflow
-&327f: 50 04            BVC &3285
-&3281: a9 7f            LDA #&7f
-&3283: 69 00            ADC #&00
+&327f: 50 04            BVC &3285			# do nothing if V clear
+&3281: a9 7f            LDA #&7f			# reset to 7f
+&3283: 69 00            ADC #&00			# possibly add 1
 &3285: 60               RTS
 
 ; convert_object_to_another
@@ -8901,52 +8933,66 @@ maggot x = &06 a = &08
 # A, X = &bc this_object_data
 # Y = &bd new_object_data_pointer; CPY #&00
 &3e95: a9 3e            LDA #&3e 						# &3e = horizontal stone door
-&3e97: 2c               BIT &85a9
-#3e98:    a9 85         LDA #&3c						# &3c = horizontal door
+&3e97: 2c               BIT ....
 ; handle_background_door
 # called with:
 # A, X = &bc this_object_data
 # Y = &bd new_object_data_pointer; CPY #&00
+&3e98: a9 85            LDA #&3c						# &3c = horizontal door
 &3e9a: 85 9c            STA &9c ; door_type
-&3e9c: cc 99 35         CPY &3599 ; door_data_pointer_store
-&3e9f: f0 41            BEQ &3ee2                                               # if so, leave
+
+&3e9c: cc 99 35         CPY &3599 ; door_data_pointer_store   # is new_object_data_pointer = door_data_pointer_store
+&3e9f: f0 41            BEQ &3ee2                       # if so, leave
+
 &3ea1: a5 09            LDA &09 ; square_orientation
-&3ea3: 0a               ASL
-&3ea4: 2a               ROL
-&3ea5: 69 00            ADC #&00
-&3ea7: 29 01            AND #&01
-&3ea9: 48               PHA
+&3ea3: 0a               ASL A			# bit 7 (flipped left/right) to carry flag
+&3ea4: 2a               ROL A			# carry (flipped left/right) to bit 0, upside down to carry
+&3ea5: 69 00            ADC #&00		# add carry flag
+&3ea7: 29 01            AND #&01		# get bit 0
+&3ea9: 48               PHA				# store. bit 0 will be set if either flipped vertically or horizontally, but not both
+
 &3eaa: b9 86 09         LDA &0986,Y ; background_objects_data
-&3ead: 30 01            BMI &3eb0
-&3eaf: 4a               LSR
-&3eb0: 29 02            AND #&02
-&3eb2: 4a               LSR
-&3eb3: e9 00            SBC #&00
-&3eb5: 85 a3            STA &a3
+&3ead: 30 01            BMI &3eb0		# branch if door is off-screen
+
+&3eaf: 4a               LSR A			# bit 0 to carry
+
+&3eb0: 29 02            AND #&02		# mask for current bit 1
+&3eb2: 4a               LSR A			# will clear carry, bit 1 to bit 0
+&3eb3: e9 00            SBC #&00		# will subtract 1, carry set if result = 0
+&3eb5: 85 a3            STA &a3			# store 0 or FF
+
 &3eb7: a5 2d            LDA &2d ; background_processing_flag
-&3eb9: 30 09            BMI &3ec4
-&3ebb: 68               PLA
+&3eb9: 30 09            BMI &3ec4		# branch if bit 7 set
+
+&3ebb: 68               PLA				# restore v_flip ^ h_flip value in bit 0
 &3ebc: 48               PHA
-&3ebd: 2a               ROL
+
+&3ebd: 2a               ROL	A			# bit 0 to bit 1, carry to bit 0
 &3ebe: aa               TAX
 &3ebf: bd 91 3e         LDA &3e91,X ; door_square_sprite_lookup
 &3ec2: 85 08            STA &08 ; square_sprite
-&3ec4: 68               PLA
+
+&3ec4: 68               PLA				# restore v_flip ^ h_flip value in bit 0
 &3ec5: 24 2d            BIT &2d ; background_processing_flag
-&3ec7: 70 19            BVS &3ee2					        # if so, leave
+&3ec7: 70 19            BVS &3ee2					        # if bit 6 set, leave
+
 &3ec9: 48               PHA
 &3eca: 18               CLC
 &3ecb: 65 9c            ADC &9c ; door_type
 &3ecd: 20 42 40         JSR &4042 ; pull_objects_in_from_tertiary_stack
-&3ed0: 68               PLA
-&3ed1: 0a               ASL
+
+&3ed0: 68               PLA				# restore v_flip ^ h_flip value in bit 0
+&3ed1: 0a               ASL A			# bit 0 to bit 1, so A = 0 for a horizontal door, and A = 2 for a vertical door
 &3ed2: 99 36 09         STA &0936,Y ; object_stack_ty
+
 &3ed5: aa               TAX
-&3ed6: b5 95            LDA &95,X ; square_x
-&3ed8: e9 00            SBC #&00
-&3eda: 99 76 09         STA &0976,Y ; object_stack_extra
+&3ed6: b5 95            LDA &95,X ; square_x / square_y
+&3ed8: e9 00            SBC #&00		# subtract 1
+&3eda: 99 76 09         STA &0976,Y ; object_stack_extra	# sets the square occupied by the door in the open position
+
 &3edd: a5 a3            LDA &a3
 &3edf: 99 16 09         STA &0916,Y ; object_stack_tx
+
 &3ee2: 60               RTS
 
 ; handle_background_teleport_beam
@@ -10666,6 +10712,7 @@ invisible switches
 &49c2: 4c 38 35         JMP &3538 ; gain_energy_or_flash_if_damaged_minimum_1e  # switch minimum energy = &1e
 
 ; can_object_trigger_switch
+; on entry, Y is the object index on the primary stack
 ; returns carry set if object can trigger switches, carry clear if not
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 ;   00 ok ok ok no -- -- ok ok ok -- ok ok -- -- ok ok
@@ -10675,7 +10722,7 @@ invisible switches
 ;   40 ok -- -- ok  n ok ok ok -- ok ok no no ok no no
 ;   50 ok ok ok ok ok ok ok ok no ok ok ok ok ok ok ok
 ;   60 ok no no ok --
-&49c5: 20 20 1e         JSR &1e20 ; get_object_weight			        # how heavy is what is touching the switch?
+&49c5: 20 20 1e         JSR &1e20 ; get_object_weight		# how heavy is what is touching the switch?
 &49c8: c9 02            CMP #&02					        # if it has weight less than 3
 &49ca: 90 0e            BCC &49da					        # then it doesn't trigger the switch
 &49cc: e0 35            CPX #&35					        # X = object type
@@ -11087,102 +11134,119 @@ invisible switches
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&4c83: 30 08            BMI &4c8d					        # is it touching anything?
-&4c85: 20 c5 49         JSR &49c5 ; can_object_trigger_switch
-&4c88: b0 03            BCS &4c8d
+&4c83: 30 08            BMI &4c8d					        # branch if it not touching anything
+&4c85: 20 c5 49         JSR &49c5 ; can_object_trigger_switch  # carry set if can trigger switch
+&4c88: b0 03            BCS &4c8d							# branch if switch can be triggered
 &4c8a: 38               SEC
-&4c8b: 66 3b            ROR &3b ; this_object_supporting
+&4c8b: 66 3b            ROR &3b ; this_object_supporting	# set bit 7 to clear effect of this_object_supporting
+
 &4c8d: 46 39            LSR &39 ; this_object_flags_lefted
-&4c8f: a6 16            LDX &16 ; this_object_ty
-&4c91: a4 11            LDY &11 ; this_object_extra
-&4c93: 94 53            STY &53,X
+&4c8f: a6 16            LDX &16 ; this_object_ty		# sets X to 0 if a horizontal door, or 2 for a vertical door
+&4c91: a4 11            LDY &11 ; this_object_extra		# gets the square occupied in the open position???
+&4c93: 94 53            STY &53,X ; this_object_x / this_object_y	# store new position
 &4c95: a9 ff            LDA #&ff
-&4c97: 95 4f            STA &4f,X
+&4c97: 95 4f            STA &4f,X ; this_object_x_low / this_object_y_low
+
 &4c99: a5 3d            LDA &3d ; ; this_object_data_pointer
 &4c9b: 8d 99 35         STA &3599 ; door_data_pointer_store
+
 &4c9e: 20 c5 0b         JSR &0bc5 ; has_object_been_hit_by_rcd_beam
-&4ca1: b0 05            BCS &4ca8                                               # has it been hit by the rcd beam?
+&4ca1: b0 05            BCS &4ca8                                               # branch if it has not been hit by the rcd beam
 &4ca3: a9 40            LDA #&40
 &4ca5: 20 ac 31         JSR &31ac ; toggle_door_locked_state                    # if so, toggle its lock
-&4ca8: 6e 99 35         ROR &3599 ; door_data_pointer_store
-&4cab: a5 bc            LDA &bc ; this_object_data
-&4cad: 09 04            ORA #&04
-&4caf: 48               PHA
-&4cb0: 4a               LSR
-&4cb1: 6a               ROR
-&4cb2: 6a               ROR
-&4cb3: 85 9f            STA &9f
-&4cb5: 4a               LSR
-&4cb6: 29 07            AND #&07
-&4cb8: 85 9e            STA &9e
-&4cba: 29 03            AND #&03
-&4cbc: aa               TAX
-&4cbd: 08               PHP
+
+&4ca8: 6e 99 35         ROR &3599 ; door_data_pointer_store			# bit 7 will be set if the rcd beam is not hitting the door
+&4cab: a5 bc            LDA &bc ; this_object_data					# get current door status
+&4cad: 09 04            ORA #&04									# set bit 2
+&4caf: 48               PHA											# save new status
+&4cb0: 4a               LSR A				# shift right, bit 0 to carry, bit 7 cleared
+&4cb1: 6a               ROR A				# shift right, carry to bit 0, carry cleared
+&4cb2: 6a               ROR A				# shift right, ba0hgfed   carry = c
+&4cb3: 85 9f            STA &9f				# and store in temporary location
+&4cb5: 4a               LSR A				# shift right, 0ba0hgfe, carry = d
+&4cb6: 29 07            AND #&07			# mask to get key required
+&4cb8: 85 9e            STA &9e				# store in temporary location
+&4cba: 29 03            AND #&03			# mask to get bottom 2 bits of key required
+&4cbc: aa               TAX					# x = bottom 2 bits of key
+
+&4cbd: 08               PHP					# store carry which has bit 3 of the status byte
 &4cbe: a5 15            LDA &15 ; this_object_energy
-&4cc0: dd 76 4d         CMP &4d76,X ; unknown_doors_lookup
-&4cc3: a9 ff            LDA #&ff
-&4cc5: b0 0e            BCS &4cd5
-&4cc7: 28               PLP
-&4cc8: 08               PHP
-&4cc9: a9 00            LDA #&00
-&4ccb: b0 08            BCS &4cd5
-&4ccd: 28               PLP
-&4cce: 68               PLA
-&4ccf: 09 08            ORA #&08
-&4cd1: 48               PHA
-&4cd2: 08               PHP
-&4cd3: b0 02            BCS &4cd7
+&4cc0: dd 76 4d         CMP &4d76,X ; unknown_doors_lookup		# set carry if this_object_energy >= unknown_doors_lookup[x]
+&4cc3: a9 ff            LDA #&ff			# to set door energy to FF
+&4cc5: b0 0e            BCS &4cd5			# branch where door has more energy
+
+&4cc7: 28               PLP					# retrieve bit 3 of the status byte
+&4cc8: 08               PHP					# keep it safe
+&4cc9: a9 00            LDA #&00			# to set door energy to 0
+&4ccb: b0 08            BCS &4cd5			# branch if bit 3 of the status byte set
+
+&4ccd: 28               PLP					# retrieve bit 3 of the status byte
+&4cce: 68               PLA					# get new door status
+&4ccf: 09 08            ORA #&08			# set bit 3
+&4cd1: 48               PHA					# restore new door status
+&4cd2: 08               PHP					# restore bit 3 of status byte
+&4cd3: b0 02            BCS &4cd7			# ??? can't ever branch - bcs is earlier and value of carry can't change ???
+
 &4cd5: 85 15            STA &15 ; this_object_energy
-&4cd7: bd 72 4d         LDA &4d72,X ; unknown_doors_two
-&4cda: 28               PLP
-&4cdb: 90 02            BCC &4cdf
-&4cdd: a9 01            LDA #&01
-&4cdf: 24 9f            BIT &9f
-&4ce1: 30 09            BMI &4cec
-&4ce3: 4a               LSR
-&4ce4: 49 ff            EOR #&ff
-&4ce6: 24 3b            BIT &3b ; this_object_supporting
-&4ce8: 30 02            BMI &4cec
-&4cea: a9 ff            LDA #&ff
+
+&4cd7: bd 72 4d         LDA &4d72,X ; unknown_doors_two		# get lookup value
+&4cda: 28               PLP					# get bit 3 of status byte into carry
+
+&4cdb: 90 02            BCC &4cdf			# branch over if standard door behaviour (fast and not latching)
+&4cdd: a9 01            LDA #&01			# use value of 1 instead of unknown_doors_two lookup
+
+&4cdf: 24 9f            BIT &9f				# retrieve door status byte ba0hgfed
+&4ce1: 30 09            BMI &4cec			# branch if open???
+&4ce3: 4a               LSR A				# shift right, with bit 0 to carry, bit 7 = 0
+&4ce4: 49 ff            EOR #&ff			# reverse all remaining bits
+&4ce6: 24 3b            BIT &3b ; this_object_supporting	# test if switch is being pressed
+&4ce8: 30 02            BMI &4cec							# branch if not being pressed
+&4cea: a9 ff            LDA #&ff			# reset when being touched
+
 &4cec: 85 9c            STA &9c
 &4cee: a5 14            LDA &14 ; this_object_tx
 &4cf0: 49 80            EOR #&80
 &4cf2: 38               SEC
 &4cf3: e5 9c            SBC &9c
 &4cf5: 50 44            BVC &4d3b
-&4cf7: 20 7f 32         JSR &327f ; prevent_overflow
+&4cf7: 20 7f 32         JSR &327f ; prevent_overflow		# reset A to 7f or 80 if carry set
 &4cfa: a8               TAY
-&4cfb: 10 0c            BPL &4d09
+&4cfb: 10 0c            BPL &4d09						# 
 &4cfd: 8a               TXA
 &4cfe: d0 0d            BNE &4d0d
 &4d00: ad 19 08         LDA &0819 ; door_timer
 &4d03: c9 14            CMP #&14
 &4d05: b0 06            BCS &4d0d
 &4d07: 90 19            BCC &4d22
+
 &4d09: 68               PLA
-&4d0a: 29 fb            AND #&fb
+&4d0a: 29 fb            AND #&fb				# clear bit 2
 &4d0c: 48               PHA
-&4d0d: 24 3b            BIT &3b ; this_object_supporting
-&4d0f: 30 29            BMI &4d3a
-&4d11: 24 9f            BIT &9f
-&4d13: 70 25            BVS &4d3a
-&4d15: 8a               TXA
-&4d16: d0 0a            BNE &4d22
+
+&4d0d: 24 3b            BIT &3b ; this_object_supporting	# test if door is being touched
+&4d0f: 30 29            BMI &4d3a							# branch if it isn't
+&4d11: 24 9f            BIT &9f								# set overflow for locked/unlocked state
+&4d13: 70 25            BVS &4d3a							# branch when locked
+&4d15: 8a               TXA									# x = bottom 2 bits of key & also set Z flag
+&4d16: d0 0a            BNE &4d22							# branch if key isn't 0 or 4
 &4d18: ad 19 08         LDA &0819 ; door_timer
-&4d1b: d0 1d            BNE &4d3a
+&4d1b: d0 1d            BNE &4d3a							# branch if door_timer <> 0
 &4d1d: a9 3c            LDA #&3c
-&4d1f: 8d 19 08         STA &0819 ; door_timer
+&4d1f: 8d 19 08         STA &0819 ; door_timer				# reset door_timer to 3c
+
 &4d22: 68               PLA
-&4d23: 49 02            EOR #&02
+&4d23: 49 02            EOR #&02							# toggle bit 1
 &4d25: 48               PHA
-&4d26: 29 02            AND #&02
-&4d28: f0 09            BEQ &4d33
-&4d2a: 20 fa 13         JSR &13fa ; play_sound
+&4d26: 29 02            AND #&02							# mask for bit 1
+&4d28: f0 09            BEQ &4d33							# branch if about to shut
+&4d2a: 20 fa 13         JSR &13fa ; play_sound				# play open sound
 #4d2d: c7 c3 c1 13 ; sound data
 &4d31: b0 07            BCS &4d3a
-&4d33: 20 fa 13         JSR &13fa ; play_sound
+&4d33: 20 fa 13         JSR &13fa ; play_sound				# play close sound
 #4d36: c7 c3 c1 03 ; sound data
+
 &4d3a: 98               TYA
+
 &4d3b: 49 80            EOR #&80
 &4d3d: a6 16            LDX &16 ; this_object_ty
 &4d3f: a8               TAY
@@ -11206,18 +11270,29 @@ invisible switches
 &4d5d: 85 bc            STA &bc ; this_object_data
 &4d5f: a6 3d            LDX &3d ; this_object_data_pointer
 &4d61: 9d 86 09         STA &0986,X ; background_objects_data
-&4d64: a6 9e            LDX &9e
-&4d66: bd 7a 4d         LDA &4d7a,X ; door_palettes
-&4d69: 24 9f            BIT &9f
-&4d6b: 70 02            BVS &4d6f
-&4d6d: 29 0f            AND #&0f
-&4d6f: 85 73            STA &73 ; this_object_palette			        # change colour
+
+&4d64: a6 9e            LDX &9e											# get key 
+&4d66: bd 7a 4d         LDA &4d7a,X ; door_palettes						# get palette for key
+&4d69: 24 9f            BIT &9f											# set overflow for locked/unlocked state
+&4d6b: 70 02            BVS &4d6f										# branch when locked
+&4d6d: 29 0f            AND #&0f										# clear primary colour for when unlocked
+
+&4d6f: 85 73            STA &73 ; this_object_palette			        # set colour scheme
 &4d71: 60               RTS
 
 #4d72: 20 10 08 20 ; unknown_doors_two
 #4d76: 80 74 c0 80 ; unknown_doors_lookup
 
 #4d7a: 2b 2d 15 1c 42 12 26 4e ; door_palettes
+indexed by key, bits 4 to 6 of the door data
+0 : green, yellow bg & cyan bg
+1 : green, yellow bg & red bg
+2 : red, yellow bg & green bg
+3 : red, white bg & yellow bg
+4 : blue, magenta bg & red bg
+5 : red, magenta bg & red bg
+6 : green, cyan bg & blue bg
+7 : blue, white bg & magenta bg
 
 #4d82: 52 63 35 21 ; teleport_beam_palettes
 

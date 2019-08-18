@@ -17,7 +17,6 @@ namespace ExileMappedBackground
         private static readonly byte[] WallPaletteFourLookup = BuildWallPaletteFourLookup();
         private static readonly Dictionary<int, byte[]> BackgroundDataLookup = BuildBackgroundDataLookup();
         private static readonly Dictionary<int, byte[]> BackgroundTypeLookup = BuildBackgroundTypeLookup();
-        private static readonly string[] ObjectTypeList = BuildObjectTypeList();
 
         public MapResult GetBackground(byte squareX, byte squareY)
             {
@@ -470,48 +469,6 @@ L19A5:
             byte? type = positionInHash < typeList.Length ? typeList[positionInHash] : new byte?();
 
             return (background: result, backgroundObjectId: backgroundObjectId, isHashDefault: false, data, type);
-            }
-
-        public static string GetBackgroundEventTypeName(byte background)
-            {
-            var spriteOrBackgroundHandler = background & 0x3f;
-            if (spriteOrBackgroundHandler < 0x10)
-                {
-                switch (spriteOrBackgroundHandler)
-                    {
-                    case 0: 
-                        return "handle_background_invisible_switch";
-                    case 1:
-                        return "handle_background_teleport_beam";
-                    case 2:
-                        return "handle_background_object_from_data";
-                    case 3:
-                        return "handle_background_door";
-                    case 4:
-                        return "handle_background_stone_door";
-                    case 5:
-                    case 6:
-                    case 7:
-                        return "handle_background_object_from_type";
-                    case 8:
-                        return "handle_background_switch";
-                    case 9:
-                    case 0xA:
-                        return "handle_background_object_emerging";
-                    case 0xB:
-                        return "handle_background_object_fixed_wind";
-                    case 0xC:
-                        return "handle_background_engine_thruster";
-                    case 0xD:
-                        return "handle_background_object_water";
-                    case 0xE:
-                        return "handle_background_object_random_wind";
-                    case 0xF:
-                        return "handle_background_mushrooms";
-                    }
-                }
-
-            return null;
             }
 
         public (byte backgroundPalette, byte displayedPalette) GetPalette(ref byte background, ref byte orientation, byte squareX, byte squareY)
@@ -1110,115 +1067,6 @@ palette_not_five:
                         {
                         }
                     }
-                };
-            return result;
-            }
-
-        private static string[] BuildObjectTypeList()
-            {
-            var result = new []
-                {
-                "player",
-                "active chatter",
-                "pericles crew member",
-                "fluffy",
-                "small nest",
-                "big nest",
-                "red frogman",
-                "green frogman",
-                "cyan frogman",
-                "red slime",
-                "green slime",
-                "yellow ball",
-                "sucker",
-                "deadly sucker",
-                "big fish",
-                "worm",
-                "piranha",
-                "wasp",
-                "active grenade",		
-                "icer bullet",				
-                "tracer bullet",				
-                "cannonball",				
-                "blue death ball",			
-                "red bullet",				
-                "pistol bullet",				
-                "plasma ball",				
-                "hover ball",				
-                "invisible hover ball",		
-                "magenta robot",				
-                "red robot",				
-                "blue robot",				
-                "green/white turret",		
-                "cyan/red turret",			
-                "hovering robot",			
-                "magenta clawed robot",		
-                "cyan clawed robot",			
-                "green clawed robot",		
-                "red clawed robot",			
-                "triax",						
-                "maggot",					
-                "gargoyle",					
-                "red/magenta imp",			
-                "red/yellow imp",			
-                "blue/cyan imp",				
-                "cyan/yellow imp",			
-                "red/cyan imp",				
-                "green/yellow bird",			
-                "white/yellow bird",			
-                "red/magenta bird",			
-                "invisible bird",			
-                "lightning",					
-                "red mushroom ball",			
-                "blue mushroom ball",		
-                "engine fire",				
-                "red drop",					
-                "flames",					
-                "inactive chatter",			
-                "moving fireball",			
-                "giant wall",				
-                "engine thruster",			
-                "horizontal door",			
-                "vertical door",				
-                "horizontal stone door",		
-                "vertical stone door",		
-                "bush",						
-                "teleport beam",				
-                "switch",					
-                "chest",					
-                "explosion",					
-                "rock",						
-                "cannon",					
-                "mysterious weapon",			
-                "maggot machine",			
-                "placeholder",				
-                "destinator",				
-                "energy capsule",			
-                "empty flask",				
-                "full flask",				
-                "remote control device",		
-                "cannon control device",		
-                "inactive grenade",			
-                "cyan/yellow/green key",		
-                "red/yellow/green key",		
-                "green/yellow/red key",		
-                "yellow/white/red key",		
-                "coronium boulder",			
-                "red/magenta/red key",		
-                "blue/cyan/green key",		
-                "coronium crystal",			
-                "jetpack booster",			
-                "pistol",					
-                "icer",						
-                "discharge device",			
-                "plasma gun",				
-                "protection suit",			
-                "fire immunity device",		
-                "mushroom immunity pill",	
-                "whistle 1",				
-                "whistle 2",					
-                "radiation immunity pill",	
-                "?"							
                 };
             return result;
             }
