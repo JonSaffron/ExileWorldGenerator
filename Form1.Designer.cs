@@ -29,23 +29,25 @@
         private void InitializeComponent()
             {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle7 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle8 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.map = new System.Windows.Forms.DataGridView();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
-            this.txtCoordinates = new System.Windows.Forms.TextBox();
-            this.txtMappedOrGeneratedInfo = new System.Windows.Forms.TextBox();
-            this.txtListOverrideInfo = new System.Windows.Forms.TextBox();
-            this.txtPaletteInfo = new System.Windows.Forms.TextBox();
-            this.txtSpriteInfo = new System.Windows.Forms.TextBox();
-            this.txtBackgroundObjectInfo = new System.Windows.Forms.TextBox();
             this.tabControl1 = new System.Windows.Forms.TabControl();
-            this.tabPage1 = new System.Windows.Forms.TabPage();
+            this.tabProperties = new System.Windows.Forms.TabPage();
+            this.tableLayoutPanel2 = new System.Windows.Forms.TableLayoutPanel();
+            this.txtBackgroundObjectInfo = new System.Windows.Forms.TextBox();
+            this.txtSpriteInfo = new System.Windows.Forms.TextBox();
+            this.txtPaletteInfo = new System.Windows.Forms.TextBox();
+            this.txtListOverrideInfo = new System.Windows.Forms.TextBox();
+            this.txtMappedOrGeneratedInfo = new System.Windows.Forms.TextBox();
+            this.txtCoordinates = new System.Windows.Forms.TextBox();
+            this.tabOptions = new System.Windows.Forms.TabPage();
             this.label1 = new System.Windows.Forms.Label();
             this.cboZoomLevel = new System.Windows.Forms.ComboBox();
-            this.tabPage2 = new System.Windows.Forms.TabPage();
             this.animationTimer = new System.Windows.Forms.Timer(this.components);
+            this.chkHighlightMappedData = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -53,7 +55,9 @@
             ((System.ComponentModel.ISupportInitialize)(this.map)).BeginInit();
             this.tableLayoutPanel1.SuspendLayout();
             this.tabControl1.SuspendLayout();
-            this.tabPage1.SuspendLayout();
+            this.tabProperties.SuspendLayout();
+            this.tableLayoutPanel2.SuspendLayout();
+            this.tabOptions.SuspendLayout();
             this.SuspendLayout();
             // 
             // splitContainer1
@@ -77,23 +81,23 @@
             // 
             this.map.AllowUserToAddRows = false;
             this.map.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle7.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle7.BackColor = System.Drawing.SystemColors.Control;
-            dataGridViewCellStyle7.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.1F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            dataGridViewCellStyle7.ForeColor = System.Drawing.SystemColors.WindowText;
-            dataGridViewCellStyle7.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle7.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle7.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
-            this.map.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle7;
+            dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.Control;
+            dataGridViewCellStyle1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.1F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.WindowText;
+            dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+            this.map.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle1;
             this.map.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle8.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle8.BackColor = System.Drawing.Color.Black;
-            dataGridViewCellStyle8.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            dataGridViewCellStyle8.ForeColor = System.Drawing.SystemColors.ControlText;
-            dataGridViewCellStyle8.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle8.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle8.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.map.DefaultCellStyle = dataGridViewCellStyle8;
+            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle2.BackColor = System.Drawing.Color.Black;
+            dataGridViewCellStyle2.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle2.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.map.DefaultCellStyle = dataGridViewCellStyle2;
             this.map.Dock = System.Windows.Forms.DockStyle.Fill;
             this.map.EditMode = System.Windows.Forms.DataGridViewEditMode.EditProgrammatically;
             this.map.Location = new System.Drawing.Point(0, 0);
@@ -114,136 +118,167 @@
             // 
             this.tableLayoutPanel1.ColumnCount = 1;
             this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanel1.Controls.Add(this.txtCoordinates, 0, 2);
-            this.tableLayoutPanel1.Controls.Add(this.txtMappedOrGeneratedInfo, 0, 3);
-            this.tableLayoutPanel1.Controls.Add(this.txtListOverrideInfo, 0, 4);
-            this.tableLayoutPanel1.Controls.Add(this.txtPaletteInfo, 0, 5);
-            this.tableLayoutPanel1.Controls.Add(this.txtSpriteInfo, 0, 6);
-            this.tableLayoutPanel1.Controls.Add(this.txtBackgroundObjectInfo, 0, 7);
             this.tableLayoutPanel1.Controls.Add(this.tabControl1, 0, 1);
             this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
             this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 9;
+            this.tableLayoutPanel1.RowCount = 3;
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 120F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
+            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
             this.tableLayoutPanel1.Size = new System.Drawing.Size(247, 447);
             this.tableLayoutPanel1.TabIndex = 0;
+            // 
+            // tabControl1
+            // 
+            this.tabControl1.Controls.Add(this.tabProperties);
+            this.tabControl1.Controls.Add(this.tabOptions);
+            this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tabControl1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tabControl1.Location = new System.Drawing.Point(3, 98);
+            this.tabControl1.Name = "tabControl1";
+            this.tabControl1.SelectedIndex = 0;
+            this.tabControl1.Size = new System.Drawing.Size(241, 250);
+            this.tabControl1.TabIndex = 6;
+            // 
+            // tabProperties
+            // 
+            this.tabProperties.Controls.Add(this.tableLayoutPanel2);
+            this.tabProperties.Location = new System.Drawing.Point(4, 25);
+            this.tabProperties.Name = "tabProperties";
+            this.tabProperties.Padding = new System.Windows.Forms.Padding(3);
+            this.tabProperties.Size = new System.Drawing.Size(233, 221);
+            this.tabProperties.TabIndex = 1;
+            this.tabProperties.Text = "Properties";
+            this.tabProperties.UseVisualStyleBackColor = true;
+            // 
+            // tableLayoutPanel2
+            // 
+            this.tableLayoutPanel2.ColumnCount = 1;
+            this.tableLayoutPanel2.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel2.Controls.Add(this.txtBackgroundObjectInfo, 0, 5);
+            this.tableLayoutPanel2.Controls.Add(this.txtSpriteInfo, 0, 4);
+            this.tableLayoutPanel2.Controls.Add(this.txtPaletteInfo, 0, 3);
+            this.tableLayoutPanel2.Controls.Add(this.txtListOverrideInfo, 0, 2);
+            this.tableLayoutPanel2.Controls.Add(this.txtMappedOrGeneratedInfo, 0, 1);
+            this.tableLayoutPanel2.Controls.Add(this.txtCoordinates, 0, 0);
+            this.tableLayoutPanel2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tableLayoutPanel2.Location = new System.Drawing.Point(3, 3);
+            this.tableLayoutPanel2.Name = "tableLayoutPanel2";
+            this.tableLayoutPanel2.RowCount = 7;
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle());
+            this.tableLayoutPanel2.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
+            this.tableLayoutPanel2.Size = new System.Drawing.Size(227, 215);
+            this.tableLayoutPanel2.TabIndex = 0;
+            // 
+            // txtBackgroundObjectInfo
+            // 
+            this.txtBackgroundObjectInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.txtBackgroundObjectInfo.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtBackgroundObjectInfo.Location = new System.Drawing.Point(2, 140);
+            this.txtBackgroundObjectInfo.Margin = new System.Windows.Forms.Padding(2);
+            this.txtBackgroundObjectInfo.Multiline = true;
+            this.txtBackgroundObjectInfo.Name = "txtBackgroundObjectInfo";
+            this.txtBackgroundObjectInfo.ReadOnly = true;
+            this.txtBackgroundObjectInfo.Size = new System.Drawing.Size(223, 18);
+            this.txtBackgroundObjectInfo.TabIndex = 7;
+            this.txtBackgroundObjectInfo.Text = "background object info";
+            // 
+            // txtSpriteInfo
+            // 
+            this.txtSpriteInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.txtSpriteInfo.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtSpriteInfo.Location = new System.Drawing.Point(2, 112);
+            this.txtSpriteInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
+            this.txtSpriteInfo.Multiline = true;
+            this.txtSpriteInfo.Name = "txtSpriteInfo";
+            this.txtSpriteInfo.ReadOnly = true;
+            this.txtSpriteInfo.Size = new System.Drawing.Size(223, 18);
+            this.txtSpriteInfo.TabIndex = 6;
+            this.txtSpriteInfo.Text = "sprite info";
+            // 
+            // txtPaletteInfo
+            // 
+            this.txtPaletteInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.txtPaletteInfo.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtPaletteInfo.Location = new System.Drawing.Point(2, 84);
+            this.txtPaletteInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
+            this.txtPaletteInfo.Multiline = true;
+            this.txtPaletteInfo.Name = "txtPaletteInfo";
+            this.txtPaletteInfo.ReadOnly = true;
+            this.txtPaletteInfo.Size = new System.Drawing.Size(223, 18);
+            this.txtPaletteInfo.TabIndex = 5;
+            this.txtPaletteInfo.Text = "palette info";
+            // 
+            // txtListOverrideInfo
+            // 
+            this.txtListOverrideInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.txtListOverrideInfo.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtListOverrideInfo.Location = new System.Drawing.Point(2, 56);
+            this.txtListOverrideInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
+            this.txtListOverrideInfo.Multiline = true;
+            this.txtListOverrideInfo.Name = "txtListOverrideInfo";
+            this.txtListOverrideInfo.ReadOnly = true;
+            this.txtListOverrideInfo.Size = new System.Drawing.Size(223, 18);
+            this.txtListOverrideInfo.TabIndex = 4;
+            this.txtListOverrideInfo.Text = "list overrides";
+            // 
+            // txtMappedOrGeneratedInfo
+            // 
+            this.txtMappedOrGeneratedInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
+            this.txtMappedOrGeneratedInfo.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.txtMappedOrGeneratedInfo.Location = new System.Drawing.Point(2, 28);
+            this.txtMappedOrGeneratedInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
+            this.txtMappedOrGeneratedInfo.Multiline = true;
+            this.txtMappedOrGeneratedInfo.Name = "txtMappedOrGeneratedInfo";
+            this.txtMappedOrGeneratedInfo.ReadOnly = true;
+            this.txtMappedOrGeneratedInfo.Size = new System.Drawing.Size(223, 18);
+            this.txtMappedOrGeneratedInfo.TabIndex = 3;
+            this.txtMappedOrGeneratedInfo.Text = "mapped/generated background info";
             // 
             // txtCoordinates
             // 
             this.txtCoordinates.BorderStyle = System.Windows.Forms.BorderStyle.None;
             this.txtCoordinates.Dock = System.Windows.Forms.DockStyle.Left;
             this.txtCoordinates.Font = new System.Drawing.Font("Microsoft Sans Serif", 10.2F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.txtCoordinates.Location = new System.Drawing.Point(2, 205);
+            this.txtCoordinates.Location = new System.Drawing.Point(2, 2);
             this.txtCoordinates.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
             this.txtCoordinates.Name = "txtCoordinates";
             this.txtCoordinates.ReadOnly = true;
             this.txtCoordinates.Size = new System.Drawing.Size(75, 16);
-            this.txtCoordinates.TabIndex = 0;
+            this.txtCoordinates.TabIndex = 1;
             this.txtCoordinates.Text = "X:xx Y:yy";
             // 
-            // txtMappedOrGeneratedInfo
+            // tabOptions
             // 
-            this.txtMappedOrGeneratedInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.txtMappedOrGeneratedInfo.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtMappedOrGeneratedInfo.Location = new System.Drawing.Point(2, 231);
-            this.txtMappedOrGeneratedInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
-            this.txtMappedOrGeneratedInfo.Multiline = true;
-            this.txtMappedOrGeneratedInfo.Name = "txtMappedOrGeneratedInfo";
-            this.txtMappedOrGeneratedInfo.ReadOnly = true;
-            this.txtMappedOrGeneratedInfo.Size = new System.Drawing.Size(243, 18);
-            this.txtMappedOrGeneratedInfo.TabIndex = 1;
-            this.txtMappedOrGeneratedInfo.Text = "mapped/generated background info";
-            // 
-            // txtListOverrideInfo
-            // 
-            this.txtListOverrideInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.txtListOverrideInfo.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtListOverrideInfo.Location = new System.Drawing.Point(2, 259);
-            this.txtListOverrideInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
-            this.txtListOverrideInfo.Multiline = true;
-            this.txtListOverrideInfo.Name = "txtListOverrideInfo";
-            this.txtListOverrideInfo.ReadOnly = true;
-            this.txtListOverrideInfo.Size = new System.Drawing.Size(243, 18);
-            this.txtListOverrideInfo.TabIndex = 2;
-            this.txtListOverrideInfo.Text = "list overrides";
-            // 
-            // txtPaletteInfo
-            // 
-            this.txtPaletteInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.txtPaletteInfo.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtPaletteInfo.Location = new System.Drawing.Point(2, 287);
-            this.txtPaletteInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
-            this.txtPaletteInfo.Multiline = true;
-            this.txtPaletteInfo.Name = "txtPaletteInfo";
-            this.txtPaletteInfo.ReadOnly = true;
-            this.txtPaletteInfo.Size = new System.Drawing.Size(243, 18);
-            this.txtPaletteInfo.TabIndex = 3;
-            this.txtPaletteInfo.Text = "palette info";
-            // 
-            // txtSpriteInfo
-            // 
-            this.txtSpriteInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.txtSpriteInfo.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtSpriteInfo.Location = new System.Drawing.Point(2, 315);
-            this.txtSpriteInfo.Margin = new System.Windows.Forms.Padding(2, 2, 2, 8);
-            this.txtSpriteInfo.Multiline = true;
-            this.txtSpriteInfo.Name = "txtSpriteInfo";
-            this.txtSpriteInfo.ReadOnly = true;
-            this.txtSpriteInfo.Size = new System.Drawing.Size(243, 18);
-            this.txtSpriteInfo.TabIndex = 4;
-            this.txtSpriteInfo.Text = "sprite info";
-            // 
-            // txtBackgroundObjectInfo
-            // 
-            this.txtBackgroundObjectInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.txtBackgroundObjectInfo.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.txtBackgroundObjectInfo.Location = new System.Drawing.Point(2, 343);
-            this.txtBackgroundObjectInfo.Margin = new System.Windows.Forms.Padding(2);
-            this.txtBackgroundObjectInfo.Multiline = true;
-            this.txtBackgroundObjectInfo.Name = "txtBackgroundObjectInfo";
-            this.txtBackgroundObjectInfo.ReadOnly = true;
-            this.txtBackgroundObjectInfo.Size = new System.Drawing.Size(243, 18);
-            this.txtBackgroundObjectInfo.TabIndex = 5;
-            this.txtBackgroundObjectInfo.Text = "background object info";
-            // 
-            // tabControl1
-            // 
-            this.tabControl1.Controls.Add(this.tabPage1);
-            this.tabControl1.Controls.Add(this.tabPage2);
-            this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tabControl1.Location = new System.Drawing.Point(3, 86);
-            this.tabControl1.Name = "tabControl1";
-            this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(241, 114);
-            this.tabControl1.TabIndex = 6;
-            // 
-            // tabPage1
-            // 
-            this.tabPage1.Controls.Add(this.label1);
-            this.tabPage1.Controls.Add(this.cboZoomLevel);
-            this.tabPage1.Location = new System.Drawing.Point(4, 22);
-            this.tabPage1.Name = "tabPage1";
-            this.tabPage1.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage1.Size = new System.Drawing.Size(233, 88);
-            this.tabPage1.TabIndex = 0;
-            this.tabPage1.Text = "tabPage1";
-            this.tabPage1.UseVisualStyleBackColor = true;
+            this.tabOptions.Controls.Add(this.chkHighlightMappedData);
+            this.tabOptions.Controls.Add(this.label1);
+            this.tabOptions.Controls.Add(this.cboZoomLevel);
+            this.tabOptions.Location = new System.Drawing.Point(4, 25);
+            this.tabOptions.Name = "tabOptions";
+            this.tabOptions.Padding = new System.Windows.Forms.Padding(3);
+            this.tabOptions.Size = new System.Drawing.Size(233, 221);
+            this.tabOptions.TabIndex = 0;
+            this.tabOptions.Text = "Options";
+            this.tabOptions.UseVisualStyleBackColor = true;
             // 
             // label1
             // 
             this.label1.AutoSize = true;
             this.label1.Location = new System.Drawing.Point(7, 7);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(62, 13);
+            this.label1.Size = new System.Drawing.Size(78, 16);
             this.label1.TabIndex = 1;
             this.label1.Text = "Zoom level:";
             // 
@@ -251,26 +286,27 @@
             // 
             this.cboZoomLevel.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboZoomLevel.FormattingEnabled = true;
-            this.cboZoomLevel.Location = new System.Drawing.Point(77, 7);
+            this.cboZoomLevel.Location = new System.Drawing.Point(91, 7);
             this.cboZoomLevel.Name = "cboZoomLevel";
-            this.cboZoomLevel.Size = new System.Drawing.Size(121, 21);
+            this.cboZoomLevel.Size = new System.Drawing.Size(108, 24);
             this.cboZoomLevel.TabIndex = 0;
             this.cboZoomLevel.SelectedIndexChanged += new System.EventHandler(this.cboZoomLevel_SelectedIndexChanged);
-            // 
-            // tabPage2
-            // 
-            this.tabPage2.Location = new System.Drawing.Point(4, 22);
-            this.tabPage2.Name = "tabPage2";
-            this.tabPage2.Padding = new System.Windows.Forms.Padding(3);
-            this.tabPage2.Size = new System.Drawing.Size(233, 88);
-            this.tabPage2.TabIndex = 1;
-            this.tabPage2.Text = "tabPage2";
-            this.tabPage2.UseVisualStyleBackColor = true;
             // 
             // animationTimer
             // 
             this.animationTimer.Enabled = true;
             this.animationTimer.Tick += new System.EventHandler(this.animationTimer_Tick);
+            // 
+            // chkHighlightMappedData
+            // 
+            this.chkHighlightMappedData.AutoSize = true;
+            this.chkHighlightMappedData.Location = new System.Drawing.Point(10, 37);
+            this.chkHighlightMappedData.Name = "chkHighlightMappedData";
+            this.chkHighlightMappedData.Size = new System.Drawing.Size(163, 20);
+            this.chkHighlightMappedData.TabIndex = 2;
+            this.chkHighlightMappedData.Text = "Highlight mapped data";
+            this.chkHighlightMappedData.UseVisualStyleBackColor = true;
+            this.chkHighlightMappedData.CheckedChanged += new System.EventHandler(this.chkHighlightMappedData_CheckedChanged);
             // 
             // Form1
             // 
@@ -288,10 +324,12 @@
             this.splitContainer1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.map)).EndInit();
             this.tableLayoutPanel1.ResumeLayout(false);
-            this.tableLayoutPanel1.PerformLayout();
             this.tabControl1.ResumeLayout(false);
-            this.tabPage1.ResumeLayout(false);
-            this.tabPage1.PerformLayout();
+            this.tabProperties.ResumeLayout(false);
+            this.tableLayoutPanel2.ResumeLayout(false);
+            this.tableLayoutPanel2.PerformLayout();
+            this.tabOptions.ResumeLayout(false);
+            this.tabOptions.PerformLayout();
             this.ResumeLayout(false);
 
             }
@@ -300,18 +338,20 @@
         private System.Windows.Forms.SplitContainer splitContainer1;
         private System.Windows.Forms.DataGridView map;
         private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
-        private System.Windows.Forms.TextBox txtCoordinates;
-        private System.Windows.Forms.TextBox txtMappedOrGeneratedInfo;
-        private System.Windows.Forms.TextBox txtListOverrideInfo;
-        private System.Windows.Forms.TextBox txtPaletteInfo;
-        private System.Windows.Forms.TextBox txtSpriteInfo;
-        private System.Windows.Forms.TextBox txtBackgroundObjectInfo;
         private System.Windows.Forms.Timer animationTimer;
         private System.Windows.Forms.TabControl tabControl1;
-        private System.Windows.Forms.TabPage tabPage1;
+        private System.Windows.Forms.TabPage tabOptions;
         private System.Windows.Forms.Label label1;
         private System.Windows.Forms.ComboBox cboZoomLevel;
-        private System.Windows.Forms.TabPage tabPage2;
+        private System.Windows.Forms.TabPage tabProperties;
+        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel2;
+        private System.Windows.Forms.TextBox txtBackgroundObjectInfo;
+        private System.Windows.Forms.TextBox txtSpriteInfo;
+        private System.Windows.Forms.TextBox txtPaletteInfo;
+        private System.Windows.Forms.TextBox txtListOverrideInfo;
+        private System.Windows.Forms.TextBox txtMappedOrGeneratedInfo;
+        private System.Windows.Forms.TextBox txtCoordinates;
+        private System.Windows.Forms.CheckBox chkHighlightMappedData;
     }
     }
 

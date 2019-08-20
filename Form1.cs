@@ -19,9 +19,9 @@ namespace ExileMappedBackground
         private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
         private static readonly string[] BackgroundHandlerTypeList = BuildBackgroundHandlerTypeList();
         private static readonly string[] ObjectTypeList = BuildObjectTypeList();
-        private decimal zoom;
+        private decimal _zoom;
         private byte lookFor = 0xff;
-        private bool highlightMappedDataSquares = true;
+        private bool _highlightMappedDataSquares;
         private readonly Stopwatch _stopwatch = new Stopwatch();
 
         public Form1()
@@ -36,11 +36,12 @@ namespace ExileMappedBackground
             cboZoomLevel.ValueMember = "Key";
             cboZoomLevel.DataSource = new BindingSource(items, null);
             cboZoomLevel.SelectedIndex = 1;
-            this.zoom = 1m;
+            this._zoom = 1m;
 
             var type = map.GetType();
             var prop = type.GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
-            prop.SetValue(this.map, true);
+            if (prop != null)
+                prop.SetValue(this.map, true);
 
             this._stopwatch.Start();
 
@@ -70,11 +71,6 @@ namespace ExileMappedBackground
         private void Form1_Shown(object sender, EventArgs e)
             {
             ResetGrid();
-
-            for (int i = 0; i <= 0x3f; i++)
-                {
-                Trace.WriteLine($"{i:x2}\t{_backgroundSpriteLookup[i]:x2}\t{_backgroundYOffsetLookup[i]:x2}\t{CalculateBackground.BackgroundPaletteLookup[i]:x2}");
-                }
             }
 
         private void ResetGrid()
@@ -86,8 +82,8 @@ namespace ExileMappedBackground
                 var value = i.ToString("X2");
                 this.map.Rows[i].HeaderCell.Value = value;
                 this.map.Columns[i].HeaderCell.Value = value;
-                this.map.Rows[i].Height = (int) (32 * zoom);
-                this.map.Columns[i].Width = (int) (32 * zoom);
+                this.map.Rows[i].Height = (int) (32 * _zoom);
+                this.map.Columns[i].Width = (int) (32 * _zoom);
                 }
             
             this.map.ResumeLayout();
@@ -205,10 +201,10 @@ namespace ExileMappedBackground
             var squarePalette = SquarePalette.FromByte(squareProperties.DisplayedPalette);
             var image = this._spriteBuilder.BuildSprite(sprite, squarePalette, rightAlign, bottomAlign, offsetAlongY);
 
-            Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, (int) (32 * zoom), (int) (32 * zoom));
+            Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, (int) (32 * _zoom), (int) (32 * _zoom));
             e.Graphics.DrawImage(image, destinationRectangle);
 
-            if (this.highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
+            if (this._highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
                 {
                 using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Orange)))
                     {
@@ -219,7 +215,7 @@ namespace ExileMappedBackground
                         TimeSpan elapsed = timeElapsed - squareProperties.NextAnimationFrame.Value;
                         int framesMoved = (int) elapsed.TotalMilliseconds / (int) frameLength.TotalMilliseconds;
                         squareProperties.AnimationFrame = (squareProperties.AnimationFrame + framesMoved) % 5;
-                        if (this.highlightMappedDataSquares)
+                        if (this._highlightMappedDataSquares)
                             {
                             TimeSpan timeToNextFrame = TimeSpan.FromMilliseconds(framesMoved * frameLength.TotalMilliseconds);
                             squareProperties.NextAnimationFrame = squareProperties.NextAnimationFrame.Value + timeToNextFrame;
@@ -703,9 +699,9 @@ namespace ExileMappedBackground
             {
             var timeElapsed = this._stopwatch.Elapsed;
 
-            Parallel.ForEach<SquareProperties>(this._squareProperties.Cast<SquareProperties>(), item => 
+            Parallel.ForEach(this._squareProperties.Cast<SquareProperties>(), item => 
                 {
-                if (this.highlightMappedDataSquares || item.NextAnimationFrame.HasValue)
+                if (this._highlightMappedDataSquares || item.NextAnimationFrame.HasValue)
                     {
                     if (timeElapsed >= item.NextAnimationFrame)
                         {
@@ -717,8 +713,15 @@ namespace ExileMappedBackground
 
         private void cboZoomLevel_SelectedIndexChanged(object sender, EventArgs e)
             {
-            this.zoom = (decimal) this.cboZoomLevel.SelectedValue;
+            this._zoom = (decimal) this.cboZoomLevel.SelectedValue;
             this.ResetGrid();
-            }   
+            }
+
+        private void chkHighlightMappedData_CheckedChanged(object sender, EventArgs e)
+            {
+            this._highlightMappedDataSquares = this.chkHighlightMappedData.Checked;
+            if (this._highlightMappedDataSquares)
+                this.animationTimer.Enabled = true;
+            }
         }
     }
