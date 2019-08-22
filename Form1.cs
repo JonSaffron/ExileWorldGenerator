@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -24,9 +25,15 @@ namespace ExileMappedBackground
         private bool _highlightMappedDataSquares;
         private readonly Stopwatch _stopwatch = new Stopwatch();
 
+        [DllImport("user32.dll", CharSet=CharSet.Auto)]
+        private static extern IntPtr SendMessage(HandleRef hWnd, int msg, int wParam, ref TV_ITEM lParam);
+
         public Form1()
             {
             InitializeComponent();
+
+            this.BackgroundObjectTree.Nodes[0].ExpandAll();
+            this.BackgroundObjectTree.StateImageList = BuildStateImageList();
 
             this.map.ColumnCount = 256;
             this.map.RowCount = 256;
@@ -722,6 +729,111 @@ namespace ExileMappedBackground
             this._highlightMappedDataSquares = this.chkHighlightMappedData.Checked;
             if (this._highlightMappedDataSquares)
                 this.animationTimer.Enabled = true;
+            }
+
+        private void BackgroundObjectTree_AfterCheck(object sender, TreeViewEventArgs e)
+            {
+            if (e.Action == TreeViewAction.Unknown)
+                return;
+            CheckOrUncheckChildren(e.Node, e.Node.Checked);
+            UpdateParentNodeState(e.Node);
+            }
+
+        private void UpdateParentNodeState(TreeNode node)
+            {
+            TreeNode parent = node.Parent;
+            while (parent != null)
+                {
+                bool? siblingState = GetSiblingNodeState(parent.Nodes);
+                if (siblingState.HasValue)
+                    {
+                    parent.Checked = siblingState.Value;
+                    }
+                else
+                    {
+                    SetNodeStateToMixed(parent);
+                    }
+                
+                parent = parent.Parent;
+                }
+            }
+
+        private void SetNodeStateToMixed(TreeNode node)
+            {
+            var lParam = new TV_ITEM 
+                {
+                mask = 0x18,            // TVIF_HANDLE | TVIF_STATE
+                hItem = node.Handle,
+                stateMask = 0xf000,     // TVIS_STATEIMAGEMASK
+                state = 0x3000
+                };
+            const int TVM_SETITEM = 0x110d;
+            SendMessage(new HandleRef(this.BackgroundObjectTree, this.BackgroundObjectTree.Handle), TVM_SETITEM, 0, ref lParam);
+            }
+
+        private void CheckOrUncheckChildren(TreeNode node, bool checkNode)
+            {
+            foreach (TreeNode child in node.Nodes)
+                {
+                child.Checked = checkNode;
+                CheckOrUncheckChildren(child, checkNode);
+                }
+            }
+
+        private bool? GetSiblingNodeState(TreeNodeCollection nodes)
+            {
+            var enumerator = nodes.GetEnumerator();
+            enumerator.MoveNext();
+            bool result = ((TreeNode) (enumerator.Current)).Checked;
+            while (enumerator.MoveNext())
+                {
+                bool isChecked = ((TreeNode) (enumerator.Current)).Checked;
+                if (result != isChecked)
+                    return null;
+                }
+            return result;
+            }
+
+        [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Auto)]
+        private struct TV_ITEM
+            {
+            public int mask;
+            public IntPtr hItem;
+            public int state;
+            public int stateMask;
+            public IntPtr pszText;
+            public int cchTextMax;
+            public int iImage;
+            public int iSelectedImage;
+            public int cChildren;
+            public IntPtr lParam;
+            }
+
+        private ImageList BuildStateImageList()
+            {
+            var stateImageList = new ImageList();
+
+            for (int i = 0; i < 3; i++)
+                {
+                Bitmap bmp = new Bitmap(16, 16);
+                Graphics chkGraphics = Graphics.FromImage(bmp);
+                switch (i)
+                    {
+                    case 0:
+                        CheckBoxRenderer.DrawCheckBox(chkGraphics, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal);
+                        break;
+                    case 1:
+                        CheckBoxRenderer.DrawCheckBox(chkGraphics, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal);
+                        break;
+                    case 2:
+                        CheckBoxRenderer.DrawCheckBox(chkGraphics, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal);
+                        break;
+                    }
+
+                stateImageList.Images.Add(bmp);
+                }
+
+            return stateImageList;
             }
         }
     }

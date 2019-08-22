@@ -31,6 +31,43 @@
             this.components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.TreeNode treeNode1 = new System.Windows.Forms.TreeNode("Invisible Switch");
+            System.Windows.Forms.TreeNode treeNode2 = new System.Windows.Forms.TreeNode("Teleport Beam");
+            System.Windows.Forms.TreeNode treeNode3 = new System.Windows.Forms.TreeNode("Object from Data");
+            System.Windows.Forms.TreeNode treeNode4 = new System.Windows.Forms.TreeNode("Door");
+            System.Windows.Forms.TreeNode treeNode5 = new System.Windows.Forms.TreeNode("Stone Door");
+            System.Windows.Forms.TreeNode treeNode6 = new System.Windows.Forms.TreeNode("with Half Wall");
+            System.Windows.Forms.TreeNode treeNode7 = new System.Windows.Forms.TreeNode("no accompaniment");
+            System.Windows.Forms.TreeNode treeNode8 = new System.Windows.Forms.TreeNode("with Foliage");
+            System.Windows.Forms.TreeNode treeNode9 = new System.Windows.Forms.TreeNode("Object from Type", new System.Windows.Forms.TreeNode[] {
+            treeNode6,
+            treeNode7,
+            treeNode8});
+            System.Windows.Forms.TreeNode treeNode10 = new System.Windows.Forms.TreeNode("Switch");
+            System.Windows.Forms.TreeNode treeNode11 = new System.Windows.Forms.TreeNode("from Bush");
+            System.Windows.Forms.TreeNode treeNode12 = new System.Windows.Forms.TreeNode("from Pipe End");
+            System.Windows.Forms.TreeNode treeNode13 = new System.Windows.Forms.TreeNode("Object Emerging", new System.Windows.Forms.TreeNode[] {
+            treeNode11,
+            treeNode12});
+            System.Windows.Forms.TreeNode treeNode14 = new System.Windows.Forms.TreeNode("Fixed Wind");
+            System.Windows.Forms.TreeNode treeNode15 = new System.Windows.Forms.TreeNode("Engine Thruster");
+            System.Windows.Forms.TreeNode treeNode16 = new System.Windows.Forms.TreeNode("Water");
+            System.Windows.Forms.TreeNode treeNode17 = new System.Windows.Forms.TreeNode("Random Wind");
+            System.Windows.Forms.TreeNode treeNode18 = new System.Windows.Forms.TreeNode("Mushrooms");
+            System.Windows.Forms.TreeNode treeNode19 = new System.Windows.Forms.TreeNode("Background Objects", new System.Windows.Forms.TreeNode[] {
+            treeNode1,
+            treeNode2,
+            treeNode3,
+            treeNode4,
+            treeNode5,
+            treeNode9,
+            treeNode10,
+            treeNode13,
+            treeNode14,
+            treeNode15,
+            treeNode16,
+            treeNode17,
+            treeNode18});
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.map = new System.Windows.Forms.DataGridView();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
@@ -44,10 +81,11 @@
             this.txtMappedOrGeneratedInfo = new System.Windows.Forms.TextBox();
             this.txtCoordinates = new System.Windows.Forms.TextBox();
             this.tabOptions = new System.Windows.Forms.TabPage();
+            this.BackgroundObjectTree = new System.Windows.Forms.TreeView();
+            this.chkHighlightMappedData = new System.Windows.Forms.CheckBox();
             this.label1 = new System.Windows.Forms.Label();
             this.cboZoomLevel = new System.Windows.Forms.ComboBox();
             this.animationTimer = new System.Windows.Forms.Timer(this.components);
-            this.chkHighlightMappedData = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -262,6 +300,7 @@
             // 
             // tabOptions
             // 
+            this.tabOptions.Controls.Add(this.BackgroundObjectTree);
             this.tabOptions.Controls.Add(this.chkHighlightMappedData);
             this.tabOptions.Controls.Add(this.label1);
             this.tabOptions.Controls.Add(this.cboZoomLevel);
@@ -272,6 +311,84 @@
             this.tabOptions.TabIndex = 0;
             this.tabOptions.Text = "Options";
             this.tabOptions.UseVisualStyleBackColor = true;
+            // 
+            // BackgroundObjectTree
+            // 
+            this.BackgroundObjectTree.CheckBoxes = true;
+            this.BackgroundObjectTree.HideSelection = false;
+            this.BackgroundObjectTree.Location = new System.Drawing.Point(10, 63);
+            this.BackgroundObjectTree.Name = "BackgroundObjectTree";
+            treeNode1.Name = "InvisibleSwitch";
+            treeNode1.Tag = "0";
+            treeNode1.Text = "Invisible Switch";
+            treeNode2.Name = "TeleportBeam";
+            treeNode2.Tag = "1";
+            treeNode2.Text = "Teleport Beam";
+            treeNode3.Name = "ObjectFromData";
+            treeNode3.Tag = "2";
+            treeNode3.Text = "Object from Data";
+            treeNode4.Name = "Door";
+            treeNode4.Tag = "3";
+            treeNode4.Text = "Door";
+            treeNode5.Name = "StoneDoor";
+            treeNode5.Tag = "4";
+            treeNode5.Text = "Stone Door";
+            treeNode6.Name = "ObjectFromTypeWithHalfWall";
+            treeNode6.Tag = "5";
+            treeNode6.Text = "with Half Wall";
+            treeNode7.Name = "ObjectFromTypeWithNoAccompaniment";
+            treeNode7.Tag = "6";
+            treeNode7.Text = "no accompaniment";
+            treeNode8.Name = "ObjectFromTypeWithFoliage";
+            treeNode8.Tag = "7";
+            treeNode8.Text = "with Foliage";
+            treeNode9.Name = "ObjectFromType";
+            treeNode9.Text = "Object from Type";
+            treeNode10.Name = "Switch";
+            treeNode10.Tag = "8";
+            treeNode10.Text = "Switch";
+            treeNode11.Name = "ObjectEmergingFromBush";
+            treeNode11.Tag = "9";
+            treeNode11.Text = "from Bush";
+            treeNode12.Name = "ObjectEmergingFromPipeEnd";
+            treeNode12.Tag = "a";
+            treeNode12.Text = "from Pipe End";
+            treeNode13.Name = "ObjectEmerging";
+            treeNode13.Text = "Object Emerging";
+            treeNode14.Name = "FixedWind";
+            treeNode14.Tag = "b";
+            treeNode14.Text = "Fixed Wind";
+            treeNode15.Name = "EngineThruster";
+            treeNode15.Tag = "c";
+            treeNode15.Text = "Engine Thruster";
+            treeNode16.Name = "Water";
+            treeNode16.Tag = "d";
+            treeNode16.Text = "Water";
+            treeNode17.Name = "RandomWind";
+            treeNode17.Tag = "e";
+            treeNode17.Text = "Random Wind";
+            treeNode18.Name = "Mushrooms";
+            treeNode18.Tag = "f";
+            treeNode18.Text = "Mushrooms";
+            treeNode19.Name = "AllBackgroundObjects";
+            treeNode19.Text = "Background Objects";
+            this.BackgroundObjectTree.Nodes.AddRange(new System.Windows.Forms.TreeNode[] {
+            treeNode19});
+            this.BackgroundObjectTree.ShowRootLines = false;
+            this.BackgroundObjectTree.Size = new System.Drawing.Size(217, 152);
+            this.BackgroundObjectTree.TabIndex = 3;
+            this.BackgroundObjectTree.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.BackgroundObjectTree_AfterCheck);
+            // 
+            // chkHighlightMappedData
+            // 
+            this.chkHighlightMappedData.AutoSize = true;
+            this.chkHighlightMappedData.Location = new System.Drawing.Point(10, 37);
+            this.chkHighlightMappedData.Name = "chkHighlightMappedData";
+            this.chkHighlightMappedData.Size = new System.Drawing.Size(163, 20);
+            this.chkHighlightMappedData.TabIndex = 2;
+            this.chkHighlightMappedData.Text = "Highlight mapped data";
+            this.chkHighlightMappedData.UseVisualStyleBackColor = true;
+            this.chkHighlightMappedData.CheckedChanged += new System.EventHandler(this.chkHighlightMappedData_CheckedChanged);
             // 
             // label1
             // 
@@ -296,17 +413,6 @@
             // 
             this.animationTimer.Enabled = true;
             this.animationTimer.Tick += new System.EventHandler(this.animationTimer_Tick);
-            // 
-            // chkHighlightMappedData
-            // 
-            this.chkHighlightMappedData.AutoSize = true;
-            this.chkHighlightMappedData.Location = new System.Drawing.Point(10, 37);
-            this.chkHighlightMappedData.Name = "chkHighlightMappedData";
-            this.chkHighlightMappedData.Size = new System.Drawing.Size(163, 20);
-            this.chkHighlightMappedData.TabIndex = 2;
-            this.chkHighlightMappedData.Text = "Highlight mapped data";
-            this.chkHighlightMappedData.UseVisualStyleBackColor = true;
-            this.chkHighlightMappedData.CheckedChanged += new System.EventHandler(this.chkHighlightMappedData_CheckedChanged);
             // 
             // Form1
             // 
@@ -352,6 +458,7 @@
         private System.Windows.Forms.TextBox txtMappedOrGeneratedInfo;
         private System.Windows.Forms.TextBox txtCoordinates;
         private System.Windows.Forms.CheckBox chkHighlightMappedData;
+        private System.Windows.Forms.TreeView BackgroundObjectTree;
     }
     }
 
