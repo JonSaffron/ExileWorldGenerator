@@ -2,7 +2,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -23,7 +25,9 @@ namespace ExileMappedBackground
         private decimal _zoom;
         private byte lookFor = 0xff;
         private bool _highlightMappedDataSquares;
+        private bool _highlightBackgroundObjects;
         private readonly Stopwatch _stopwatch = new Stopwatch();
+        private List<byte> _selectedBackgroundObjectTypes = new List<byte>();
 
         [DllImport("user32.dll", CharSet=CharSet.Auto)]
         private static extern IntPtr SendMessage(HandleRef hWnd, int msg, int wParam, ref TV_ITEM lParam);
@@ -78,6 +82,9 @@ namespace ExileMappedBackground
         private void Form1_Shown(object sender, EventArgs e)
             {
             ResetGrid();
+            map.FirstDisplayedCell = map.Rows[0x39].Cells[0x97];
+            map.CurrentCell = map.Rows[0x3b].Cells[0x9b];
+            map_SelectionChanged(null, null);
             }
 
         private void ResetGrid()
@@ -117,7 +124,7 @@ namespace ExileMappedBackground
             data.IsHashDefault = backgroundProperties.isHashDefault;
 
             byte background = (byte) (data.BackgroundAfterHashing & 0x3f);
-            if (background < 0x10)
+            if (data.IsBackgroundEvent)
                 {
                 data.BackgroundHandlerType = BackgroundHandlerTypeList[background];
                 if (backgroundProperties.backgroundObjectId.HasValue)
@@ -127,6 +134,7 @@ namespace ExileMappedBackground
                     data.BackgroundDescription = DescribeBackground(background, backgroundProperties.type, backgroundProperties.data);
                     }
                 }
+
             byte orientation = (byte) (data.BackgroundAfterHashing & 0xc0);
             (data.BackgroundPalette, data.DisplayedPalette) = _mapper.GetPalette(ref background, ref orientation, x, y);
             data.BackgroundAfterPalette = (byte) (background ^ orientation);
@@ -134,7 +142,7 @@ namespace ExileMappedBackground
             this._squareProperties[x, y] = data;
             }
 
-        private string DescribeBackground(byte backgroundHandler, byte? type, byte? data)
+        private static string DescribeBackground(byte backgroundHandler, byte? type, byte? data)
             {
             switch (backgroundHandler)
                 {
@@ -170,9 +178,9 @@ namespace ExileMappedBackground
                 case 0xd:
                     return null;        // water does not have data
                 case 0xe:
-                    return "*** random wind tbd ***";
+                    return null;        // random wind does not have data
                 case 0xf:
-                    return "*** mushrooms tbd ***";
+                    return null;        // mushrooms does not have data
                 }
             throw new InvalidOperationException();
             }
@@ -211,52 +219,125 @@ namespace ExileMappedBackground
             Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, (int) (32 * _zoom), (int) (32 * _zoom));
             e.Graphics.DrawImage(image, destinationRectangle);
 
-            if (this._highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
+            if (DoesSquareRequireAnimating(squareProperties))
                 {
-                using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Orange)))
+                AdvanceAnimation(squareProperties, timeElapsed);
+
+                if (this._highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
                     {
-                    TimeSpan frameLength = TimeSpan.FromMilliseconds(100);
-
-                    if (squareProperties.NextAnimationFrame.HasValue)
+                    using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Orange)))
                         {
-                        TimeSpan elapsed = timeElapsed - squareProperties.NextAnimationFrame.Value;
-                        int framesMoved = (int) elapsed.TotalMilliseconds / (int) frameLength.TotalMilliseconds;
-                        squareProperties.AnimationFrame = (squareProperties.AnimationFrame + framesMoved) % 5;
-                        if (this._highlightMappedDataSquares)
+                        using (Pen pen = new Pen(brush, squareProperties.AnimationFrame))
                             {
-                            TimeSpan timeToNextFrame = TimeSpan.FromMilliseconds(framesMoved * frameLength.TotalMilliseconds);
-                            squareProperties.NextAnimationFrame = squareProperties.NextAnimationFrame.Value + timeToNextFrame;
-                            }
-                        else
-                            {
-                            squareProperties.NextAnimationFrame = null;
+                            Rectangle r = e.CellBounds;
+                            r.Inflate(-1, -1);
+                            e.Graphics.DrawRectangle(pen, r);
                             }
                         }
-                    else
-                        {
-                        squareProperties.AnimationFrame = 0;
-                        squareProperties.NextAnimationFrame = timeElapsed + frameLength;
-                        }
+                    }
 
-                    using (Pen pen = new Pen(brush, squareProperties.AnimationFrame))
+                if (this._highlightBackgroundObjects && DoesSquareMatchBackgroundObjectCriteria(squareProperties))
+                    {
+                    using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Aqua)))
                         {
-                        Rectangle r = e.CellBounds;
-                        r.Inflate(-1, -1);
-                        e.Graphics.DrawRectangle(pen, r);
+                        using (Pen pen = new Pen(brush, squareProperties.AnimationFrame))
+                            {
+                            Rectangle r = e.CellBounds;
+                            r.Inflate(-1, -1);
+                            e.Graphics.DrawEllipse(pen, r);
+                            }
                         }
+                    }
+                }
 
+            if (this.map.SelectedCells.Count != 0)
+                {
+                if (e.RowIndex == this.map.SelectedCells[0].RowIndex && e.ColumnIndex == this.map.SelectedCells[0].ColumnIndex)
+                    {
+                    using (Brush brush = new SolidBrush(Color.FromArgb(0x80, Color.DarkOrchid)))
+                        {
+                        e.Graphics.FillRectangle(brush, e.CellBounds);
+                        }
                     }
                 }
 
             if ((squareProperties.BackgroundAfterPalette & 0x3f) == lookFor)
                 {
-                using (Brush brush = new SolidBrush(Color.FromArgb(0x80, Color.Orange)))
-                    {
-                    e.Graphics.FillRectangle(brush, e.CellBounds);
-                    }
                 }
 
             e.Handled = true;
+            }
+
+        private void AdvanceAnimation(SquareProperties squareProperties, TimeSpan timeElapsed)
+            {
+            TimeSpan frameLength = TimeSpan.FromMilliseconds(100);
+
+            if (squareProperties.NextAnimationFrame.HasValue)
+                {
+                TimeSpan elapsed = timeElapsed - squareProperties.NextAnimationFrame.Value;
+                int framesMoved = (int) elapsed.TotalMilliseconds / (int) frameLength.TotalMilliseconds;
+                squareProperties.AnimationFrame = (squareProperties.AnimationFrame + framesMoved) % 5;
+                if (this._highlightMappedDataSquares || this._highlightBackgroundObjects)
+                    {
+                    TimeSpan timeToNextFrame = TimeSpan.FromMilliseconds(framesMoved * frameLength.TotalMilliseconds);
+                    squareProperties.NextAnimationFrame = squareProperties.NextAnimationFrame.Value + timeToNextFrame;
+                    }
+                else
+                    {
+                    squareProperties.NextAnimationFrame = null;
+                    }
+                }
+            else
+                {
+                squareProperties.AnimationFrame = 0;
+                squareProperties.NextAnimationFrame = timeElapsed + frameLength;
+                }
+            }
+
+        private bool DoesSquareRequireAnimating(SquareProperties squareProperties)
+            {
+            if (squareProperties.NextAnimationFrame.HasValue)
+                return true;
+            if (this._highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
+                return true;
+            if (this._highlightBackgroundObjects && DoesSquareMatchBackgroundObjectCriteria(squareProperties))
+                return true;
+            return false;
+            }
+
+        private bool DoesSquareMatchBackgroundObjectCriteria(SquareProperties squareProperties)
+            {
+            var type = (byte) (squareProperties.BackgroundAfterPalette & 0x3f);
+            if (type > 0xf || !this._selectedBackgroundObjectTypes.Contains(type))
+                {
+                return false;
+                }
+
+            var result = type > 0xc || squareProperties.BackgroundObjectId.HasValue;
+            return result;
+            }
+
+        private List<byte> BuildSelectedBackgroundTypes()
+            {
+            var result = new List<byte>();
+            AddSelectedNodes(result, this.BackgroundObjectTree.Nodes[0]);
+            return result;
+            }
+
+        private void AddSelectedNodes(List<byte> result, TreeNode node)
+            {
+            if (node.Nodes.Count != 0)
+                {
+                foreach (TreeNode child in node.Nodes)
+                    {
+                    AddSelectedNodes(result, child);
+                    }
+                }
+            else
+                {
+                if (node.Checked)
+                    result.Add(byte.Parse((string) node.Tag, NumberStyles.HexNumber));
+                }
             }
 
         private class SquareProperties
@@ -278,66 +359,19 @@ namespace ExileMappedBackground
             public byte? BackgroundData;
             public string BackgroundDescription;
 
-            //public bool CurrentlyAnimating;
             public TimeSpan? NextAnimationFrame;
             public int AnimationFrame;
-            }
 
-        private void dataGridView1_CellToolTipTextNeeded(object sender, DataGridViewCellToolTipTextNeededEventArgs e)
-            {
-            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+            public bool IsBackgroundEvent
                 {
-                return;
-                }
-
-            var squareValue = this._squareProperties[e.ColumnIndex, e.RowIndex];
-            var text = $"({squareValue.X:X2},{squareValue.Y:X2}) ";
-            if (squareValue.MappedDataPosition.HasValue)
-                text += "Explicitly mapped using position " + squareValue.MappedDataPosition.Value;
-            var calculatedBackground = squareValue.CalculatedBackground;
-            var backgroundAfterHashing = squareValue.BackgroundAfterHashing;
-            if ((calculatedBackground & 0x3f) < 0x9)
-                {
-                text += $"\r\nPre-Hash Result: {calculatedBackground:x2} (range {calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped vertically" : (calculatedBackground & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
-                text += $"\r\nPost-Hash Result: {backgroundAfterHashing:x2} ({backgroundAfterHashing & 0x3f:x2}{((backgroundAfterHashing & 0xC0) == 0xC0 ? " flipped both ways" : (backgroundAfterHashing & 0x40) != 0 ? " flipped vertically" : (backgroundAfterHashing & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
-                if (squareValue.IsHashDefault)
+                get 
                     {
-                    Debug.Assert(!squareValue.BackgroundObjectId.HasValue);
-                    text += "\r\nUsing hash default value";
-                    }
-                else
-                    {
-                    Debug.Assert(squareValue.BackgroundObjectId.HasValue);
-                    text += $"\r\nBackground object id = {squareValue.BackgroundObjectId.Value:X2}";
+                    var background = this.BackgroundAfterHashing & 0x3f;
+                    if (this.BackgroundObjectId.HasValue & background <= 0xc)
+                        return true;
+                    return background <= 0xf;
                     }
                 }
-            else
-                {
-                Debug.Assert(backgroundAfterHashing == calculatedBackground);
-                Debug.Assert(!squareValue.IsHashDefault);
-                Debug.Assert(!squareValue.BackgroundObjectId.HasValue);
-                text += $"\r\nResult: {calculatedBackground:x2} ({calculatedBackground & 0x3f:x2}{((calculatedBackground & 0xC0) == 0xC0 ? " flipped both ways" : (calculatedBackground & 0x40) != 0 ? " flipped vertically" : (calculatedBackground & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
-                }
-
-            if (squareValue.BackgroundHandlerType != null)
-                text += "\r\nBackground handler type: " + squareValue.BackgroundHandlerType;
-
-            text += $"\r\nPalette for background: {squareValue.BackgroundPalette:x2}";
-            var colours = SquarePalette.FromByte(squareValue.DisplayedPalette);
-            text += $"\r\nDisplayed Palette: {squareValue.DisplayedPalette:x2} {colours.Colour1}, {colours.Colour2}, {colours.Colour3}";
-
-            if (squareValue.BackgroundAfterHashing != squareValue.BackgroundAfterPalette)
-                {
-                text += "\r\nPalette changed background and/or orientation";
-                text += $"\r\nFinal background: {squareValue.BackgroundAfterPalette:x2} ({squareValue.BackgroundAfterPalette & 0x3f:x2}{((squareValue.BackgroundAfterPalette & 0xC0) == 0xC0 ? " flipped both ways" : (squareValue.BackgroundAfterPalette & 0x40) != 0 ? " flipped vertically" : (squareValue.BackgroundAfterPalette & 0x80) != 0 ? " flipped horizontally" : string.Empty)})";
-                }
-
-            byte sprite = (byte) (_backgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);
-            text += $"\r\nSprite: {sprite:x2}";
-            text += $"\r\nFlip sprite horizontally: {this._spriteBuilder.FlipSpriteHorizontally[sprite]}";
-            text += $"\r\nFlip sprite vertically: {this._spriteBuilder.FlipSpriteVertically[sprite]}";
-
-            e.ToolTipText = text;
             }
 
         private static byte[] BuildBackgroundSpriteLookup()
@@ -368,7 +402,7 @@ namespace ExileMappedBackground
             return result;
             }
 
-        private void dataGridView1_SelectionChanged(object sender, EventArgs e)
+        private void map_SelectionChanged(object sender, EventArgs e)
             {
             var squareValue = this._squareProperties[this.map.CurrentCell.ColumnIndex, this.map.CurrentCell.RowIndex];
             
@@ -378,6 +412,14 @@ namespace ExileMappedBackground
             SetMappedOrGeneratedInfo(squareValue);
 
             SetListOverrideInfo(squareValue);
+            //using (var g = this.txtListOverrideInfo.CreateGraphics())
+            //    {
+            //    g.PageUnit = GraphicsUnit.Pixel;
+            //    Size proposedSize = new Size(this.txtListOverrideInfo.Width, this.txtListOverrideInfo.Height);
+            //    var size = TextRenderer.MeasureText(g, this.txtListOverrideInfo.Text, this.txtListOverrideInfo.Font, proposedSize, TextFormatFlags.TextBoxControl | TextFormatFlags.WordBreak | TextFormatFlags.ExternalLeading);
+            //    //var size = g.MeasureString(this.txtListOverrideInfo.Text, this.txtListOverrideInfo.Font, this.txtListOverrideInfo.Width);
+            //    this.txtListOverrideInfo.Height = size.Height + 10;
+            //    }
 
             SetPaletteInfo(squareValue);
 
@@ -389,19 +431,28 @@ namespace ExileMappedBackground
         private void SetBackgroundObjectInfo(SquareProperties squareValue)
             {
             string backgroundObjectInfo;
-            if ((squareValue.BackgroundAfterPalette & 0x3f)  > 0xf)
-                backgroundObjectInfo = "No background object";
-            else
+            byte background = (byte) (squareValue.BackgroundAfterPalette & 0x3f); 
+            if (background >= 0x10)
+                {
+                backgroundObjectInfo = "No background event";
+                }
+            else if (background >= 0xd)
                 {
                 backgroundObjectInfo =
-                    $"Background handler type: {squareValue.BackgroundHandlerType}";
+                    $"Background handler: {squareValue.BackgroundHandlerType}\r\n" +
+                    "Requires no data.";
+                }
+            else 
+                {
+                backgroundObjectInfo =
+                    $"Background handler: {squareValue.BackgroundHandlerType}";
 
                 if (!squareValue.BackgroundObjectId.HasValue)
                     {
                     backgroundObjectInfo += "\r\n" +
                         "Not active event - used only as scenery";
                     }
-                else if ((squareValue.BackgroundAfterPalette & 0x3f) <= 0xb)
+                else 
                     {
                     if (squareValue.BackgroundType.HasValue)
                         {
@@ -521,8 +572,8 @@ namespace ExileMappedBackground
                     $"Orientation: {squareValue.BackgroundAfterHashing & 0xc0:X2} " +
                     $"({DescribeOrientation(squareValue.BackgroundAfterHashing)})";
                 this.txtListOverrideInfo.Text = listOverride;
-                SetTextBoxHeight(this.txtListOverrideInfo);
                 }
+            SetTextBoxHeight(this.txtListOverrideInfo);
             }
 
         private void SetMappedOrGeneratedInfo(SquareProperties squareValue)
@@ -706,16 +757,21 @@ namespace ExileMappedBackground
             {
             var timeElapsed = this._stopwatch.Elapsed;
 
+            bool isAnimationBeingDisabled = !this._highlightMappedDataSquares && !this._highlightBackgroundObjects;
+
             Parallel.ForEach(this._squareProperties.Cast<SquareProperties>(), item => 
                 {
-                if (this._highlightMappedDataSquares || item.NextAnimationFrame.HasValue)
+                if (DoesSquareRequireAnimating(item))
                     {
-                    if (timeElapsed >= item.NextAnimationFrame)
+                    if (isAnimationBeingDisabled || !item.NextAnimationFrame.HasValue || timeElapsed >= item.NextAnimationFrame)
                         {
                         this.map.InvalidateCell(item.X, item.Y);
                         }
                     }
                 });
+
+            if (isAnimationBeingDisabled)
+                this.animationTimer.Enabled = false;
             }
 
         private void cboZoomLevel_SelectedIndexChanged(object sender, EventArgs e)
@@ -731,12 +787,20 @@ namespace ExileMappedBackground
                 this.animationTimer.Enabled = true;
             }
 
+        private void chkHighlightBackgroundObjects_CheckedChanged(object sender, EventArgs e)
+            {
+            this._highlightBackgroundObjects = this.chkHighlightBackgroundObjects.Checked;
+            if (this._highlightBackgroundObjects)
+                this.animationTimer.Enabled = true;
+            }
+
         private void BackgroundObjectTree_AfterCheck(object sender, TreeViewEventArgs e)
             {
             if (e.Action == TreeViewAction.Unknown)
                 return;
             CheckOrUncheckChildren(e.Node, e.Node.Checked);
             UpdateParentNodeState(e.Node);
+            this._selectedBackgroundObjectTypes = BuildSelectedBackgroundTypes();
             }
 
         private void UpdateParentNodeState(TreeNode node)
@@ -767,6 +831,7 @@ namespace ExileMappedBackground
                 stateMask = 0xf000,     // TVIS_STATEIMAGEMASK
                 state = 0x3000
                 };
+            // ReSharper disable once InconsistentNaming
             const int TVM_SETITEM = 0x110d;
             SendMessage(new HandleRef(this.BackgroundObjectTree, this.BackgroundObjectTree.Handle), TVM_SETITEM, 0, ref lParam);
             }
@@ -780,6 +845,7 @@ namespace ExileMappedBackground
                 }
             }
 
+        [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
         private bool? GetSiblingNodeState(TreeNodeCollection nodes)
             {
             var enumerator = nodes.GetEnumerator();
@@ -795,6 +861,9 @@ namespace ExileMappedBackground
             }
 
         [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Auto)]
+        [SuppressMessage("ReSharper", "MemberCanBePrivate.Local")]
+        [SuppressMessage("ReSharper", "FieldCanBeMadeReadOnly.Local")]
+        // ReSharper disable once InconsistentNaming
         private struct TV_ITEM
             {
             public int mask;

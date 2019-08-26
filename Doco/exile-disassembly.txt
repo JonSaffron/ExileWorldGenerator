@@ -1396,10 +1396,10 @@ These are a list of square_x values in sections delimited by background_objects_
 #   &f2 : &06e1 = &62  &07e0 = &02  &0a6b = &a5      n/a      (&62, &cc) &02 object_from_data : red clawed robot
 #   &f3 : &06e2 = &69  &07e1 = &c4  &0a6c = &c1      n/a      (&69, &d1) &04: stone door
 #   &f4 : &06e3 = &2c  &07e2 = &c4  &0a6d = &f1      n/a      (&2c, &d6) &04: stone door
-#   &f5 : &06e4 = &a5  &07e3 = &0b  &0a6e = &70      n/a      (&a5, &64) &0b: downdraught
+#   &f5 : &06e4 = &a5  &07e3 = &0b  &0a6e = &70      n/a      (&a5, &64) &0b: fixed wind: downdraught
 
-# 8:&f6 : &06e5 = &b8  &07e4 = &0b  &0a6f = &d0      n/a      (&b8, &aa) &0b: updraught
-#   &f7 : &06e6 = &b9  &07e5 = &0b  &0a70 = &80      n/a      (&b9, &de) &0b: updraught
+# 8:&f6 : &06e5 = &b8  &07e4 = &0b  &0a6f = &d0      n/a      (&b8, &aa) &0b: fixed wind: updraught
+#   &f7 : &06e6 = &b9  &07e5 = &0b  &0a70 = &80      n/a      (&b9, &de) &0b: fixed wind: updraught
 #   &f8 : &06e7 = &d9  &07e6 = &d1      n/a          n/a      (&d9, &57) &11 scenery : leaf
 #   &f9 : &06e8 = &59  &07e7 = &91      n/a          n/a      (&59, &8c) &11 scenery : leaf
 #   &fa : &06e9 = &79  &07e8 = &d1      n/a          n/a      (&79, &53) &11 scenery : leaf
