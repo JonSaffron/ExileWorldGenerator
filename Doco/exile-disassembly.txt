@@ -718,87 +718,12 @@ data type indicates the type of the object e.g. nest
 #0496: c3 0d 0d 0d 0d 03 0d 0d 03 0d 0d 0d 0d 0d 0d 0d ; 50
 #04a6: 0d 0d 0d 0d 05                                  ; 60
 
-
-###############################################################################
-#
-#   Background sprites
-#   ==================
-#   
-#   00 = bottom left, unflipped
-#   40 = top left, vertical flip
-#   80 = bottom right, horizontal flip
-#   c0 = top right, vertical & horizontal flip
-#   
-#   00 = bush
-#   01 = stone \ wall, filled in bottom left
-#   02 = turret, top, facing left
-#   03 = door, horizontal, top
-#   04 = brick wall, solid
-#   05 = brick wall, 3/4 full, \, filled in bottom left
-#   06 = brick wall, \, starting top left, ending middle right
-#   07 = stone wall, bottom edging
-#   08 = nothing ?
-#   09 = sucker, bottom
-#   0a = big pipe entrance, bottom
-#   0b = wind
-#   0c = engine exhaust, \ filled in bottom left
-#   0d = water
-#   0e = mushrooms, bottom right corner
-#   0f = mushrooms, bottom
-#   10 = green stone wall, bottom edging
-#   11 = green leaf, bottom left corner
-#   12 = brick wall, solid
-#   13 = brick wall, \, starting top middle, ending middle right, 3/4 full
-#   14 = spaceship pipework
-#   15 = thin spaceship wall, left side
-#   16 = thick spaceship wall, bottom edge
-#   17 = thin spacewship wall, bottom edge
-#   18 = flag? left side
-#   19 = nothing ?
-#   1a = half a bush, bottom left corner
-#   1b = bush, bottom left corner
-#   1c = spaceship tiny corner piece, bottom left
-#   1d = spaceship 3/4 corner piece, bottom left
-#   1e = brick wall, solid
-#   1f = brick wall, bottom half
-#   20 = horizontal brick door
-#   21 = pillar, left edge
-#   22 = green leaf, bottom left corner
-#   23 = brick \ wall, filled in bottom left
-#   24 = brick wall, \, starting top left, ending middle right
-#   25 = brick wall, \, starting middle left, ending bottom right
-#   26 = spaceship wall, \, starting top left, ending half top right
-#   27 = spaceship wall, \, starting half top left, ending middle right
-#   28 = spaceship wall, \, starting middle left, ending half bottom right
-#   29 = spaceship wall, \, starting half bottom left, ending bottom left
-#   2a = brick wall, \, very steep down
-#   2b = couple of pixels of stone edging strip, bottom
-#   2c = stone edge, bottom
-#   2d = stone wall, solid
-#   2e = stone \ wall, filled in bottom left
-#   2f = stone \ wall, starting top left, ending middle right
-#   30 = stone \ wall, starting middle left, ending bottom right
-#   31 = stone - wall, filled bottom
-#   32 = spaceship corner with pipes, filled
-#   33 = pipe, bottom
-#   34 = pipe, bottom left corner
-#   35 = pipe, left
-#   36 = spaceship - wall, filled bottom
-#   37 = spaceship corner with pipes, filled
-#   38 = spaceship pipes, half, filled bottom
-#   39 = vertical brick door
-#   3a = gargoyle, bottom left
-#   3b = brick wall, 3/4 filled bottom 
-#   3c = big pipe entrance, bottom
-#   3d = spaceship support
-#   3e = computer console, bottom left
-#   3f = hydraulic leg
-#
-###############################################################################
-
 ; background_sprite_lookup 
-; & &7f = sprite
-; & &80 = vertically flipped
+; Format: hvssssss
+; h: horizontal flip
+; v: vertical flip
+; s: sprite number
+
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #04ab: c6 ce c6 c6 c6 bb c6 18 2d 70 6a c6 23 39 c6 62
 	0	46 nothing (handle_background_invisible_switch)
@@ -814,7 +739,7 @@ data type indicates the type of the object e.g. nest
 	a	6a pipe top/plant pot/airlock (handle_background_object_emerging)
 	b	46 nothing (handle_background_object_fixed_wind)
 	c	23 half an engine (handle_background_engine_thruster)
-	d	39 full wall - presumably careful palette choices makes it blue (handle_background_object_water)
+	d	39 full wall with all colours set to blue (handle_background_object_water)
 	e	46 nothing (handle_background_object_random_wind)
 	f	62 mushrooms (handle_background_mushrooms)
 #04bb: c0 8e 39 44 47 26 48 49 df c6 99 9a 25 2b 39 3b
@@ -833,7 +758,7 @@ data type indicates the type of the object e.g. nest
 	1c	25 small corner of spaceship
 	1d	2b spaceship with corner removed
 	1e	39 full wall
-	1f	3b hall a wall
+	1f	3b half a wall
 #04cb: 3c 55 8e 43 34 35 27 28 29 2a 42 bf 40 3d 38 36
 	20	3c quarter of wall / door
 	21	55 pillar
@@ -865,7 +790,7 @@ data type indicates the type of the object e.g. nest
 	3a	45 gargoyle
 	3b	3a three quarter height wall
 	3c	6a pipe top/plant pot/airlock
-	3d	23 half an engine
+	3d	23 half an spaceship foot
 	3e	60 computer console
 	3f	4c hydraulic leg
 

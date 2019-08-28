@@ -26,8 +26,10 @@ namespace ExileMappedBackground
         private byte lookFor = 0xff;
         private bool _highlightMappedDataSquares;
         private bool _highlightBackgroundObjects;
+        private bool _highlightDisplayElement;
         private readonly Stopwatch _stopwatch = new Stopwatch();
         private List<byte> _selectedBackgroundObjectTypes = new List<byte>();
+        private int _displayElementToHighlight;
 
         [DllImport("user32.dll", CharSet=CharSet.Auto)]
         private static extern IntPtr SendMessage(HandleRef hWnd, int msg, int wParam, ref TV_ITEM lParam);
@@ -48,6 +50,16 @@ namespace ExileMappedBackground
             cboZoomLevel.DataSource = new BindingSource(items, null);
             cboZoomLevel.SelectedIndex = 1;
             this._zoom = 1m;
+
+            var backgroundItems = new Dictionary<int, string>();
+            for (int i = 0x10; i <= 0x3f; i++)
+                {
+                backgroundItems.Add(i, "0x" + i.ToString("X"));
+                }
+            cboHighlightBackground.DisplayMember = "Value";
+            cboHighlightBackground.ValueMember = "Key";
+            cboHighlightBackground.DataSource = new BindingSource(backgroundItems, null);
+            cboHighlightBackground.SelectedIndex = 1;
 
             var type = map.GetType();
             var prop = type.GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -248,6 +260,24 @@ namespace ExileMappedBackground
                             }
                         }
                     }
+
+                if (this._highlightDisplayElement && (squareProperties.BackgroundAfterPalette & 0x3f) == this._displayElementToHighlight)
+                    {
+                    using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Silver)))
+                        {
+                        using (Pen pen = new Pen(brush, squareProperties.AnimationFrame))
+                            {
+                            Point topMiddle = e.CellBounds.Location + new Size(e.CellBounds.Width / 2, 0);
+                            Point leftMiddle = e.CellBounds.Location + new Size(0, e.CellBounds.Height / 2);
+                            Point bottomMiddle = e.CellBounds.Location + new Size(e.CellBounds.Width / 2, e.CellBounds.Height);
+                            Point rightMiddle = e.CellBounds.Location + new Size(e.CellBounds.Width, e.CellBounds.Height / 2);
+                            e.Graphics.DrawLine(pen, topMiddle, leftMiddle);
+                            e.Graphics.DrawLine(pen, leftMiddle, bottomMiddle);
+                            e.Graphics.DrawLine(pen, bottomMiddle, rightMiddle);
+                            e.Graphics.DrawLine(pen, rightMiddle, topMiddle);
+                            }
+                        }
+                    }
                 }
 
             if (this.map.SelectedCells.Count != 0)
@@ -277,7 +307,7 @@ namespace ExileMappedBackground
                 TimeSpan elapsed = timeElapsed - squareProperties.NextAnimationFrame.Value;
                 int framesMoved = (int) elapsed.TotalMilliseconds / (int) frameLength.TotalMilliseconds;
                 squareProperties.AnimationFrame = (squareProperties.AnimationFrame + framesMoved) % 5;
-                if (this._highlightMappedDataSquares || this._highlightBackgroundObjects)
+                if (this._highlightMappedDataSquares || this._highlightBackgroundObjects || this._highlightDisplayElement)
                     {
                     TimeSpan timeToNextFrame = TimeSpan.FromMilliseconds(framesMoved * frameLength.TotalMilliseconds);
                     squareProperties.NextAnimationFrame = squareProperties.NextAnimationFrame.Value + timeToNextFrame;
@@ -301,6 +331,8 @@ namespace ExileMappedBackground
             if (this._highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
                 return true;
             if (this._highlightBackgroundObjects && DoesSquareMatchBackgroundObjectCriteria(squareProperties))
+                return true;
+            if (this._highlightDisplayElement && (squareProperties.BackgroundAfterPalette & 0x3f) == this._displayElementToHighlight)
                 return true;
             return false;
             }
@@ -757,7 +789,7 @@ namespace ExileMappedBackground
             {
             var timeElapsed = this._stopwatch.Elapsed;
 
-            bool isAnimationBeingDisabled = !this._highlightMappedDataSquares && !this._highlightBackgroundObjects;
+            bool isAnimationBeingDisabled = !this._highlightMappedDataSquares && !this._highlightBackgroundObjects && !this._highlightDisplayElement;
 
             Parallel.ForEach(this._squareProperties.Cast<SquareProperties>(), item => 
                 {
@@ -903,6 +935,18 @@ namespace ExileMappedBackground
                 }
 
             return stateImageList;
+            }
+
+        private void chkHighlightDisplayElement_CheckedChanged(object sender, EventArgs e)
+            {
+            this._highlightDisplayElement = this.chkHighlightDisplayElement.Checked;
+            if (this._highlightDisplayElement)
+                this.animationTimer.Enabled = true;
+            }
+
+        private void cboHighlightBackground_SelectedIndexChanged(object sender, EventArgs e)
+            {
+            this._displayElementToHighlight = (int) this.cboHighlightBackground.SelectedValue;
             }
         }
     }

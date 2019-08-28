@@ -29,45 +29,45 @@
         private void InitializeComponent()
             {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
-            System.Windows.Forms.TreeNode treeNode1 = new System.Windows.Forms.TreeNode("Invisible Switch");
-            System.Windows.Forms.TreeNode treeNode2 = new System.Windows.Forms.TreeNode("Teleport Beam");
-            System.Windows.Forms.TreeNode treeNode3 = new System.Windows.Forms.TreeNode("Object from Data");
-            System.Windows.Forms.TreeNode treeNode4 = new System.Windows.Forms.TreeNode("Door");
-            System.Windows.Forms.TreeNode treeNode5 = new System.Windows.Forms.TreeNode("Stone Door");
-            System.Windows.Forms.TreeNode treeNode6 = new System.Windows.Forms.TreeNode("with Half Wall");
-            System.Windows.Forms.TreeNode treeNode7 = new System.Windows.Forms.TreeNode("no accompaniment");
-            System.Windows.Forms.TreeNode treeNode8 = new System.Windows.Forms.TreeNode("with Foliage");
-            System.Windows.Forms.TreeNode treeNode9 = new System.Windows.Forms.TreeNode("Object from Type", new System.Windows.Forms.TreeNode[] {
-            treeNode6,
-            treeNode7,
-            treeNode8});
-            System.Windows.Forms.TreeNode treeNode10 = new System.Windows.Forms.TreeNode("Switch");
-            System.Windows.Forms.TreeNode treeNode11 = new System.Windows.Forms.TreeNode("from Bush");
-            System.Windows.Forms.TreeNode treeNode12 = new System.Windows.Forms.TreeNode("from Pipe End");
-            System.Windows.Forms.TreeNode treeNode13 = new System.Windows.Forms.TreeNode("Object Emerging", new System.Windows.Forms.TreeNode[] {
-            treeNode11,
-            treeNode12});
-            System.Windows.Forms.TreeNode treeNode14 = new System.Windows.Forms.TreeNode("Fixed Wind");
-            System.Windows.Forms.TreeNode treeNode15 = new System.Windows.Forms.TreeNode("Engine Thruster");
-            System.Windows.Forms.TreeNode treeNode16 = new System.Windows.Forms.TreeNode("Water");
-            System.Windows.Forms.TreeNode treeNode17 = new System.Windows.Forms.TreeNode("Random Wind");
-            System.Windows.Forms.TreeNode treeNode18 = new System.Windows.Forms.TreeNode("Mushrooms");
-            System.Windows.Forms.TreeNode treeNode19 = new System.Windows.Forms.TreeNode("Background Objects", new System.Windows.Forms.TreeNode[] {
-            treeNode1,
-            treeNode2,
-            treeNode3,
-            treeNode4,
-            treeNode5,
-            treeNode9,
-            treeNode10,
-            treeNode13,
-            treeNode14,
-            treeNode15,
-            treeNode16,
-            treeNode17,
-            treeNode18});
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle9 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle10 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.TreeNode treeNode77 = new System.Windows.Forms.TreeNode("Invisible Switch");
+            System.Windows.Forms.TreeNode treeNode78 = new System.Windows.Forms.TreeNode("Teleport Beam");
+            System.Windows.Forms.TreeNode treeNode79 = new System.Windows.Forms.TreeNode("Object from Data");
+            System.Windows.Forms.TreeNode treeNode80 = new System.Windows.Forms.TreeNode("Door");
+            System.Windows.Forms.TreeNode treeNode81 = new System.Windows.Forms.TreeNode("Stone Door");
+            System.Windows.Forms.TreeNode treeNode82 = new System.Windows.Forms.TreeNode("with Half Wall");
+            System.Windows.Forms.TreeNode treeNode83 = new System.Windows.Forms.TreeNode("no accompaniment");
+            System.Windows.Forms.TreeNode treeNode84 = new System.Windows.Forms.TreeNode("with Foliage");
+            System.Windows.Forms.TreeNode treeNode85 = new System.Windows.Forms.TreeNode("Object from Type", new System.Windows.Forms.TreeNode[] {
+            treeNode82,
+            treeNode83,
+            treeNode84});
+            System.Windows.Forms.TreeNode treeNode86 = new System.Windows.Forms.TreeNode("Switch");
+            System.Windows.Forms.TreeNode treeNode87 = new System.Windows.Forms.TreeNode("from Bush");
+            System.Windows.Forms.TreeNode treeNode88 = new System.Windows.Forms.TreeNode("from Pipe End");
+            System.Windows.Forms.TreeNode treeNode89 = new System.Windows.Forms.TreeNode("Object Emerging", new System.Windows.Forms.TreeNode[] {
+            treeNode87,
+            treeNode88});
+            System.Windows.Forms.TreeNode treeNode90 = new System.Windows.Forms.TreeNode("Fixed Wind");
+            System.Windows.Forms.TreeNode treeNode91 = new System.Windows.Forms.TreeNode("Engine Thruster");
+            System.Windows.Forms.TreeNode treeNode92 = new System.Windows.Forms.TreeNode("Water");
+            System.Windows.Forms.TreeNode treeNode93 = new System.Windows.Forms.TreeNode("Random Wind");
+            System.Windows.Forms.TreeNode treeNode94 = new System.Windows.Forms.TreeNode("Mushrooms");
+            System.Windows.Forms.TreeNode treeNode95 = new System.Windows.Forms.TreeNode("Background Objects", new System.Windows.Forms.TreeNode[] {
+            treeNode77,
+            treeNode78,
+            treeNode79,
+            treeNode80,
+            treeNode81,
+            treeNode85,
+            treeNode86,
+            treeNode89,
+            treeNode90,
+            treeNode91,
+            treeNode92,
+            treeNode93,
+            treeNode94});
             this.splitContainer1 = new System.Windows.Forms.SplitContainer();
             this.map = new System.Windows.Forms.DataGridView();
             this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
@@ -75,7 +75,9 @@
             this.tabProperties = new System.Windows.Forms.TabPage();
             this.panelProperties = new System.Windows.Forms.Panel();
             this.txtBackgroundObjectInfo = new System.Windows.Forms.TextBox();
+            this.panel5 = new System.Windows.Forms.Panel();
             this.txtSpriteInfo = new System.Windows.Forms.TextBox();
+            this.panel4 = new System.Windows.Forms.Panel();
             this.txtPaletteInfo = new System.Windows.Forms.TextBox();
             this.panel3 = new System.Windows.Forms.Panel();
             this.txtListOverrideInfo = new System.Windows.Forms.TextBox();
@@ -91,8 +93,9 @@
             this.cboZoomLevel = new System.Windows.Forms.ComboBox();
             this.tabSearch = new System.Windows.Forms.TabPage();
             this.animationTimer = new System.Windows.Forms.Timer(this.components);
-            this.panel4 = new System.Windows.Forms.Panel();
-            this.panel5 = new System.Windows.Forms.Panel();
+            this.chkHighlightDisplayElement = new System.Windows.Forms.CheckBox();
+            this.label2 = new System.Windows.Forms.Label();
+            this.cboHighlightBackground = new System.Windows.Forms.ComboBox();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
             this.splitContainer1.Panel1.SuspendLayout();
             this.splitContainer1.Panel2.SuspendLayout();
@@ -118,7 +121,7 @@
             // splitContainer1.Panel2
             // 
             this.splitContainer1.Panel2.Controls.Add(this.tableLayoutPanel1);
-            this.splitContainer1.Size = new System.Drawing.Size(800, 447);
+            this.splitContainer1.Size = new System.Drawing.Size(800, 554);
             this.splitContainer1.SplitterDistance = 549;
             this.splitContainer1.TabIndex = 0;
             // 
@@ -126,23 +129,23 @@
             // 
             this.map.AllowUserToAddRows = false;
             this.map.AllowUserToDeleteRows = false;
-            dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
-            dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.Control;
-            dataGridViewCellStyle1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.1F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.WindowText;
-            dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
-            this.map.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle1;
+            dataGridViewCellStyle9.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
+            dataGridViewCellStyle9.BackColor = System.Drawing.SystemColors.Control;
+            dataGridViewCellStyle9.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.1F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle9.ForeColor = System.Drawing.SystemColors.WindowText;
+            dataGridViewCellStyle9.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle9.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle9.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+            this.map.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle9;
             this.map.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle2.BackColor = System.Drawing.Color.Black;
-            dataGridViewCellStyle2.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            dataGridViewCellStyle2.ForeColor = System.Drawing.SystemColors.ControlText;
-            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.SystemColors.Highlight;
-            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
-            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
-            this.map.DefaultCellStyle = dataGridViewCellStyle2;
+            dataGridViewCellStyle10.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle10.BackColor = System.Drawing.Color.Black;
+            dataGridViewCellStyle10.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle10.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle10.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle10.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle10.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.map.DefaultCellStyle = dataGridViewCellStyle10;
             this.map.Dock = System.Windows.Forms.DockStyle.Fill;
             this.map.EditMode = System.Windows.Forms.DataGridViewEditMode.EditProgrammatically;
             this.map.Location = new System.Drawing.Point(0, 0);
@@ -152,7 +155,7 @@
             this.map.RowHeadersWidthSizeMode = System.Windows.Forms.DataGridViewRowHeadersWidthSizeMode.DisableResizing;
             this.map.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
             this.map.ShowEditingIcon = false;
-            this.map.Size = new System.Drawing.Size(549, 447);
+            this.map.Size = new System.Drawing.Size(549, 554);
             this.map.TabIndex = 1;
             this.map.VirtualMode = true;
             this.map.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.dataGridView1_CellPainting);
@@ -176,7 +179,7 @@
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
             this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 20F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(247, 447);
+            this.tableLayoutPanel1.Size = new System.Drawing.Size(247, 554);
             this.tableLayoutPanel1.TabIndex = 0;
             // 
             // tabControl1
@@ -186,10 +189,10 @@
             this.tabControl1.Controls.Add(this.tabSearch);
             this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tabControl1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.tabControl1.Location = new System.Drawing.Point(3, 11);
+            this.tabControl1.Location = new System.Drawing.Point(3, 27);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(241, 425);
+            this.tabControl1.Size = new System.Drawing.Size(241, 500);
             this.tabControl1.TabIndex = 6;
             // 
             // tabProperties
@@ -226,7 +229,7 @@
             // 
             this.txtBackgroundObjectInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
             this.txtBackgroundObjectInfo.Dock = System.Windows.Forms.DockStyle.Top;
-            this.txtBackgroundObjectInfo.Location = new System.Drawing.Point(0, 133);
+            this.txtBackgroundObjectInfo.Location = new System.Drawing.Point(0, 163);
             this.txtBackgroundObjectInfo.Multiline = true;
             this.txtBackgroundObjectInfo.Name = "txtBackgroundObjectInfo";
             this.txtBackgroundObjectInfo.ReadOnly = true;
@@ -234,17 +237,33 @@
             this.txtBackgroundObjectInfo.TabIndex = 9;
             this.txtBackgroundObjectInfo.Text = "background object info";
             // 
+            // panel5
+            // 
+            this.panel5.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panel5.Location = new System.Drawing.Point(0, 148);
+            this.panel5.Name = "panel5";
+            this.panel5.Size = new System.Drawing.Size(227, 15);
+            this.panel5.TabIndex = 14;
+            // 
             // txtSpriteInfo
             // 
             this.txtSpriteInfo.BorderStyle = System.Windows.Forms.BorderStyle.None;
             this.txtSpriteInfo.Dock = System.Windows.Forms.DockStyle.Top;
-            this.txtSpriteInfo.Location = new System.Drawing.Point(0, 115);
+            this.txtSpriteInfo.Location = new System.Drawing.Point(0, 130);
             this.txtSpriteInfo.Multiline = true;
             this.txtSpriteInfo.Name = "txtSpriteInfo";
             this.txtSpriteInfo.ReadOnly = true;
             this.txtSpriteInfo.Size = new System.Drawing.Size(227, 18);
             this.txtSpriteInfo.TabIndex = 8;
             this.txtSpriteInfo.Text = "sprite info";
+            // 
+            // panel4
+            // 
+            this.panel4.Dock = System.Windows.Forms.DockStyle.Top;
+            this.panel4.Location = new System.Drawing.Point(0, 115);
+            this.panel4.Name = "panel4";
+            this.panel4.Size = new System.Drawing.Size(227, 15);
+            this.panel4.TabIndex = 13;
             // 
             // txtPaletteInfo
             // 
@@ -320,6 +339,9 @@
             // 
             // tabOptions
             // 
+            this.tabOptions.Controls.Add(this.cboHighlightBackground);
+            this.tabOptions.Controls.Add(this.label2);
+            this.tabOptions.Controls.Add(this.chkHighlightDisplayElement);
             this.tabOptions.Controls.Add(this.chkHighlightBackgroundObjects);
             this.tabOptions.Controls.Add(this.BackgroundObjectTree);
             this.tabOptions.Controls.Add(this.chkHighlightMappedData);
@@ -328,7 +350,7 @@
             this.tabOptions.Location = new System.Drawing.Point(4, 25);
             this.tabOptions.Name = "tabOptions";
             this.tabOptions.Padding = new System.Windows.Forms.Padding(3);
-            this.tabOptions.Size = new System.Drawing.Size(233, 396);
+            this.tabOptions.Size = new System.Drawing.Size(233, 471);
             this.tabOptions.TabIndex = 0;
             this.tabOptions.Text = "Options";
             this.tabOptions.UseVisualStyleBackColor = true;
@@ -350,62 +372,62 @@
             this.BackgroundObjectTree.HideSelection = false;
             this.BackgroundObjectTree.Location = new System.Drawing.Point(23, 88);
             this.BackgroundObjectTree.Name = "BackgroundObjectTree";
-            treeNode1.Name = "InvisibleSwitch";
-            treeNode1.Tag = "0";
-            treeNode1.Text = "Invisible Switch";
-            treeNode2.Name = "TeleportBeam";
-            treeNode2.Tag = "1";
-            treeNode2.Text = "Teleport Beam";
-            treeNode3.Name = "ObjectFromData";
-            treeNode3.Tag = "2";
-            treeNode3.Text = "Object from Data";
-            treeNode4.Name = "Door";
-            treeNode4.Tag = "3";
-            treeNode4.Text = "Door";
-            treeNode5.Name = "StoneDoor";
-            treeNode5.Tag = "4";
-            treeNode5.Text = "Stone Door";
-            treeNode6.Name = "ObjectFromTypeWithHalfWall";
-            treeNode6.Tag = "5";
-            treeNode6.Text = "with Half Wall";
-            treeNode7.Name = "ObjectFromTypeWithNoAccompaniment";
-            treeNode7.Tag = "6";
-            treeNode7.Text = "no accompaniment";
-            treeNode8.Name = "ObjectFromTypeWithFoliage";
-            treeNode8.Tag = "7";
-            treeNode8.Text = "with Foliage";
-            treeNode9.Name = "ObjectFromType";
-            treeNode9.Text = "Object from Type";
-            treeNode10.Name = "Switch";
-            treeNode10.Tag = "8";
-            treeNode10.Text = "Switch";
-            treeNode11.Name = "ObjectEmergingFromBush";
-            treeNode11.Tag = "9";
-            treeNode11.Text = "from Bush";
-            treeNode12.Name = "ObjectEmergingFromPipeEnd";
-            treeNode12.Tag = "a";
-            treeNode12.Text = "from Pipe End";
-            treeNode13.Name = "ObjectEmerging";
-            treeNode13.Text = "Object Emerging";
-            treeNode14.Name = "FixedWind";
-            treeNode14.Tag = "b";
-            treeNode14.Text = "Fixed Wind";
-            treeNode15.Name = "EngineThruster";
-            treeNode15.Tag = "c";
-            treeNode15.Text = "Engine Thruster";
-            treeNode16.Name = "Water";
-            treeNode16.Tag = "d";
-            treeNode16.Text = "Water";
-            treeNode17.Name = "RandomWind";
-            treeNode17.Tag = "e";
-            treeNode17.Text = "Random Wind";
-            treeNode18.Name = "Mushrooms";
-            treeNode18.Tag = "f";
-            treeNode18.Text = "Mushrooms";
-            treeNode19.Name = "AllBackgroundObjects";
-            treeNode19.Text = "Background Objects";
+            treeNode77.Name = "InvisibleSwitch";
+            treeNode77.Tag = "0";
+            treeNode77.Text = "Invisible Switch";
+            treeNode78.Name = "TeleportBeam";
+            treeNode78.Tag = "1";
+            treeNode78.Text = "Teleport Beam";
+            treeNode79.Name = "ObjectFromData";
+            treeNode79.Tag = "2";
+            treeNode79.Text = "Object from Data";
+            treeNode80.Name = "Door";
+            treeNode80.Tag = "3";
+            treeNode80.Text = "Door";
+            treeNode81.Name = "StoneDoor";
+            treeNode81.Tag = "4";
+            treeNode81.Text = "Stone Door";
+            treeNode82.Name = "ObjectFromTypeWithHalfWall";
+            treeNode82.Tag = "5";
+            treeNode82.Text = "with Half Wall";
+            treeNode83.Name = "ObjectFromTypeWithNoAccompaniment";
+            treeNode83.Tag = "6";
+            treeNode83.Text = "no accompaniment";
+            treeNode84.Name = "ObjectFromTypeWithFoliage";
+            treeNode84.Tag = "7";
+            treeNode84.Text = "with Foliage";
+            treeNode85.Name = "ObjectFromType";
+            treeNode85.Text = "Object from Type";
+            treeNode86.Name = "Switch";
+            treeNode86.Tag = "8";
+            treeNode86.Text = "Switch";
+            treeNode87.Name = "ObjectEmergingFromBush";
+            treeNode87.Tag = "9";
+            treeNode87.Text = "from Bush";
+            treeNode88.Name = "ObjectEmergingFromPipeEnd";
+            treeNode88.Tag = "a";
+            treeNode88.Text = "from Pipe End";
+            treeNode89.Name = "ObjectEmerging";
+            treeNode89.Text = "Object Emerging";
+            treeNode90.Name = "FixedWind";
+            treeNode90.Tag = "b";
+            treeNode90.Text = "Fixed Wind";
+            treeNode91.Name = "EngineThruster";
+            treeNode91.Tag = "c";
+            treeNode91.Text = "Engine Thruster";
+            treeNode92.Name = "Water";
+            treeNode92.Tag = "d";
+            treeNode92.Text = "Water";
+            treeNode93.Name = "RandomWind";
+            treeNode93.Tag = "e";
+            treeNode93.Text = "Random Wind";
+            treeNode94.Name = "Mushrooms";
+            treeNode94.Tag = "f";
+            treeNode94.Text = "Mushrooms";
+            treeNode95.Name = "AllBackgroundObjects";
+            treeNode95.Text = "Background Objects";
             this.BackgroundObjectTree.Nodes.AddRange(new System.Windows.Forms.TreeNode[] {
-            treeNode19});
+            treeNode95});
             this.BackgroundObjectTree.ShowRootLines = false;
             this.BackgroundObjectTree.Size = new System.Drawing.Size(204, 302);
             this.BackgroundObjectTree.TabIndex = 4;
@@ -456,27 +478,41 @@
             this.animationTimer.Enabled = true;
             this.animationTimer.Tick += new System.EventHandler(this.animationTimer_Tick);
             // 
-            // panel4
+            // chkHighlightDisplayElement
             // 
-            this.panel4.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panel4.Location = new System.Drawing.Point(0, 151);
-            this.panel4.Name = "panel4";
-            this.panel4.Size = new System.Drawing.Size(227, 15);
-            this.panel4.TabIndex = 13;
+            this.chkHighlightDisplayElement.AutoSize = true;
+            this.chkHighlightDisplayElement.Location = new System.Drawing.Point(10, 405);
+            this.chkHighlightDisplayElement.Name = "chkHighlightDisplayElement";
+            this.chkHighlightDisplayElement.Size = new System.Drawing.Size(177, 20);
+            this.chkHighlightDisplayElement.TabIndex = 5;
+            this.chkHighlightDisplayElement.Text = "Highlight display element";
+            this.chkHighlightDisplayElement.UseVisualStyleBackColor = true;
+            this.chkHighlightDisplayElement.CheckedChanged += new System.EventHandler(this.chkHighlightDisplayElement_CheckedChanged);
             // 
-            // panel5
+            // label2
             // 
-            this.panel5.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panel5.Location = new System.Drawing.Point(0, 166);
-            this.panel5.Name = "panel5";
-            this.panel5.Size = new System.Drawing.Size(227, 15);
-            this.panel5.TabIndex = 14;
+            this.label2.AutoSize = true;
+            this.label2.Location = new System.Drawing.Point(30, 431);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(84, 16);
+            this.label2.TabIndex = 6;
+            this.label2.Text = "Background:";
+            // 
+            // cboHighlightBackground
+            // 
+            this.cboHighlightBackground.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cboHighlightBackground.FormattingEnabled = true;
+            this.cboHighlightBackground.Location = new System.Drawing.Point(138, 428);
+            this.cboHighlightBackground.Name = "cboHighlightBackground";
+            this.cboHighlightBackground.Size = new System.Drawing.Size(90, 24);
+            this.cboHighlightBackground.TabIndex = 7;
+            this.cboHighlightBackground.SelectedIndexChanged += new System.EventHandler(this.cboHighlightBackground_SelectedIndexChanged);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(800, 447);
+            this.ClientSize = new System.Drawing.Size(800, 554);
             this.Controls.Add(this.splitContainer1);
             this.Name = "Form1";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
@@ -524,6 +560,9 @@
         private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Panel panel5;
         private System.Windows.Forms.Panel panel4;
+        private System.Windows.Forms.ComboBox cboHighlightBackground;
+        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.CheckBox chkHighlightDisplayElement;
     }
     }
 
