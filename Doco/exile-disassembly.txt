@@ -92,16 +92,16 @@ details to the stack.
 
 Angles are stored in 8 bits, indicating a position around the perimiter of
 a 32x32 box starting from straight right at &00 and increasing clockwise. 
-Therefore:
-A	Degrees		Direction
-0	0		Right
-&20	45		Down & Right
-&40	90		Down
-&60	135		Down & Left
-&80	180		Left
-&A0	225		Up & Left
-&C0	270		Up
-&E0	315		Up & Right
+Therefore the 8 compass points have the following representation:
+A	Bit Pattern	Degrees		Direction
+0	000xxxxx	0		Right
+&20	001xxxxx	45		Down & Right
+&40	010xxxxx	90		Down
+&60	011xxxxx	135		Down & Left
+&80	100xxxxx	180		Left
+&A0	101xxxxx	225		Up & Left
+&C0	110xxxxx	270		Up
+&E0	111xxxxx	315		Up & Right
 
 This system provides angles that are spot on every 45 degrees, but are approximate 
 to within 5 degrees between those positions, e.g.
