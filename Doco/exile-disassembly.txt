@@ -30,7 +30,8 @@ efficient branching as well as providing multiple entry points to functions.
 
 Graphics
 ========
-The co-ordinate system is based on 16 bits on both X and Y axis.
+The co-ordinate system is based on 16 bits on both X and Y axis, with the
+origin being in the top left corner and decreasing to the right and down.
 For display purposes, not all of the bits are used:
  - For the X axis the top 12 bits are relevant. 
  - For the Y axis the top 13 bits are relevant.
@@ -89,8 +90,23 @@ A custom interrupt routine handles sound and keyboard events. Each keypress
 has a function associated with it, which the routine calls by pushing its
 details to the stack.
 
-Angles are stored such that &100 = 360 degrees, starting from straight right at
-&00 and increasing clockwise. &40 = down, &80 = left, &c0 = up.
+Angles are stored in 8 bits, indicating a position around the perimiter of
+a 32x32 box starting from straight right at &00 and increasing clockwise. 
+Therefore:
+A	Degrees		Direction
+0	0		Right
+&20	45		Down & Right
+&40	90		Down
+&60	135		Down & Left
+&80	180		Left
+&A0	225		Up & Left
+&C0	270		Up
+&E0	315		Up & Right
+
+This system provides angles that are spot on every 45 degrees, but are approximate 
+to within 5 degrees between those positions, e.g.
+a value of &10 provides an angle of 26.565 degrees, rather than 22.5 it would be
+if the 256 possible angles were evenly distributed.
 
 Game-play notes
 ===============
