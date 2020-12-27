@@ -4954,27 +4954,32 @@ f $FE                        ; white bg, cyan bg
 ; get_angle_between_objects
 # compare two object centres
 # returns angle in &b5
-# this_object
-# X = other object
-&22a0: 20 88 22         JSR &2288 ; get_object_centre
+# this_object specifies the first object
+# X specifies the second object
+&22a0: 20 88 22         JSR &2288 # get_object_centre for this_object 
+                                  # sets 87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d this_object_y_center
 
-&22a3: bc 70 08         LDY &0870,X ; object_stack_sprite
-&22a6: b9 0c 5e         LDA &5e0c,Y ; sprite_width_lookup
-&22a9: 4a               LSR					# add half the width
-&22aa: 7d 80 08         ADC &0880,X ; object_stack_x_low
-&22ad: 85 88            STA &88 ; stack_object_x_centre_low
-&22af: bd 91 08         LDA &0891,X ; object_stack_x
-&22b2: 69 00            ADC #&00
-&22b4: 85 8c            STA &8c ; stack_object_x_centre
-&22b6: b9 89 5e         LDA &5e89,Y ; sprite_height_lookup
-&22b9: 4a               LSR					# add half the height
-&22ba: 7d a3 08         ADC &08a3,X ; object_stack_y_low
-&22bd: 85 8a            STA &8a ; stack_object_y_centre_low
-&22bf: bd b4 08         LDA &08b4,X ; object_stack_y
-&22c2: 69 00            ADC #&00
-&22c4: 85 8e            STA &8e ; stack_object_y_centre
+&22a3: bc 70 08         LDY &0870,X ; object_stack_sprite       # get sprite indicated in object_stack_sprite,X
+
+&22a6: b9 0c 5e         LDA &5e0c,Y ; sprite_width_lookup       # get the width of the sprite
+&22a9: 4a               LSR					# halve it to get the distance to the middle
+&22aa: 7d 80 08         ADC &0880,X ; object_stack_x_low        # add the low byte of its X position
+&22ad: 85 88            STA &88 ; stack_object_x_centre_low     # store result
+&22af: bd 91 08         LDA &0891,X ; object_stack_x		# get the high byte of the X position
+&22b2: 69 00            ADC #&00                                # add any carry
+&22b4: 85 8c            STA &8c ; stack_object_x_centre         # store result
+
+&22b6: b9 89 5e         LDA &5e89,Y ; sprite_height_lookup      # get the height of the sprite
+&22b9: 4a               LSR					# halve it to get the distance to the middle
+&22ba: 7d a3 08         ADC &08a3,X ; object_stack_y_low        # add the low byte of its Y position
+&22bd: 85 8a            STA &8a ; stack_object_y_centre_low     # store result
+&22bf: bd b4 08         LDA &08b4,X ; object_stack_y            # get the high byte of its Y position
+&22c2: 69 00            ADC #&00                                # add any carry
+&22c4: 85 8e            STA &8e ; stack_object_y_centre         # store result
 
 &22c6: 20 fe 22         JSR &22fe ; calculate_object_centre_deltas
+				# returns with A = abs(support_delta_x_low), &b7 = abs(support_delta_y_low), &b8 = delta_magnitude which should be 1 to 7
+
 &22c9: 4c d7 22         JMP &22d7 ; calculate_angle
 
 ; calculate_angle_from_this_object_velocities
@@ -4986,36 +4991,41 @@ f $FE                        ; white bg, cyan bg
 # takes &b4 velocity_x, &b6 velocity_y
 # returns &b5 angle
 &22d4: 20 3d 23         JSR &233d ; get_opposite_velocities     # a = x_vel &b7 = y_vel
+
 ; calculate_angle
-# takes A = velocity_x, &b7 = velocity_y
+# takes A = velocity_x, &b7 = velocity_y, &99 velocity_signs
 # returns &b5 angle
-&22d7: c5 b7            CMP &b7 ; oppositite_velocity_y
-&22d9: 90 05            BCC &22e0 ; no_xy_swap          # is support_delta_x_low (A) < support_delta_y_low (&b8) ?
+&22d7: c5 b7            CMP &b7 ; opposite_velocity_y	# set C if A >= &b7
+&22d9: 90 05            BCC &22e0 ; no_xy_swap          # branch if x < y 
 &22db: a8               TAY                             
-&22dc: a5 b7            LDA &b7 ; oppositite_velocity_y # if not, swap A and &b7
-&22de: 84 b7            STY &b7 ; oppositite_velocity_y # ie, force A < &b7
+&22dc: a5 b7            LDA &b7 ; opposite_velocity_y # if not, swap A and &b7
+&22de: 84 b7            STY &b7 ; opposite_velocity_y # ie, force A < &b7
 ; no_xy_swap
-&22e0: 26 99            ROL &99 ; velocity_signs                        # note the swap in &99 velocity_signs
-&22e2: a0 08            LDY #&08
+&22e0: 26 99            ROL &99 ; velocity_signs                # add swap/unswapped flag to &99 velocity_signs (set bit 0 from C, 0 if not swapped, 1 if swapped)
+&22e2: a0 08            LDY #&08				# start with angle 8
 &22e4: 84 b5            STY &b5 ; angle
 ; calc_angle_loop
-&22e6: 0a               ASL
+&22e6: 0a               ASL					# double value, 0 is shifted into bit 0 and the original bit 7 is shifted into the Carry
 &22e7: c5 b7            CMP &b7 ; oppositite_velocity_y
 &22e9: 90 02            BCC &22ed
 &22eb: e5 b7            SBC &b7 ; oppositite_velocity_y
 &22ed: 26 b5            ROL &b5 ; angle
-&22ef: 90 f5            BCC &22e6 ; calc_angle_loop
+&22ef: 90 f5            BCC &22e6 ; calc_angle_loop		# 
 
-&22f1: a5 99            LDA &99 ; velocity_signs
-&22f3: 29 07            AND #&07
-&22f5: a8               TAY
-&22f6: a5 b5            LDA &b5 ; angle
-&22f8: 59 bf 14         EOR &14bf,Y ; angle_modification_table
+&22f1: a5 99            LDA &99 ; velocity_signs		# get sign bits (only 0 to 2 relevant)
+&22f3: 29 07            AND #&07				# mask to get 3 relevant bits
+&22f5: a8               TAY					# transfer to Y
+&22f6: a5 b5            LDA &b5 ; angle				# get saved angle
+&22f8: 59 bf 14         EOR &14bf,Y ; angle_modification_table	# update angle to set top 3 bits to indicate which 8th of the perimiter the angle is in, 
+                                                                # and keep or reverse the bottom 5 bits
 &22fb: 85 b5            STA &b5 ; angle
 &22fd: 60               RTS
 
 ; calculate_object_centre_deltas
-# leaves with A = support_delta_x_low, &b7 = support_delta_y_low, &b8 = delta_magnitude
+# on entry, data should be supplied in:
+#   87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d (this_object_y_center)
+#   88 (stack_object_x_centre_low), 8a (stack_object_y_centre_low), 8c (stack_object_x_centre), 8e (stack_object_y_centre)
+# leaves with A = abs(support_delta_x_low), &b7 = abs(support_delta_y_low), &b8 = delta_magnitude which should be 1 to 7
 &22fe: a0 04            LDY #&04        # first y direction (Y = 4), then x direction (Y = 2)
 
 # &7d support_delta_y_low = &8a stack_object_y_centre_low - &89 this_object_y_centre_low
@@ -5024,38 +5034,42 @@ f $FE                        ; white bg, cyan bg
 # &7c support_delta_x = &8c stack_object_x_centre - &8b this_object_x_centre
 # &99 has bit 0 set if the X delta is +ve, bit 1 set if the Y delta is +ve.
 
-&2300: 85 b7            STA &b7 ; tmp
+&2300: 85 b7            STA &b7 ; tmp   # on 2nd time around loop stores support_delta_y
+
 &2302: b9 86 00         LDA &0086,Y     # Y = 4, &8a stack_object_y_centre_low; Y = 2, &88 stack_object_x_centre_low
 &2305: f9 85 00         SBC &0085,Y     # Y = 4, &89 this_object_y_centre_low; Y = 2, &87 this_object_x_centre_low
 &2308: 99 79 00         STA &0079,Y     # Y = 4, &7d support_delta_y_low; Y = 2, &7b support_delta_x_low
+
 &230b: b9 8a 00         LDA &008a,Y     # Y = 4, &8e stack_object_y_centre; Y = &8c stack_object_x_centre
 &230e: f9 89 00         SBC &0089,Y     # Y = 4, &8d this_object_y_centre; Y = 2, &8b this_object_x_centre
 &2311: 99 7a 00         STA &007a,Y     # Y = 4, &7e support_delta_y; Y = 2, &7c support_delta_x
+
 &2314: 38               SEC
 &2315: 10 03            BPL &231a
-&2317: 20 56 32         JSR &3256 ; make_positive (as part of operation bit 7 will be set to 0)
-&231a: 26 99            ROL &99 ; velocity-signs	carry flag introduced at bit 0
+&2317: 20 56 32         JSR &3256 ; make_positive (as part of operation bit 7 will be set to 0, and C will be cleared)
+&231a: 26 99            ROL &99 ; velocity-signs	# shift left and set bit 0 to value of carry flag: set if that_x > this_x, or that_y > this_y, cleared otherwise 
 &231c: 88               DEY
 &231d: 88               DEY
 &231e: d0 e0            BNE &2300       # now do it again for the x direction
 
-&2320: 05 b7            ORA &b7 ; tmp                   # A = abs(support_delta_y) | abs(support_delta_x), ie largest of the two
-&2322: 0a               ASL A							# double (bit 7 goes to C but it should always be 0 anyway, bit 0 set to 0)
+&2320: 05 b7            ORA &b7 ; tmp                   # A = abs(support_delta_y) | abs(support_delta_x), so that we get 0xxxxxxx
+                                                        # the number of bits set will be counted by Y and determine the delta_magnitude
+&2322: 0a               ASL A				# double (bit 7 goes to C but it should always be 0 anyway, bit 0 set to 0)
 
-&2323: 46 7c            LSR &7c							# halve (sets bit 7 to 0, bit 0 goes to C)
-&2325: 66 7b            ROR &7b                         # halve support_delta_x (sets bit 7 to C)
-&2327: 46 7e            LSR &7e							# halve (sets bit 7 to 0, bit 0 goes to C)
-&2329: 66 7d            ROR &7d                         # halve support_delta_y (sets bit 7 to C)
-&232b: c8               INY                             # for each halving, increase Y
+&2323: 46 7c            LSR &7c	; support_delta_x	# halve (sets bit 7 to 0, bit 0 goes to C)
+&2325: 66 7b            ROR &7b ; support_delta_x_low   # halve support_delta_x (sets bit 7 to C)
+&2327: 46 7e            LSR &7e	; support_delta_y	# halve (sets bit 7 to 0, bit 0 goes to C)
+&2329: 66 7d            ROR &7d ; support_delta_y_low   # halve support_delta_y (sets bit 7 to C)
+&232b: c8               INY                             # for each halving, increment Y
 &232c: 4a               LSR A
 &232d: d0 f4            BNE &2323                       # keep halving A until zero
 
-&232f: 84 b8            STY &b8 ; delta_magnitude		# should be 1 to 7
+&232f: 84 b8            STY &b8 ; delta_magnitude	# should be 1 to 7
 &2331: a5 7d            LDA &7d                         # support_delta_y_low
 &2333: 20 56 32         JSR &3256 ; make_positive
 &2336: 85 b7            STA &b7 ; some_kind_of_velocity
 &2338: a5 7b            LDA &7b                         # support_delta_x_low
-&233a: 4c 56 32         JMP &3256 ; make_positive
+&233a: 4c 56 32         JMP &3256 ; make_positive	# and rts
 
 ; get_opposite_velocities
 # returns &b7 as y_vel, A as x_vel
