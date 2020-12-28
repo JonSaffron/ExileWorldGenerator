@@ -2915,7 +2915,18 @@ f $FE                        ; white bg, cyan bg
 #14bd: 92 ; game_paused							# game is paused whilst bit 7 is 0
 #14be: 01 ; palette_register_data_updated
 
-#14bf: bf 80 c0 ff 40 7f 3f 00 ; angle_modification_table
+#14bf: bf 80 c0 ff 40 7f 3f 00 ; angle_modification_table		# used to help create an angle
+# Indexed by which of the 8 areas is indicated by the 3 sign flags
+# Yields 3 bits which indicate the region of the perimeter, and a 5 bit mask which may negate the point within the region
+# yxh  8th mask
+# 000: 101 11111 = 6th sector (top side, left half)
+# 001: 100 00000 = 5th sector (left side, top half) 
+# 010: 110 00000 = 7th sector (top side, right half)
+# 011: 111 11111 = 8th sector (right side, top half)
+# 100: 010 00000 = 3rd sector (bottom side, left half)
+# 101: 011 11111 = 4th sector (left side, bottom half)
+# 110: 001 11111 = 2nd sector (bottom side, right half)
+# 111: 000 00000 = 1st sector (right side, bottom half)
 
 #14c7: 04 ; something_scrolly_x
 #14c8: 00 ; scroll_offset_x
@@ -4978,7 +4989,7 @@ f $FE                        ; white bg, cyan bg
 &22c4: 85 8e            STA &8e ; stack_object_y_centre         # store result
 
 &22c6: 20 fe 22         JSR &22fe ; calculate_object_centre_deltas
-				# returns with A = abs(support_delta_x_low), &b7 = abs(support_delta_y_low), &b8 = delta_magnitude which should be 1 to 7
+				# returns with A = distance x, &b7 = distance y, &b8 = delta_magnitude which should be 1 to 7
 
 &22c9: 4c d7 22         JMP &22d7 ; calculate_angle
 
@@ -4993,7 +5004,7 @@ f $FE                        ; white bg, cyan bg
 &22d4: 20 3d 23         JSR &233d ; get_opposite_velocities     # a = x_vel &b7 = y_vel
 
 ; calculate_angle
-# takes A = velocity_x, &b7 = velocity_y, &99 velocity_signs
+# takes A = distance_x, &b7 = distance_y, &99 velocity_signs (bottom two bits only, bit 1 for y, bit 0 for x)
 # returns &b5 angle
 &22d7: c5 b7            CMP &b7 ; opposite_velocity_y	# set C if A >= &b7
 &22d9: 90 05            BCC &22e0 ; no_xy_swap          # branch if x < y 
@@ -5002,15 +5013,15 @@ f $FE                        ; white bg, cyan bg
 &22de: 84 b7            STY &b7 ; opposite_velocity_y # ie, force A < &b7
 ; no_xy_swap
 &22e0: 26 99            ROL &99 ; velocity_signs                # add swap/unswapped flag to &99 velocity_signs (set bit 0 from C, 0 if not swapped, 1 if swapped)
-&22e2: a0 08            LDY #&08				# start with angle 8
+&22e2: a0 08            LDY #&08				# initialise loop counter and result - the bit will move until it enters C and the loop ends
 &22e4: 84 b5            STY &b5 ; angle
 ; calc_angle_loop
 &22e6: 0a               ASL					# double value, 0 is shifted into bit 0 and the original bit 7 is shifted into the Carry
 &22e7: c5 b7            CMP &b7 ; oppositite_velocity_y
 &22e9: 90 02            BCC &22ed
 &22eb: e5 b7            SBC &b7 ; oppositite_velocity_y
-&22ed: 26 b5            ROL &b5 ; angle
-&22ef: 90 f5            BCC &22e6 ; calc_angle_loop		# 
+&22ed: 26 b5            ROL &b5 ; angle                         # increment loop counter and save result from C
+&22ef: 90 f5            BCC &22e6 ; calc_angle_loop		# loop around 5 times
 
 &22f1: a5 99            LDA &99 ; velocity_signs		# get sign bits (only 0 to 2 relevant)
 &22f3: 29 07            AND #&07				# mask to get 3 relevant bits
