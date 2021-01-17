@@ -4142,16 +4142,16 @@ f $FE                        ; white bg, cyan bg
 &1cde: a0 00            LDY #&00				                # set player velocities
 &1ce0: 20 a9 0b         JSR &0ba9 ; set_object_velocities
 ; not_held_object2
-&1ce3: a5 15            LDA &15 ; this_object_energy		                # has it got energy
-&1ce5: d0 0f            BNE &1cf6 ; not_exploding
-&1ce7: a4 41            LDY &41 ; this_object_type  		                # explosion time!
+&1ce3: a5 15            LDA &15 ; this_object_energy		                # test if the current object has any energy remaining
+&1ce5: d0 0f            BNE &1cf6 ; not_exploding				# branch if still extant
+&1ce7: a4 41            LDY &41 ; this_object_type  		                # explosion time! the object will be destroyed.
 &1ce9: b9 46 04         LDA &0446,Y ; object_handler_table_h 	            # object_handler_table_h &c0 determines explosion type
 &1cec: 29 c0            AND #&c0											# get top two bits
 &1cee: 0a               ASL													# bit 7 to C, bit 6 to bit 7, 0 to bit 0
 &1cef: 2a               ROL													# C to bit 0, bit 7 to C
 &1cf0: 2a               ROL													# C to bit 0, bit 7 to C
 &1cf1: 69 10            ADC #&10											# add &10 to bring to range &10 to &13, the 4 explosion types
-&1cf3: 20 f1 19         JSR &19f1 ; handle_current_object                   # call explosion handler
+&1cf3: 20 f1 19         JSR &19f1 ; handle_current_object                   # call explosion handler to destroy the object
 ; not_exploding
 &1cf6: 20 87 25         JSR &2587 ; increment_timers
 &1cf9: 4a               LSR
@@ -5365,11 +5365,21 @@ f $FE                        ; white bg, cyan bg
 &24ff: e5 9d            SBC &9d ; damage                                        # reduce energy by damage
 &2501: b0 05            BCS &2508
 &2503: a9 00            LDA #&00                                                # setting to zero if too much
-&2505: 2c a9 01         BIT &01a9
+
+*** interlaced code *** 
+
+&2505: 2c a9 01         BIT &01a9						# set zero flag
+&2508: 99 26 09         STA &0926,Y ; object_stack_energy
+&250b: 60               RTS
+
+*** alternative code ***
+
 ; set_stack_object_energy_to_one
 #2506:    a9 01         LDA #&01
 &2508: 99 26 09         STA &0926,Y ; object_stack_energy
 &250b: 60               RTS
+
+*** interlaced code ends
 
 ; damage_object
 &250c: 20 a6 24         JSR &24a6 ; take_damage                                 # have we still got energy?
