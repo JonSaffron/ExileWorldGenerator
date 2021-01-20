@@ -542,7 +542,9 @@ data type indicates the type of the object e.g. nest
 #
 #   Object handlers
 #   ===============
-#   background objects:
+#
+#   first &10 entries cover background objects. the top 4 bits of the high address indicate... something
+#
 #   no   l   h    addr  name									sprite		object created          80 40 20 10
 #   &00  &d7 &20  3ef2 handle_background_invisible_switch		(none)				                -  -  +  -		
 #   &01  &c8 &b0  3ee3 handle_background_teleport_beam     		teleporter	teleport beam			+  -  +  +
@@ -561,20 +563,30 @@ data type indicates the type of the object e.g. nest
 #   &0e  &fd &30  3f18 handle_background_object_random_wind		(none)	                            -  -  +  +		not specifically referenced
 #   &0f  &b7 &31  3fd2 handle_background_mushrooms				mushrooms	mushroom ball			-  -  +  +		not specifically referenced
 #
+#  next 4 entries handle what happens to an object when it is destroyed:
+#
 #   &10  &7b &02  4096 handle_explosion_type_00		player or doesn't explode
 #   &11  &a3 &02  40be handle_explosion_type_40		plays extra sound then same as handle_explosion_type_c0
 #   &12  &a0 &02  40bb handle_explosion_type_80		turns into fireball
 #   &13  &aa &02  40c5 handle_explosion_type_c0		turns exploding object into an explosion
 #
-#   stack objects by object_type:
+#   the rest of the entries are indexed by object_type
+#   the top 2 bits of the high byte of the handler address indicate how the object will be handled when it is destroyed
+#   the object types are categorised into ranges by object_type_ranges which have default energy determined by energy_by_range
+#
 # r no   l   h    addr  name						  object					energy	explosion (top 2 bits of h)
-# 0:&00  &f6 &0b  &4a11 handle_player_object          player					7f		0
+# 0:player and allies
+#   &00  &f6 &0b  &4a11 handle_player_object          player					7f		0
 #   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			7f		0 (indestructable)
 #   &02  &d5 &88  &46f0 handle_crew_member            pericles crew member		7f		80
 #   &03  &6d &84  &4288 handle_fluffy                 fluffy					7f		80
+#
+# 1:nests
 # 1:&04  &94 &cd  &4baf handle_nest                   small nest				3f		c0
 #   &05  &94 &cd  &4baf handle_nest                   big nest					3f		c0
-# 2:&06  &48 &86  &4463 handle_frogman_red            red frogman				7f		80
+#
+# 2:big creatures
+#   &06  &48 &86  &4463 handle_frogman_red            red frogman				7f		80
 #   &07  &5c &86  &4477 handle_frogman_green          green frogman				7f		80
 #   &08  &5a &86  &4475 handle_frogman_cyan           cyan frogman				7f		80
 #   &09  &ae &09  &47c9 handle_red_slime              red slime					7f		0
@@ -583,92 +595,106 @@ data type indicates the type of the object e.g. nest
 #   &0c  &6e &09  &4789 handle_sucker                 sucker					7f		0
 #   &0d  &d2 &0f  &4ded handle_sucker_deadly          deadly sucker				7f		0
 #   &0e  &46 &89  &4761 handle_big_fish               big fish					7f		80
-# 3:&0f  &ef &83  &420a handle_worm                   worm						07		80
+#
+# 3:small creatures
+#   &0f  &ef &83  &420a handle_worm                   worm						07		80
 #   &10  &06 &d1  &4f21 handle_nest_dweller           piranha					07		c0
 #   &11  &06 &91  &4f21 handle_nest_dweller           wasp						07		80
-# 4:&12  &dc &c4  &42f7 handle_grenade_active         active grenade			3f		c0
+#
+# 4:bullets, grenades
+#   &12  &dc &c4  &42f7 handle_grenade_active         active grenade			3f		c0
 #   &13  &a4 &c8  &46bf handle_icer_bullet            icer bullet				3f		c0
 #   &14  &f9 &c7  &4614 handle_tracer_bullet          tracer bullet				3f		c0
-#   &15  &0b &c5  &4326 handle_cannonball			  cannonball				3f		c0
+#   &15  &0b &c5  &4326 handle_cannonball	      cannonball				3f		c0
 #   &16  &17 &c5  &4332 handle_death_ball_blue        blue death ball			3f		c0
 #   &17  &2f &c5  &434a handle_red_bullet             red bullet				3f		c0
 #   &18  &00 &c6  &441b handle_pistol_bullet          pistol bullet				3f		c0
 #   &19  &6d &8c  &4a88 handle_plasma_ball            plasma ball				3f		80
 #   &1a  &cc &45  &43e7 handle_hover_ball             hover ball				3f		40
 #   &1b  &d0 &45  &43eb handle_hover_ball_invisible   invisible hover ball		3f		40
-# 5:&1c  &c3 &50  &4ede handle_robot                  magenta robot				3f		40
-#   &1d  &c3 &50  &4ede handle_robot                  red robot					3f		40
-#   &1e  &c7 &50  &4ee2 handle_robot_blue             blue robot				3f		40
-#   &1f  &bd &50  &4ed8 handle_turret                 green/white turret		3f		40
-#   &20  &bd &50  &4ed8 handle_turret                 cyan/red turret			3f		40
-#   &21  &e9 &49  &4804 handle_hovering_robot         hovering robot			3f		40
-# 6:&22  &04 &4a  &481f handle_clawed_robot           magenta clawed robot		81		40
-#   &23  &04 &4a  &481f handle_clawed_robot           cyan clawed robot			81		40
-#   &24  &04 &4a  &481f handle_clawed_robot           green clawed robot		81		40
-#   &25  &04 &4a  &481f handle_clawed_robot           red clawed robot			81		40
-#   &26  &e9 &08  &4704 handle_triax                  triax						81		0
-#   &27  &37 &90  &4e52 handle_maggot                 maggot					81		80
-#   &28  &55 &c3  &4170 handle_gargoyle               gargoyle					81		c0
-#   &29  &d4 &86  &44ef handle_imp                    red/magenta imp			81		80
-#   &2a  &d4 &86  &44ef handle_imp                    red/yellow imp			81		80
-#   &2b  &d4 &86  &44ef handle_imp                    blue/cyan imp				81		80
-#   &2c  &d4 &86  &44ef handle_imp                    cyan/yellow imp			81		80
-#   &2d  &d4 &86  &44ef handle_imp                    red/cyan imp				81		80
-#   &2e  &16 &88  &4631 handle_bird                   green/yellow bird			81		80
-#   &2f  &16 &88  &4631 handle_bird                   white/yellow bird			81		80
-#   &30  &06 &88  &4621 handle_bird_red               red/magenta bird			81		80
-#   &31  &10 &88  &462b handle_bird_invisible         invisible bird			81		80
-# 7:&32  &e6 &02  &4000 handle_lightning              lightning					fd		0
-#   &33  &7d &08  &4698 handle_mushroom_ball          red mushroom ball			fd		0
-#   &34  &7d &08  &4698 handle_mushroom_ball          blue mushroom ball		fd		0
-#   &35  &76 &09  &4791 handle_engine_fire            engine fire				fd		0
-#   &36  &7e &c9  &4799 handle_red_drop               red drop					fd		c0
-#   &37  &bb &0c  &4ad6 handle_fireball               flames					fd		0
-# 8:&38  &a6 &0a  &48c1 handle_chatter_inactive       inactive chatter			3f		0
-#   &39  &0b &0d  &4b26 handle_moving_fireball        moving fireball			3f		0
-#   &3a  &81 &05  &439c handle_giant_wall             giant wall				3f		0
-#   &3b  &fa &0d  &4c15 handle_engine_thruster        engine thruster			3f		0
-#   &3c  &68 &ce  &4c83 handle_door                   horizontal door			3f		c0
-#   &3d  &68 &ce  &4c83 handle_door                   vertical door				3f		c0
-#   &3e  &68 &ce  &4c83 handle_door                   horizontal stone door		3f		c0
-#   &3f  &68 &ce  &4c83 handle_door                   vertical stone door		3f		c0
-#   &40  &8e &0d  &4ba9 handle_bush                   bush						3f		0
-#   &41  &6b &0f  &4d86 handle_teleport_beam          teleport beam				3f		0
-#   &42  &82 &cb  &499d handle_switch                 switch					3f		c0
-#   &43  &92 &05  &43ad (null function)               chest						3f		0
-#   &44  &81 &11  &4f9c handle_explosion              explosion					3f		0
-#   &45  &92 &05  &43ad (null function)               rock						3f		0
-#   &46  &d3 &02  &40ee handle_cannon                 cannon					3f		0
-#   &47  &fb &43  &4216 handle_mysterious_weapon      mysterious weapon			3f		40
-#   &48  &84 &03  &419f handle_maggot_machine         maggot machine			3f		0
-#   &49  &49 &0d  &4b64 handle_placeholder            placeholder				3f		0
-# 9:&4a  &59 &05  &4374 handle_destinator             destinator				ff		0
-#   &4b  &45 &85  &4360 handle_energy_capsule         energy capsule			ff		80
-#   &4c  &8c &05  &43a7 handle_flask                  empty flask				ff		0
-#   &4d  &93 &05  &43ae handle_flask_full             full flask				ff		0
-#   &4e  &36 &05  &4351 handle_remote_control         remote control device		ff		0
-#   &4f  &36 &05  &4351 handle_remote_control         cannon control device		ff		0
-#   &50  &3d &c3  &4158 handle_grenade_inactive       inactive grenade			ff		c0
-#   &51  &6d &0d  &4b88 handle_collectable            cyan/yellow/green key		ff		0
-#   &52  &6d &0d  &4b88 handle_collectable            red/yellow/green key		ff		0
-#   &53  &6d &0d  &4b88 handle_collectable            green/yellow/red key		ff		0
-#   &54  &6d &0d  &4b88 handle_collectable            yellow/white/red key		ff		0
-#   &55  &af &03  &41ca handle_coronium_boulder       coronium boulder			ff		0
-#   &56  &6d &0d  &4b88 handle_collectable            red/magenta/red key		ff		0
-#   &57  &6d &0d  &4b88 handle_collectable            blue/cyan/green key		ff		0
-#   &58  &a7 &03  &41c2 handle_coronium_crystal       coronium crystal			ff		0
-#   &59  &6d &0d  &4b88 handle_collectable            jetpack booster			ff		0
-#   &5a  &6d &0d  &4b88 handle_collectable            pistol					ff		0
-#   &5b  &6d &0d  &4b88 handle_collectable            icer						ff		0
-#   &5c  &6d &0d  &4b88 handle_collectable            discharge device			ff		0
-#   &5d  &6d &0d  &4b88 handle_collectable            plasma gun				ff		0
-#   &5e  &6d &0d  &4b88 handle_collectable            protection suit			ff		0
-#   &5f  &6d &0d  &4b88 handle_collectable            fire immunity device		ff		0
-#   &60  &6d &0d  &4b88 handle_collectable            mushroom immunity pill	ff		0
-#   &61  &6d &0d  &4b88 handle_collectable            whistle 1					ff		0
-#   &62  &6d &0d  &4b88 handle_collectable            whistle 2					ff		0
-#   &63  &6d &0d  &4b88 handle_collectable            radiation immunity pill	ff		0
-#   &64  &92 &05  &43ad (null function)               ?							ff		0
+#
+# 5:robots and turrets
+#   &1c  &c3 &50  &4ede handle_robot                  magenta robot				81		40
+#   &1d  &c3 &50  &4ede handle_robot                  red robot					81		40
+#   &1e  &c7 &50  &4ee2 handle_robot_blue             blue robot				81		40
+#   &1f  &bd &50  &4ed8 handle_turret                 green/white turret		81		40
+#   &20  &bd &50  &4ed8 handle_turret                 cyan/red turret			81		40
+#   &21  &e9 &49  &4804 handle_hovering_robot         hovering robot			81		40
+#
+# 6:flying things / imps
+#   &22  &04 &4a  &481f handle_clawed_robot           magenta clawed robot		fd		40
+#   &23  &04 &4a  &481f handle_clawed_robot           cyan clawed robot			fd		40
+#   &24  &04 &4a  &481f handle_clawed_robot           green clawed robot		fd		40
+#   &25  &04 &4a  &481f handle_clawed_robot           red clawed robot			fd		40
+#   &26  &e9 &08  &4704 handle_triax                  triax						fd		0
+#   &27  &37 &90  &4e52 handle_maggot                 maggot					fd		80
+#   &28  &55 &c3  &4170 handle_gargoyle               gargoyle					fd		c0
+#   &29  &d4 &86  &44ef handle_imp                    red/magenta imp			fd		80
+#   &2a  &d4 &86  &44ef handle_imp                    red/yellow imp			fd		80
+#   &2b  &d4 &86  &44ef handle_imp                    blue/cyan imp				fd		80
+#   &2c  &d4 &86  &44ef handle_imp                    cyan/yellow imp			fd		80
+#   &2d  &d4 &86  &44ef handle_imp                    red/cyan imp				fd		80
+#   &2e  &16 &88  &4631 handle_bird                   green/yellow bird			fd		80
+#   &2f  &16 &88  &4631 handle_bird                   white/yellow bird			fd		80
+#   &30  &06 &88  &4621 handle_bird_red               red/magenta bird			fd		80
+#   &31  &10 &88  &462b handle_bird_invisible         invisible bird			fd		80
+#
+# 7:lightning, mushroom balls & fire
+#   &32  &e6 &02  &4000 handle_lightning              lightning					3f		0
+#   &33  &7d &08  &4698 handle_mushroom_ball          red mushroom ball			3f		0
+#   &34  &7d &08  &4698 handle_mushroom_ball          blue mushroom ball		3f		0
+#   &35  &76 &09  &4791 handle_engine_fire            engine fire				3f		0
+#   &36  &7e &c9  &4799 handle_red_drop               red drop					3f		c0
+#   &37  &bb &0c  &4ad6 handle_fireball               flames					3f		0
+#
+# 8:scenery
+#   &38  &a6 &0a  &48c1 handle_chatter_inactive       inactive chatter			ff		0
+#   &39  &0b &0d  &4b26 handle_moving_fireball        moving fireball			ff		0
+#   &3a  &81 &05  &439c handle_giant_wall             giant wall				ff		0
+#   &3b  &fa &0d  &4c15 handle_engine_thruster        engine thruster			ff		0
+#   &3c  &68 &ce  &4c83 handle_door                   horizontal door			ff		c0
+#   &3d  &68 &ce  &4c83 handle_door                   vertical door				ff		c0
+#   &3e  &68 &ce  &4c83 handle_door                   horizontal stone door		ff		c0
+#   &3f  &68 &ce  &4c83 handle_door                   vertical stone door		ff		c0
+#   &40  &8e &0d  &4ba9 handle_bush                   bush						ff		0
+#   &41  &6b &0f  &4d86 handle_teleport_beam          teleport beam				ff		0
+#   &42  &82 &cb  &499d handle_switch                 switch					ff		c0
+#   &43  &92 &05  &43ad (null function)               chest						ff		0
+#   &44  &81 &11  &4f9c handle_explosion              explosion					ff		0
+#   &45  &92 &05  &43ad (null function)               rock						ff		0
+#   &46  &d3 &02  &40ee handle_cannon                 cannon					ff		0
+#   &47  &fb &43  &4216 handle_mysterious_weapon      mysterious weapon			ff		40
+#   &48  &84 &03  &419f handle_maggot_machine         maggot machine			ff		0
+#   &49  &49 &0d  &4b64 handle_placeholder            placeholder				ff		0
+#
+# 9:equipment
+#   &4a  &59 &05  &4374 handle_destinator             destinator				7d		0
+#   &4b  &45 &85  &4360 handle_energy_capsule         energy capsule			7d		80
+#   &4c  &8c &05  &43a7 handle_flask                  empty flask				7d		0
+#   &4d  &93 &05  &43ae handle_flask_full             full flask				7d		0
+#   &4e  &36 &05  &4351 handle_remote_control         remote control device		7d		0
+#   &4f  &36 &05  &4351 handle_remote_control         cannon control device		7d		0
+#   &50  &3d &c3  &4158 handle_grenade_inactive       inactive grenade			7d		c0
+#   &51  &6d &0d  &4b88 handle_collectable            cyan/yellow/green key		7d		0
+#   &52  &6d &0d  &4b88 handle_collectable            red/yellow/green key		7d		0
+#   &53  &6d &0d  &4b88 handle_collectable            green/yellow/red key		7d		0
+#   &54  &6d &0d  &4b88 handle_collectable            yellow/white/red key		7d		0
+#   &55  &af &03  &41ca handle_coronium_boulder       coronium boulder			7d		0
+#   &56  &6d &0d  &4b88 handle_collectable            red/magenta/red key		7d		0
+#   &57  &6d &0d  &4b88 handle_collectable            blue/cyan/green key		7d		0
+#   &58  &a7 &03  &41c2 handle_coronium_crystal       coronium crystal			7d		0
+#   &59  &6d &0d  &4b88 handle_collectable            jetpack booster			7d		0
+#   &5a  &6d &0d  &4b88 handle_collectable            pistol					7d		0
+#   &5b  &6d &0d  &4b88 handle_collectable            icer						7d		0
+#   &5c  &6d &0d  &4b88 handle_collectable            discharge device			7d		0
+#   &5d  &6d &0d  &4b88 handle_collectable            plasma gun				7d		0
+#   &5e  &6d &0d  &4b88 handle_collectable            protection suit			7d		0
+#   &5f  &6d &0d  &4b88 handle_collectable            fire immunity device		7d		0
+#   &60  &6d &0d  &4b88 handle_collectable            mushroom immunity pill	7d		0
+#   &61  &6d &0d  &4b88 handle_collectable            whistle 1					7d		0
+#   &62  &6d &0d  &4b88 handle_collectable            whistle 2					7d		0
+#   &63  &6d &0d  &4b88 handle_collectable            radiation immunity pill	7d		0
+#   &64  &92 &05  &43ad (null function)               ?							7d		0
 #
 ###############################################################################
 
@@ -3745,30 +3771,37 @@ f $FE                        ; white bg, cyan bg
 &19e7: 4c b6 19         JMP &19b6 ; main_loop                                   # go round the loop again
 
 ; handle_background_object
+on entry A is object_handler_table_h[background_object_type] where background_object_type is 0 to &f
+and Y is new_object_data_pointer
+
 &19ea: ba               TSX
 &19eb: 86 26            STX &26 ; copy_of_stack_pointer
-&19ed: a6 08            LDX &08 ; square_sprite
-&19ef: 10 04            BPL &19f5	                                        # we've already got A and calculated h of our handler
+&19ed: a6 08            LDX &08 ; square_sprite					# side effect is to clear N so next instruction will always branch
+&19ef: 10 04            BPL &19f5	                                        # jump over next bit as we've already got the high address of the object handler
+
 ; handle_current_object
+on entry A is object_type + &14, OR in the range &10 to &13 for an explosion
+and Y is this_object_supporting, OR the original object_type for an explosion
 &19f1: aa               TAX
-&19f2: bd 32 04         LDA &0432,X ; object_handler_table_h		        # Calculate address of object handler
+&19f2: bd 32 04         LDA &0432,X ; object_handler_table_h		        # Calculate high byte address of object handler
 
 &19f5: 48               PHA
-&19f6: bd b9 03         LDA &03b9,X ; object_handler_table		
+&19f6: bd b9 03         LDA &03b9,X ; object_handler_table			# get low byte of object handler address
 &19f9: 18               CLC
-&19fa: 69 1a            ADC #&1a     ;
-&19fc: aa               TAX
-&19fd: 68               PLA
-&19fe: 29 3f            AND #&3f
-&1a00: 69 3e            ADC #&3e
-&1a02: 48               PHA						        # high = ((&0432, type + &14)) & 3f) + &3e
+&19fa: 69 1a            ADC #&1a     						# add lowbyte(handlers_start - 1)
+&19fc: aa               TAX							
+&19fd: 68               PLA							# restore the high byte
+&19fe: 29 3f            AND #&3f						# mask to get lower 6 bits (top 2 contain explosion data)
+&1a00: 69 3e            ADC #&3e						# add highbyte(handlers_start - 1) + C
+&1a02: 48               PHA						        # push high byte for RTS
 &1a03: 8a               TXA
-&1a04: 48               PHA						        # low = (&03b9, type + &14) + &1a
+&1a04: 48               PHA						        # push low byte for RTS
 
-&1a05: a6 bc            LDX &bc ; this_object_data
+&1a05: a6 bc            LDX &bc ; this_object_data				# set up parameters for the object handler to use
 &1a07: 8a               TXA
-&1a08: c0 00            CPY #&00
-&1a0a: 60               RTS						        # Call the object handler we've put on stack
+&1a08: c0 00            CPY #&00						# Set C Z and N
+&1a0a: 60               RTS						        # Call the object handler we've put on stack (RTS will go to address on stack + 1)
+										# Jump to object_handlers[object_type + &14] + handlers_start
 
 ; process_objects
 &1a0b: a2 00            LDX #&00			                        # start with object 0
@@ -5972,8 +6005,8 @@ f $FE                        ; white bg, cyan bg
 
 ###############################################################################
 #
-#   Ranges
-#   ======
+#   Object Type Ranges
+#   ==================
 #   0 : player and allies
 #   1 : nests
 #   2 : big creatures
@@ -6531,9 +6564,6 @@ f $FE                        ; white bg, cyan bg
 &2db3: dd ee 29         CMP &29ee,X ; object_type_ranges
 &2db6: 90 fa            BCC &2db2
 &2db8: 60               RTS
-
-     ;  0  1  2  3  4  5  6  7  8  9
-#29ee: 00 04 06 0f 12 22 32 38 4a 7f; object_type_ranges
 
 ; sound_data_big_lookup_table
 #2db9: 88 03 10 03 f0 80 03 c0 01 04 05 06 82 0c fe 03
