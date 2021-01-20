@@ -359,13 +359,13 @@ Disassembly
 ;     &bd new_object_data_pointer
 ;     &be new_object_type_pointer
 ;     &bf this_object_offscreen
-;     &c0 loop_counter
-;     &c1 loop_counter_every_40
-;     &c2 loop_counter_every_20
-;     &c3 loop_counter_every_10
-;     &c4 loop_counter_every_08
-;     &c5 loop_counter_every_04
-;     &c6 loop_counter_every_02
+;     &c0 loop_counter						; continually incremented
+;     &c1 loop_counter_every_40				; will be negative when c0 & 1000000 = 0
+;     &c2 loop_counter_every_20				; will be negative when c0 & 100000 = 0
+;     &c3 loop_counter_every_10				; will be negative when c0 & 10000 = 0
+;     &c4 loop_counter_every_08				; will be negative when c0 & 1000 = 0
+;     &c5 loop_counter_every_04				; will be negative when c0 & 100 = 0
+;     &c6 loop_counter_every_02				; will be negative when c0 & 10 = 0
 ;     &c7 screen_start_square_x_low
 ;     &c8 screen_start_square_x
 ;     &c9 screen_start_square_y_low
@@ -543,7 +543,7 @@ data type indicates the type of the object e.g. nest
 #   Object handlers
 #   ===============
 #
-#   first &10 entries cover background objects. the top 4 bits of the high address indicate... something
+#   first &10 entries cover background objects. the top 4 bits of the high address are matched against the value of &2d background_processing_flag at certain points
 #
 #   no   l   h    addr  name									sprite		object created          80 40 20 10
 #   &00  &d7 &20  3ef2 handle_background_invisible_switch		(none)				                -  -  +  -		
@@ -565,7 +565,7 @@ data type indicates the type of the object e.g. nest
 #
 #  next 4 entries handle what happens to an object when it is destroyed:
 #
-#   &10  &7b &02  4096 handle_explosion_type_00		player or doesn't explode
+#   &10  &7b &02  4096 handle_explosion_type_00		indestructable (includes player)
 #   &11  &a3 &02  40be handle_explosion_type_40		plays extra sound then same as handle_explosion_type_c0
 #   &12  &a0 &02  40bb handle_explosion_type_80		turns into fireball
 #   &13  &aa &02  40c5 handle_explosion_type_c0		turns exploding object into an explosion
@@ -573,11 +573,12 @@ data type indicates the type of the object e.g. nest
 #   the rest of the entries are indexed by object_type
 #   the top 2 bits of the high byte of the handler address indicate how the object will be handled when it is destroyed
 #   the object types are categorised into ranges by object_type_ranges which have default energy determined by energy_by_range
+#   the sprites used for each object_type are given in object_sprite_lookup and the palette used in object_palette_lookup
 #
-# r no   l   h    addr  name						  object					energy	explosion (top 2 bits of h)
+# r no   l   h    addr  name						  object					energy	explosion
 # 0:player and allies
 #   &00  &f6 &0b  &4a11 handle_player_object          player					7f		0
-#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			7f		0 (indestructable)
+#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			7f		0
 #   &02  &d5 &88  &46f0 handle_crew_member            pericles crew member		7f		80
 #   &03  &6d &84  &4288 handle_fluffy                 fluffy					7f		80
 #
@@ -605,7 +606,7 @@ data type indicates the type of the object e.g. nest
 #   &12  &dc &c4  &42f7 handle_grenade_active         active grenade			3f		c0
 #   &13  &a4 &c8  &46bf handle_icer_bullet            icer bullet				3f		c0
 #   &14  &f9 &c7  &4614 handle_tracer_bullet          tracer bullet				3f		c0
-#   &15  &0b &c5  &4326 handle_cannonball	      cannonball				3f		c0
+#   &15  &0b &c5  &4326 handle_cannonball			  cannonball				3f		c0
 #   &16  &17 &c5  &4332 handle_death_ball_blue        blue death ball			3f		c0
 #   &17  &2f &c5  &434a handle_red_bullet             red bullet				3f		c0
 #   &18  &00 &c6  &441b handle_pistol_bullet          pistol bullet				3f		c0
@@ -617,7 +618,7 @@ data type indicates the type of the object e.g. nest
 #   &1c  &c3 &50  &4ede handle_robot                  magenta robot				81		40
 #   &1d  &c3 &50  &4ede handle_robot                  red robot					81		40
 #   &1e  &c7 &50  &4ee2 handle_robot_blue             blue robot				81		40
-#   &1f  &bd &50  &4ed8 handle_turret                 green/white turret		81		40
+#   &1f  &bd &50  &4ed8 handle_turret                 pink/green/white turret	81		40
 #   &20  &bd &50  &4ed8 handle_turret                 cyan/red turret			81		40
 #   &21  &e9 &49  &4804 handle_hovering_robot         hovering robot			81		40
 #
@@ -737,6 +738,7 @@ data type indicates the type of the object e.g. nest
 ; low byte of addresses of handler routines which are stored relative to the address of handlers_start
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0  1  2  3
 #03b9: d7 c8 a4 7d 7a 9c 9c 9c b2 00 00 26 6f 88 fd b7 7b a3 a0 aa ; for background objects / explosions
+
 #03cd: f6 bc d5 6d 94 94 48 5c 5a ae 0f 4b 6e d2 46 ef ; 00
 #03dd: 06 06 dc a4 f9 0b 17 2f 00 6d cc d0 c3 c3 c7 bd ; 10
 #03ed: bd e9 04 04 04 04 e9 37 55 d4 d4 d4 d4 d4 16 16 ; 20
@@ -1083,7 +1085,7 @@ These are a list of square_x values in sections delimited by background_objects_
 
 #0956: ce 0e ce 0d 0f cb 05 11 05 02 43 03 0d 05 85 05 ; object_stack_timer
 
-#0966: 00 05 05 c3 0d 0d 0d 0d 03 0d 0d 03 0d 0d 0d 0d ; object_stack_data_pointer
+#0966: 00 05 05 c3 0d 0d 0d 0d 03 0d 0d 03 0d 0d 0d 0d ; object_stack_data_pointer  this gives an index into the area at background_objects_data
 
 #0976: 0d 0d 0d 0d 0d 0d 0d 05 c6 ce c6 c6 c6 bb c6 18 ; object_stack_extra
 
@@ -3743,18 +3745,18 @@ f $FE                        ; white bg, cyan bg
 
 ; main_loop 
 &19b6: 46 27            LSR &27 ; whistle1_played                               # reset whistle1
-&19b8: e6 c0            INC &c0 ; loop_counter                                  # increment loop counter
-&19ba: a5 c0            LDA &c0 ; loop_counter
-&19bc: a0 ff            LDY #&ff
+&19b8: e6 c0            INC &c0 ; loop_counter                                  # increment main loop counter
+&19ba: a5 c0            LDA &c0 ; loop_counter									# fetch the new value (0 to 255)
 
-&19be: a2 05            LDX #&05
-; loop_counter_every_loop			                                # calculate loop_counter_every_* based on bits of loop_counter
-&19c0: 4a               LSR
-&19c1: 90 01            BCC &19c4
-&19c3: c8               INY			                                # loop_counter_every_X is &ff every X counts
-&19c4: 94 c1            STY &c1,X       
-&19c6: ca               DEX
-&19c7: 10 f7            BPL &19c0 ; loop_counter_every_loop
+&19bc: a0 ff            LDY #&ff												# Y starts out negative
+&19be: a2 05            LDX #&05												# initialise loop counter for 6 iterations
+; loop_counter_every_loop														# calculate loop_counter_every_* based on bits of loop_counter
+&19c0: 4a               LSR														# shift the &c0 value left, lowest bit to carry
+&19c1: 90 01            BCC &19c4												# skip over next instruction if carry clear
+&19c3: c8               INY														# make Y positive from now on
+&19c4: 94 c1            STY &c1,X												# set the loop_counter_every_NN value to postive/negative
+&19c6: ca               DEX														# decrement loop counter
+&19c7: 10 f7            BPL &19c0 ; loop_counter_every_loop						# loop until x goes negative
 
 &19c9: 20 97 1f         JSR &1f97 ; process_screen_background_flash
 &19cc: 20 0b 1a         JSR &1a0b ; process_objects
@@ -7581,16 +7583,18 @@ e336d: 90 02            BCC &3371
 
 ; gain_energy_or_flash_if_damaged_minimum_1e
 &3538: a0 1e            LDY #&1e                                                # minimum energy = &1e
-; gain_energy_or_flash_if_damaged                                               # or Y
+
+; gain_energy_or_flash_if_damaged                                               # minimum energy = Y
 # Y = minimum energy to give object
-&353a: 24 c5            BIT &c5 ; loop_counter_every_04                         # every four cycles
-&353c: 10 09            BPL &3547
-&353e: a5 15            LDA &15 ; this_object_energy
-&3540: c9 c0            CMP #&c0
-&3542: b0 03            BCS &3547
-&3544: 20 4e 25         JSR &254e; gain_one_energy_point_if_not_immortal        # gain energy if < &c0
+&353a: 24 c5            BIT &c5 ; loop_counter_every_04                         # only increase energy every four cycles
+&353c: 10 09            BPL &3547												
+&353e: a5 15            LDA &15 ; this_object_energy							# get current energy level
+&3540: c9 c0            CMP #&c0												
+&3542: b0 03            BCS &3547												# branch over when c0 or more
+&3544: 20 4e 25         JSR &254e; gain_one_energy_point_if_not_immortal        # gain an energy point
+
 ; give_minimum_energy_and_flash_if_damaged
-&3547: 20 2e 35         JSR &352e ; give_minimum_energy
+&3547: 20 2e 35         JSR &352e ; give_minimum_energy							# specified in Y, result returned in A
 &354a: 0a               ASL
 &354b: 08               PHP
 &354c: b0 06            BCS &3554                                               # is energy < &80 ?
@@ -9221,7 +9225,7 @@ maggot x = &06 a = &08
 &401a: 60               RTS
 
 ; reserve_object_for_background
-&401b: a2 35            LDX #&35                                                # &35 = engine thruster
+&401b: a2 35            LDX #&35                                                # &35 = engine fire
 ; reserve_object_for_background_type_X
 &401d: a9 10            LDA #&10
 &401f: 24 2d            BIT &2d ; background_processing_flag
@@ -10453,7 +10457,7 @@ maggot x = &06 a = &08
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&4804: 20 10 4f         JSR &4f10 ; towards_gain_energy_or_flash_if_damaged     # hovering robot energy = &14
+&4804: 20 10 4f         JSR &4f10 ; no_firing                                   # hovering robot energy = &14
 &4807: 90 b9            BCC &47c2                                               # leave if insufficient energy
 &4809: a5 dc            LDA &dc ; timer_4
 &480b: 4a               LSR
@@ -11510,26 +11514,37 @@ indexed by key, bits 4 to 6 of the door data
 &4eee: 20 df 3a         JSR &3adf ; something_motion_related
 &4ef1: 20 78 25         JSR &2578 ; flip_object_in_direction_of_travel_on_random_3
 &4ef4: a4 41            LDY &41 ; this_object_type
-&4ef6: be 02 4f         LDX &4f02,Y ; robot_bullet_lookup       # actually &4f1e
+&4ef6: be 02 4f         LDX &4f02,Y ; robot_bullet_lookup       # table stored at &4f1e, as first applicable object_type value is &1c
 ; turret_firing
 &4ef9: 24 15            BIT &15 ; this_object_energy                            # consider the object's energy
-&4efb: 10 13            BPL &4f10                                               # don't fire if energy is low
-&4efd: a0 84            LDY #&84
+&4efb: 10 13            BPL &4f10 ; no_firing                                   # don't fire if energy is low
+
+&4efd: a0 84            LDY #&84												# specify secondary target &84 = range 4 (bullets, grenades)
 &4eff: a5 55            LDA &55 ; this_object_y
-&4f01: c9 b4            CMP #&b4                                                # is y > &b4 ?
-&4f03: b0 06            BCS &4f0b
+&4f01: c9 b4            CMP #&b4                                                
+&4f03: b0 06            BCS &4f0b												# branch if y >= &b4 
 &4f05: 24 db            BIT &db ; timer_3
-&4f07: 70 02            BVS &4f0b
-&4f09: a0 86            LDY #&86                                                # &86 = range 6 (flying enemies)
-&4f0b: a9 81            LDA #&81                                                # &81 = active chatter + player
+&4f07: 70 02            BVS &4f0b												# branch on random
+&4f09: a0 86            LDY #&86                                                # change secondary target &86 = range 6 (flying enemies)
+&4f0b: a9 81            LDA #&81                                                # set primary target &81 = active chatter + player
 &4f0d: 20 68 27         JSR &2768 ; find_a_target_and_fire_at_it                # find a target and fire at it
 ; no_firing
 &4f10: a6 41            LDX &41 ; this_object_type
-&4f12: bc fc 4e         LDY &4efc,X ; robot_energy_lookup       # actually &4f18 # minimum energy
+&4f12: bc fc 4e         LDY &4efc,X ; robot_energy_lookup       # sets minimum energy, table stored at &4f18 as first applicable object_type value is &1c
 &4f15: 4c 3a 35         JMP &353a ; gain_energy_or_flash_if_damaged
-#4f18: 14 46 46 14 7f 14 ; robot_energy_lookup
-;      1c 1d 1e ; magenta robot, red robot, blue robot
-#4f1e: 18 13 14 ; robot_bullet_lookup   # &18 = pistol bullet, &13 = icer bullet, &14 = tracer bullet
+
+; robot_energy_lookup
+#4f18: 14 ; magenta robot (&1c)
+#4f19: 46 ; red robot (&1d)
+#4f1a: 46 ; blue robot (&1e)
+#4f1b: 14 ; green/white turret (&1f)
+#4f1c: 7f ; cyan/red turret (&20)
+#4f1d: 14 ; hovering robot (&21)
+
+; robot_bullet_lookup
+#4f1e: 18 ; magenta robot (&1c) = pistol bullet (&18)
+#4f1f: 13 ; red robot (&1d) = icer bullet (&13)
+#4f20: 14 ; blue robot (&1e) = tracer bullet (&14)
 
 ; handle_nest_dweller
 # called with:
