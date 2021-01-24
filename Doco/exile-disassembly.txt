@@ -532,7 +532,7 @@ example for background object id 29:
 
 handle_background_object_from_type:
 data type indicates the type of the object e.g. nest
-
+the data byte is simply passed to the new object so is specific to the type
 
 		for a nest, data byte format: xtttttyz
 			where ttttt is the type of the object produced
@@ -3989,7 +3989,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1b7f: 85 1a            STA &1a ; wall_collision_count_bottom
 &1b81: 4e b4 19         LSR &19b4 ; collided_in_last_cycle
 &1b84: a5 6f            LDA &6f ; this_object_flags
-&1b86: 29 fd            AND #&fd
+&1b86: 29 fd            AND #&fd						# clear bit 1 (&02)
 &1b88: 85 6f            STA &6f ; this_object_flags
 &1b8a: 24 1a            BIT &1a ; wall_collision_count_bottom
 &1b8c: 30 0a            BMI &1b98
@@ -4087,7 +4087,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1c3b: 4c 2e 1d         JMP &1d2e
 
 &1c3e: a5 6f            LDA &6f ; this_object_flags
-&1c40: 29 ef            AND #&ef
+&1c40: 29 ef            AND #&ef						# clear teleport flag
 &1c42: 85 6f            STA &6f ; this_object_flags
 &1c44: 20 49 25         JSR &2549 ; gain_one_energy_point
 ; not_teleporting
@@ -5351,7 +5351,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &24a5: 60               RTS
 
 ; take_damage
-; A = damage, Y = object to damage
+; A = damage, Y = stack object to damage
 &24a6: c0 00            CPY #&00                                                # is it the player being damaged?
 &24a8: d0 41            BNE &24eb ; not_player_being_damaged
 &24aa: 8d 5f 08         STA &085f ; damage
@@ -5366,13 +5366,13 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &24ba: 48               PHA
 &24bb: 2c 13 08         BIT &0813 ; protection_suit_collected                   # have we got the protection suit?
 &24be: 10 0d            BPL &24cd ; no_protection_suit
-&24c0: a2 05            LDX #&05
+&24c0: a2 05            LDX #&05						# identifies the protection suit
 &24c2: 20 79 2d         JSR &2d79 ; reduce_weapon_energy_for_x                  # drain its energy
 &24c5: 20 79 2d         JSR &2d79 ; reduce_weapon_energy_for_x
 &24c8: 20 92 2d         JSR &2d92 ; make_firing_erratic_at_low_energy
 &24cb: b0 0d            BCS &24da ; suit_working                                # carry set if suit is working
 ; no_protection_suit
-&24cd: a0 03            LDY #&03
+&24cd: a0 03            LDY #&03						# init loop counter
 &24cf: 0e 5f 08         ASL &085f ; damage
 &24d2: 90 03            BCC &24d7
 &24d4: 6e 5f 08         ROR &085f ; damage                                      # if no suit, multiply the damage by 8
@@ -5390,7 +5390,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; not_player_being_damaged
 &24eb: 85 9d            STA &9d ; damage
 &24ed: c9 08            CMP #&08
-&24ef: 90 08            BCC &24f9                                               # if the damage is &08 or more
+&24ef: 90 08            BCC &24f9                                               # branch over if the damage is more than &08 (why?)
 &24f1: b9 c6 08         LDA &08c6,Y ; object_stack_flags
 &24f4: 09 08            ORA #&08                                                # mark the object as being damaged
 &24f6: 99 c6 08         STA &08c6,Y ; object_stack_flags
@@ -5455,6 +5455,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &253b: 60               RTS
 
 ; is_this_object_damaged
+; on exit, Z will be set if the current object is marked damaged
 &253c: 48               PHA
 &253d: a5 6f            LDA &6f ; this_object_flags
 &253f: 29 08            AND #&08
@@ -5469,6 +5470,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &254b: f0 f8            BEQ &2545
 &254d: 60               RTS
 ; gain_one_energy_point_if_not_immortal
+; adds a point if the current energy level isn't 0 or FF
 &254e: e6 15            INC &15 ; this_object_energy
 &2550: c6 15            DEC &15 ; this_object_energy
 &2552: d0 f5            BNE &2549 ; gain_one_energy_point
@@ -9263,7 +9265,9 @@ maggot x = &06 a = &08
 
 &4052: a5 a2            LDA &a2 ; new_object_type
 ; pull_objects_in_from_tertiary_stack_alt
-&4054: 20 62 1e         JSR &1e62 ; reserve_objects 				# find a slot for it (Y = number to reserve)
+&4054: 20 62 1e         JSR &1e62 ; reserve_objects 				# find a slot for it 
+										# (Y is 0 so every effort will be made to find a slot on the primary object stack
+										#  on return carry will be clear if successful and Y will indicate the slot to use)
 &4057: b0 38            BCS &4091 ; restore_stack_pointer			# if no free slots, leave
 &4059: 20 67 28         JSR &2867 ; set_object_x_y_tx_ty_to_square_x_y	# set location for new object
 
@@ -9272,7 +9276,7 @@ maggot x = &06 a = &08
 &4061: aa               TAX
 
 &4062: a5 09            LDA &09 ; square_orientation				# get orientation (bits 6 and 7)
-&4064: 09 05            ORA #&05									# set bits 0 and 2
+&4064: 09 05            ORA #&05						# set bits 0 and 2 (bit 2 for marking damaged, don't yet know for bit 0)
 &4066: 99 c6 08         STA &08c6,Y ; object_stack_flags			# store flags
 
 &4069: a9 00            LDA #&00
@@ -9289,7 +9293,7 @@ maggot x = &06 a = &08
 
 &407e: 99 a3 08         STA &08a3,Y ; object_stack_y_low			# store y position high byte
 
-&4081: a5 bd            LDA &bd ; new_object_data_pointer
+&4081: a5 bd            LDA &bd ; new_object_data_pointer		# get pointer to the object data
 &4083: 99 66 09         STA &0966,Y ; object_stack_data_pointer		# store data pointer (might be 0)
 
 &4086: aa               TAX
