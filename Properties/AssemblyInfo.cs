@@ -4,12 +4,12 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("ExlieMappedBackground")]
+[assembly: AssemblyTitle("ExlieWorldGenerator")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("Freshfields Bruckhaus Deringer LLP")]
-[assembly: AssemblyProduct("ExlieMappedBackground")]
-[assembly: AssemblyCopyright("Copyright © Freshfields Bruckhaus Deringer LLP 2019")]
+[assembly: AssemblyCompany("J Saffron Consulting Ltd")]
+[assembly: AssemblyProduct("Exlie World Generator")]
+[assembly: AssemblyCopyright("Copyright © J Saffron Consulting 2019-2021")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
