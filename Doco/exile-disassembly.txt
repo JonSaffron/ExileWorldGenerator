@@ -38,6 +38,7 @@ For display purposes, not all of the bits are used:
 The non-visible lower bits are maintained to give smoother movement.
 The world is defined using 256x256 squares which correspond to the high byte in 
 the X and Y co-ordinate. Therefore each square is displayed using 16x32 pixels.
+The position of each game object identifies its top-left corner.
 
 The screen is 128x128 pixels, with each pixel taking 4 bits to give 16 colours.
 Therefore screen memory is 8Kb between &6000 and &7FFF.
@@ -507,8 +508,9 @@ type indicates the type of object that triggers the switch. bit 7 is set if anyt
 data format is tbd
 
 handle_background_object_emerging: 
-data byte format: xnnnnnyz
+data byte format: xnnnnnee
 	where nnnnn is the number of surviving objects that can emerge
+	and when ee is 0 objects will be generated, otherwise the object is disabled
 data type indicates the type of the object that is created
 
 handle_background_door:
@@ -545,6 +547,11 @@ the data byte is simply passed to the new object so is specific to the type
 #
 #   first &10 entries cover background objects. the top 4 bits of the high address are matched against the value of &2d background_processing_flag at certain points
 #
+	10 regular call, time passing
+	20 touched
+	40 in sight
+	80 display related
+
 #   no   l   h    addr  name									sprite		object created          80 40 20 10
 #   &00  &d7 &20  3ef2 handle_background_invisible_switch		(none)				                -  -  +  -		
 #   &01  &c8 &b0  3ee3 handle_background_teleport_beam     		teleporter	teleport beam			+  -  +  +
@@ -575,127 +582,127 @@ the data byte is simply passed to the new object so is specific to the type
 #   the object types are categorised into ranges by object_type_ranges which have default energy determined by energy_by_range
 #   the sprites used for each object_type are given in object_sprite_lookup and the palette used in object_palette_lookup
 #
-# r no   l   h    addr  name						  object					energy	explosion
+# r no   l   h    addr  name						  object					energy	explo	sprte	pallt	grav
 # 0:player and allies
-#   &00  &f6 &0b  &4a11 handle_player_object          player					7f		0
-#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			7f		0
-#   &02  &d5 &88  &46f0 handle_crew_member            pericles crew member		7f		80
-#   &03  &6d &84  &4288 handle_fluffy                 fluffy					7f		80
+#   &00  &f6 &0b  &4a11 handle_player_object          player					7f		0		04		3e		03
+#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			7f		0		14		1b		23
+#   &02  &d5 &88  &46f0 handle_crew_member            pericles crew member		7f		80		04		2e		23
+#   &03  &6d &84  &4288 handle_fluffy                 fluffy					7f		80		75		f2		22
 #
 # 1:nests
-# 1:&04  &94 &cd  &4baf handle_nest                   small nest				3f		c0
-#   &05  &94 &cd  &4baf handle_nest                   big nest					3f		c0
+# 1:&04  &94 &cd  &4baf handle_nest                   small nest				3f		c0		1e		32		77
+#   &05  &94 &cd  &4baf handle_nest                   big nest					3f		c0		1b		32		77
 #
 # 2:big creatures
-#   &06  &48 &86  &4463 handle_frogman_red            red frogman				7f		80
-#   &07  &5c &86  &4477 handle_frogman_green          green frogman				7f		80
-#   &08  &5a &86  &4475 handle_frogman_cyan           cyan frogman				7f		80
-#   &09  &ae &09  &47c9 handle_red_slime              red slime					7f		0
-#   &0a  &0f &04  &422a handle_green_slime            green slime				7f		0
-#   &0b  &4b &04  &4266 handle_yellow_ball            yellow ball				7f		0
-#   &0c  &6e &09  &4789 handle_sucker                 sucker					7f		0
-#   &0d  &d2 &0f  &4ded handle_sucker_deadly          deadly sucker				7f		0
-#   &0e  &46 &89  &4761 handle_big_fish               big fish					7f		80
+#   &06  &48 &86  &4463 handle_frogman_red            red frogman				7f		80		10		53		26
+#   &07  &5c &86  &4477 handle_frogman_green          green frogman				7f		80		10		05		6d
+#   &08  &5a &86  &4475 handle_frogman_cyan           cyan frogman				7f		80		10		0f		6e
+#   &09  &ae &09  &47c9 handle_red_slime              red slime					7f		0		1c		14		f7
+#   &0a  &0f &04  &422a handle_green_slime            green slime				7f		0		1c		29		6e
+#   &0b  &4b &04  &4266 handle_yellow_ball            yellow ball				7f		0		20		bc		25
+#   &0c  &6e &09  &4789 handle_sucker                 sucker					7f		0		70		65		f7
+#   &0d  &d2 &0f  &4ded handle_sucker_deadly          deadly sucker				7f		0		70		65		f7
+#   &0e  &46 &89  &4761 handle_big_fish               big fish					7f		80		61		f7		25
 #
 # 3:small creatures
-#   &0f  &ef &83  &420a handle_worm                   worm						07		80
-#   &10  &06 &d1  &4f21 handle_nest_dweller           piranha					07		c0
-#   &11  &06 &91  &4f21 handle_nest_dweller           wasp						07		80
-#
+#   &0f  &ef &83  &420a handle_worm                   worm						07		80		52		97		69
+#   &10  &06 &d1  &4f21 handle_nest_dweller           piranha					07		c0		72		d3		6b
+#   &11  &06 &91  &4f21 handle_nest_dweller           wasp						07		80		4f		c7		68
+#	
 # 4:bullets, grenades
-#   &12  &dc &c4  &42f7 handle_grenade_active         active grenade			3f		c0
-#   &13  &a4 &c8  &46bf handle_icer_bullet            icer bullet				3f		c0
-#   &14  &f9 &c7  &4614 handle_tracer_bullet          tracer bullet				3f		c0
-#   &15  &0b &c5  &4326 handle_cannonball			  cannonball				3f		c0
-#   &16  &17 &c5  &4332 handle_death_ball_blue        blue death ball			3f		c0
-#   &17  &2f &c5  &434a handle_red_bullet             red bullet				3f		c0
-#   &18  &00 &c6  &441b handle_pistol_bullet          pistol bullet				3f		c0
-#   &19  &6d &8c  &4a88 handle_plasma_ball            plasma ball				3f		80
-#   &1a  &cc &45  &43e7 handle_hover_ball             hover ball				3f		40
-#   &1b  &d0 &45  &43eb handle_hover_ball_invisible   invisible hover ball		3f		40
+#   &12  &dc &c4  &42f7 handle_grenade_active         active grenade			3f		c0		21		ef		04
+#   &13  &a4 &c8  &46bf handle_icer_bullet            icer bullet				3f		c0		08		7e		63
+#   &14  &f9 &c7  &4614 handle_tracer_bullet          tracer bullet				3f		c0		08		5f		66
+#   &15  &0b &c5  &4326 handle_cannonball			  cannonball				3f		c0		21		3c		66
+#   &16  &17 &c5  &4332 handle_death_ball_blue        blue death ball			3f		c0		21		5a		65
+#   &17  &2f &c5  &434a handle_red_bullet             red bullet				3f		c0		08		11		66
+#   &18  &00 &c6  &441b handle_pistol_bullet          pistol bullet				3f		c0		08		2d		62
+#   &19  &6d &8c  &4a88 handle_plasma_ball            plasma ball				3f		80		21		34		64
+#   &1a  &cc &45  &43e7 handle_hover_ball             hover ball				3f		40		78		e1		69
+#   &1b  &d0 &45  &43eb handle_hover_ball_invisible   invisible hover ball		3f		40		78		80		69
 #
 # 5:robots and turrets
-#   &1c  &c3 &50  &4ede handle_robot                  magenta robot				81		40
-#   &1d  &c3 &50  &4ede handle_robot                  red robot					81		40
-#   &1e  &c7 &50  &4ee2 handle_robot_blue             blue robot				81		40
-#   &1f  &bd &50  &4ed8 handle_turret                 pink/green/white turret	81		40
-#   &20  &bd &50  &4ed8 handle_turret                 cyan/red turret			81		40
-#   &21  &e9 &49  &4804 handle_hovering_robot         hovering robot			81		40
+#   &1c  &c3 &50  &4ede handle_robot                  magenta robot				81		40		13		55		24
+#   &1d  &c3 &50  &4ede handle_robot                  red robot					81		40		13		1b		25
+#   &1e  &c7 &50  &4ee2 handle_robot_blue             blue robot				81		40		13		4c		26
+#   &1f  &bd &50  &4ed8 handle_turret                 pink/green/white turret	81		40		5e		59		77
+#   &20  &bd &50  &4ed8 handle_turret                 cyan/red turret			81		40		5e		23		77
+#   &21  &e9 &49  &4804 handle_hovering_robot         hovering robot			81		40		15		72		23
 #
 # 6:flying things / imps
-#   &22  &04 &4a  &481f handle_clawed_robot           magenta clawed robot		fd		40
-#   &23  &04 &4a  &481f handle_clawed_robot           cyan clawed robot			fd		40
-#   &24  &04 &4a  &481f handle_clawed_robot           green clawed robot		fd		40
-#   &25  &04 &4a  &481f handle_clawed_robot           red clawed robot			fd		40
-#   &26  &e9 &08  &4704 handle_triax                  triax						fd		0
-#   &27  &37 &90  &4e52 handle_maggot                 maggot					fd		80
-#   &28  &55 &c3  &4170 handle_gargoyle               gargoyle					fd		c0
-#   &29  &d4 &86  &44ef handle_imp                    red/magenta imp			fd		80
-#   &2a  &d4 &86  &44ef handle_imp                    red/yellow imp			fd		80
-#   &2b  &d4 &86  &44ef handle_imp                    blue/cyan imp				fd		80
-#   &2c  &d4 &86  &44ef handle_imp                    cyan/yellow imp			fd		80
-#   &2d  &d4 &86  &44ef handle_imp                    red/cyan imp				fd		80
-#   &2e  &16 &88  &4631 handle_bird                   green/yellow bird			fd		80
-#   &2f  &16 &88  &4631 handle_bird                   white/yellow bird			fd		80
-#   &30  &06 &88  &4621 handle_bird_red               red/magenta bird			fd		80
-#   &31  &10 &88  &462b handle_bird_invisible         invisible bird			fd		80
+#   &22  &04 &4a  &481f handle_clawed_robot           magenta clawed robot		fd		40		16		2e		05
+#   &23  &04 &4a  &481f handle_clawed_robot           cyan clawed robot			fd		40		16		7b		05
+#   &24  &04 &4a  &481f handle_clawed_robot           green clawed robot		fd		40		16		77		05
+#   &25  &04 &4a  &481f handle_clawed_robot           red clawed robot			fd		40		16		33		05
+#   &26  &e9 &08  &4704 handle_triax                  triax						fd		0		04		39		04
+#   &27  &37 &90  &4e52 handle_maggot                 maggot					fd		80		52		8b		68
+#   &28  &55 &c3  &4170 handle_gargoyle               gargoyle					fd		c0		45		44		77
+#   &29  &d4 &86  &44ef handle_imp                    red/magenta imp			fd		80		64		51		6a
+#   &2a  &d4 &86  &44ef handle_imp                    red/yellow imp			fd		80		64		0d		6c
+#   &2b  &d4 &86  &44ef handle_imp                    blue/cyan imp				fd		80		64		46		6b
+#   &2c  &d4 &86  &44ef handle_imp                    cyan/yellow imp			fd		80		64		2b		6b
+#   &2d  &d4 &86  &44ef handle_imp                    red/cyan imp				fd		80		64		53		6c
+#   &2e  &16 &88  &4631 handle_bird                   green/yellow bird			fd		80		59		35		6c
+#   &2f  &16 &88  &4631 handle_bird                   white/yellow bird			fd		80		59		3c		6c
+#   &30  &06 &88  &4621 handle_bird_red               red/magenta bird			fd		80		59		02		6d
+#   &31  &10 &88  &462b handle_bird_invisible         invisible bird			fd		80		59		01		6d
 #
 # 7:lightning, mushroom balls & fire
-#   &32  &e6 &02  &4000 handle_lightning              lightning					3f		0
-#   &33  &7d &08  &4698 handle_mushroom_ball          red mushroom ball			3f		0
-#   &34  &7d &08  &4698 handle_mushroom_ball          blue mushroom ball		3f		0
-#   &35  &76 &09  &4791 handle_engine_fire            engine fire				3f		0
-#   &36  &7e &c9  &4799 handle_red_drop               red drop					3f		c0
-#   &37  &bb &0c  &4ad6 handle_fireball               flames					3f		0
+#   &32  &e6 &02  &4000 handle_lightning              lightning					3f		0		6d		70		e5
+#   &33  &7d &08  &4698 handle_mushroom_ball          red mushroom ball			3f		0		63		9c		61
+#   &34  &7d &08  &4698 handle_mushroom_ball          blue mushroom ball		3f		0		63		cf		61
+#   &35  &76 &09  &4791 handle_engine_fire            engine fire				3f		0		0b		00		e4
+#   &36  &7e &c9  &4799 handle_red_drop               red drop					3f		c0		0f		14		e5
+#   &37  &bb &0c  &4ad6 handle_fireball               flames					3f		0		17		10		e8
 #
 # 8:scenery
-#   &38  &a6 &0a  &48c1 handle_chatter_inactive       inactive chatter			ff		0
-#   &39  &0b &0d  &4b26 handle_moving_fireball        moving fireball			ff		0
-#   &3a  &81 &05  &439c handle_giant_wall             giant wall				ff		0
-#   &3b  &fa &0d  &4c15 handle_engine_thruster        engine thruster			ff		0
-#   &3c  &68 &ce  &4c83 handle_door                   horizontal door			ff		c0
-#   &3d  &68 &ce  &4c83 handle_door                   vertical door				ff		c0
-#   &3e  &68 &ce  &4c83 handle_door                   horizontal stone door		ff		c0
-#   &3f  &68 &ce  &4c83 handle_door                   vertical stone door		ff		c0
-#   &40  &8e &0d  &4ba9 handle_bush                   bush						ff		0
-#   &41  &6b &0f  &4d86 handle_teleport_beam          teleport beam				ff		0
-#   &42  &82 &cb  &499d handle_switch                 switch					ff		c0
-#   &43  &92 &05  &43ad (null function)               chest						ff		0
-#   &44  &81 &11  &4f9c handle_explosion              explosion					ff		0
-#   &45  &92 &05  &43ad (null function)               rock						ff		0
-#   &46  &d3 &02  &40ee handle_cannon                 cannon					ff		0
-#   &47  &fb &43  &4216 handle_mysterious_weapon      mysterious weapon			ff		40
-#   &48  &84 &03  &419f handle_maggot_machine         maggot machine			ff		0
-#   &49  &49 &0d  &4b64 handle_placeholder            placeholder				ff		0
+#   &38  &a6 &0a  &48c1 handle_chatter_inactive       inactive chatter			ff		0		14		4b		24
+#   &39  &0b &0d  &4b26 handle_moving_fireball        moving fireball			ff		0		17		10		ec
+#   &3a  &81 &05  &439c handle_giant_wall             giant wall				ff		0		39		0c		26
+#   &3b  &fa &0d  &4c15 handle_engine_thruster        engine thruster			ff		0		17		34		d7
+#   &3c  &68 &ce  &4c83 handle_door                   horizontal door			ff		c0		4a		6b		57
+#   &3d  &68 &ce  &4c83 handle_door                   vertical door				ff		c0		4b		6b		57
+#   &3e  &68 &ce  &4c83 handle_door                   horizontal stone door		ff		c0		3c		42		57
+#   &3f  &68 &ce  &4c83 handle_door                   vertical stone door		ff		c0		41		42		57
+#   &40  &8e &0d  &4ba9 handle_bush                   tree						ff		0		1a		31		d6
+#   &41  &6b &0f  &4d86 handle_teleport_beam          teleport beam				ff		0		71		6f		d7
+#   &42  &82 &cb  &499d handle_switch                 switch					ff		c0		2e		15		57
+#   &43  &92 &05  &43ad (null function)               chest						ff		0		5d		2e		25
+#   &44  &81 &11  &4f9c handle_explosion              explosion					ff		0		17		12		82
+#   &45  &92 &05  &43ad (null function)               rock						ff		0		20		cb		26
+#   &46  &d3 &02  &40ee handle_cannon                 cannon					ff		0		56		33		25
+#   &47  &fb &43  &4216 handle_mysterious_weapon      mysterious weapon			ff		40		57		b1		24
+#   &48  &84 &03  &419f handle_maggot_machine         maggot machine			ff		0		47		62		77
+#   &49  &49 &0d  &4b64 handle_placeholder            placeholder				ff		0		22		00		74
 #
 # 9:equipment
-#   &4a  &59 &05  &4374 handle_destinator             destinator				7d		0
-#   &4b  &45 &85  &4360 handle_energy_capsule         energy capsule			7d		80
-#   &4c  &8c &05  &43a7 handle_flask                  empty flask				7d		0
-#   &4d  &93 &05  &43ae handle_flask_full             full flask				7d		0
-#   &4e  &36 &05  &4351 handle_remote_control         remote control device		7d		0
-#   &4f  &36 &05  &4351 handle_remote_control         cannon control device		7d		0
-#   &50  &3d &c3  &4158 handle_grenade_inactive       inactive grenade			7d		c0
-#   &51  &6d &0d  &4b88 handle_collectable            cyan/yellow/green key		7d		0
-#   &52  &6d &0d  &4b88 handle_collectable            red/yellow/green key		7d		0
-#   &53  &6d &0d  &4b88 handle_collectable            green/yellow/red key		7d		0
-#   &54  &6d &0d  &4b88 handle_collectable            yellow/white/red key		7d		0
-#   &55  &af &03  &41ca handle_coronium_boulder       coronium boulder			7d		0
-#   &56  &6d &0d  &4b88 handle_collectable            red/magenta/red key		7d		0
-#   &57  &6d &0d  &4b88 handle_collectable            blue/cyan/green key		7d		0
-#   &58  &a7 &03  &41c2 handle_coronium_crystal       coronium crystal			7d		0
-#   &59  &6d &0d  &4b88 handle_collectable            jetpack booster			7d		0
-#   &5a  &6d &0d  &4b88 handle_collectable            pistol					7d		0
-#   &5b  &6d &0d  &4b88 handle_collectable            icer						7d		0
-#   &5c  &6d &0d  &4b88 handle_collectable            discharge device			7d		0
-#   &5d  &6d &0d  &4b88 handle_collectable            plasma gun				7d		0
-#   &5e  &6d &0d  &4b88 handle_collectable            protection suit			7d		0
-#   &5f  &6d &0d  &4b88 handle_collectable            fire immunity device		7d		0
-#   &60  &6d &0d  &4b88 handle_collectable            mushroom immunity pill	7d		0
-#   &61  &6d &0d  &4b88 handle_collectable            whistle 1					7d		0
-#   &62  &6d &0d  &4b88 handle_collectable            whistle 2					7d		0
-#   &63  &6d &0d  &4b88 handle_collectable            radiation immunity pill	7d		0
-#   &64  &92 &05  &43ad (null function)               ?							7d		0
+#   &4a  &59 &05  &4374 handle_destinator             destinator				7d		0		60		db		24
+#   &4b  &45 &85  &4360 handle_energy_capsule         energy capsule			7d		80		7b		9f		02
+#   &4c  &8c &05  &43a7 handle_flask                  empty flask				7d		0		76		8f		22
+#   &4d  &93 &05  &43ae handle_flask_full             full flask				7d		0		76		cf		24
+#   &4e  &36 &05  &4351 handle_remote_control         remote control device		7d		0		58		e5		22
+#   &4f  &36 &05  &4351 handle_remote_control         cannon control device		7d		0		58		8e		22
+#   &50  &3d &c3  &4158 handle_grenade_inactive       inactive grenade			7d		c0		21		ef		24
+#   &51  &6d &0d  &4b88 handle_collectable            cyan/yellow/green key		7d		0		4d		ab		23
+#   &52  &6d &0d  &4b88 handle_collectable            red/yellow/green key		7d		0		4d		ad		23
+#   &53  &6d &0d  &4b88 handle_collectable            green/yellow/red key		7d		0		4d		95		23
+#   &54  &6d &0d  &4b88 handle_collectable            yellow/white/red key		7d		0		4d		9c		23
+#   &55  &af &03  &41ca handle_coronium_boulder       coronium boulder			7d		0		20		91		25
+#   &56  &6d &0d  &4b88 handle_collectable            red/magenta/red key		7d		0		4d		92		23
+#   &57  &6d &0d  &4b88 handle_collectable            blue/cyan/green key		7d		0		4d		a6		23
+#   &58  &a7 &03  &41c2 handle_coronium_crystal       coronium crystal			7d		0		22		91		02
+#   &59  &6d &0d  &4b88 handle_collectable            jetpack booster			7d		0		6b		b1		26
+#   &5a  &6d &0d  &4b88 handle_collectable            pistol					7d		0		6c		8e		23
+#   &5b  &6d &0d  &4b88 handle_collectable            icer						7d		0		6c		e0		23
+#   &5c  &6d &0d  &4b88 handle_collectable            discharge device			7d		0		79		a2		23
+#   &5d  &6d &0d  &4b88 handle_collectable            plasma gun				7d		0		6c		b5		23
+#   &5e  &6d &0d  &4b88 handle_collectable            protection suit			7d		0		04		b3		26
+#   &5f  &6d &0d  &4b88 handle_collectable            fire immunity device		7d		0		7a		e3		25
+#   &60  &6d &0d  &4b88 handle_collectable            mushroom immunity pill	7d		0		63		d5		22
+#   &61  &6d &0d  &4b88 handle_collectable            whistle 1					7d		0		7c		e3		22
+#   &62  &6d &0d  &4b88 handle_collectable            whistle 2					7d		0		7c		d7		22
+#   &63  &6d &0d  &4b88 handle_collectable            radiation immunity pill	7d		0		79		f0		25
+#   &64  &92 &05  &43ad (null function)               ?							7d		0		77		f1		e7
 #
 ###############################################################################
 
@@ -736,10 +743,11 @@ the data byte is simply passed to the new object so is specific to the type
 
 ; object_handler_table
 ; low byte of addresses of handler routines which are stored relative to the address of handlers_start
-;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  0  1  2  3
-#03b9: d7 c8 a4 7d 7a 9c 9c 9c b2 00 00 26 6f 88 fd b7 7b a3 a0 aa ; for background objects / explosions
+;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  
+#03b9: d7 c8 a4 7d 7a 9c 9c 9c b2 00 00 26 6f 88 fd b7			# background objects
+#03c9: 7b a3 a0 aa												# explosions
 
-#03cd: f6 bc d5 6d 94 94 48 5c 5a ae 0f 4b 6e d2 46 ef ; 00
+#03cd: f6 bc d5 6d 94 94 48 5c 5a ae 0f 4b 6e d2 46 ef ; 00		# stack objects
 #03dd: 06 06 dc a4 f9 0b 17 2f 00 6d cc d0 c3 c3 c7 bd ; 10
 #03ed: bd e9 04 04 04 04 e9 37 55 d4 d4 d4 d4 d4 16 16 ; 20
 #03fd: 06 10 e6 7d 7d 76 7e bb a6 0b 81 fa 68 68 68 68 ; 30
@@ -971,6 +979,7 @@ These are a list of square_x values in sections delimited by background_objects_
 #0803: 00 00 00
 
 ; keys_collected
+; set to FF when collected
 #0806: 00 ; cyan/yellow/green key
 #0807: 00 ; red/yellow/green key
 #0808: 00 ; green/yellow/red key
@@ -1097,284 +1106,293 @@ These are a list of square_x values in sections delimited by background_objects_
 #								  handler = background_objects_handler_lookup
 #								  new_object_data_pointer = no + background_objects_data_offset[r]
 #								  new_object_type_pointer = new_object_data_pointer + background_objects_type_offset[r]
-# r no    x            square s&o   data         type            x, y    handler: object
-# 0:&00 : &05ef = &ff  &06ee = &89  &0987 = &7c  &0a72 = &0f  (&ff, &??) &09 object_emerging_from_sucker/bush : worm (x 31) (unused?)
-#   &01 : &05f0 = &ff  &06ef = &89  &0988 = &60  &0a73 = &27  (&ff, &??) &09 object_emerging_from_sucker/bush : maggot (x 24) (unused?)
-#   &02 : &05f1 = &b0  &06f0 = &89  &0989 = &04  &0a74 = &2e  (&b0, &4e) &09 object_emerging_from_sucker/bush : green/yellow bird - the first npc we meet
-#   &03 : &05f2 = &ec  &06f1 = &89  &098a = &88  &0a75 = &07  (&ec, &c0) &09 object_emerging_from_sucker/bush : green frogman (x 2)
-#   &04 : &05f3 = &77  &06f2 = &89  &098b = &88  &0a76 = &2f  (&77, &54) &09 object_emerging_from_sucker/bush : white/yellow bird (x 2)
-#   &05 : &05f4 = &64  &06f3 = &8a  &098c = &a0  &0a77 = &2d  (&64, &94) &0a object_emerging_from_pipe_end : red/cyan imp (x 8)
-#   &06 : &05f5 = &9a  &06f4 = &46  &098d = &a6  &0a78 = &1f  (&9a, &80) &06 object_from_type : green/white turret
-#   &07 : &05f6 = &af  &06f5 = &c6  &098e = &ae  &0a79 = &1f  (&af, &61) &06 object_from_type : green/white turret
-#   &08 : &05f7 = &da  &06f6 = &06  &098f = &83  &0a7a = &0d  (&da, &80) &06 object_from_type : deadly sucker
-#   &09 : &05f8 = &c6  &06f7 = &06  &0990 = &86  &0a7b = &0d  (&c6, &c0) &06 object_from_type : deadly sucker
-#   &0a : &05f9 = &36  &06f8 = &46  &0991 = &82  &0a7c = &0d  (&36, &8c) &06 object_from_type : deadly sucker
-#   &0b : &05fa = &9f  &06f9 = &05  &0992 = &80  &0a7d = &0c  (&9f, &c0) &05 object_from_type_half_wall : sucker
-#   &0c : &05fb = &2e  &06fa = &05  &0993 = &80  &0a7e = &60  (&2e, &94) &05 object_from_type_half_wall : mushroom immunity pull
-#   &0d : &05fc = &a9  &06fb = &00  &0994 = &ad  &0a7f = &2c  (&a9, &9c) &00: invisible switch (triggered by cyan/yellow imp)
-#   &0e : &05fd = &9c  &06fc = &c3  &0995 = &81  &0a80 = &00  (&9c, &3c) &03: door (type value is unused)
-#   &0f : &05fe = &83  &06fd = &04  &0996 = &f7      n/a      (&83, &77) &04: stone door
+# range 0
+# no	id	x            square s&o   data         type            x, y    handler: object
+# &00	 1	&05ef = &ff  &06ee = &89  &0987 = &7c  &0a72 = &0f  (&ff, &??) &09 object_emerging_from_sucker/bush : worm (x 31) (used for random emergents in process_events)
+# &01	 2	&05f0 = &ff  &06ef = &89  &0988 = &60  &0a73 = &27  (&ff, &??) &09 object_emerging_from_sucker/bush : maggot (x 24) (used for random emergents in process_events)
+# &02	 3	&05f1 = &b0  &06f0 = &89  &0989 = &04  &0a74 = &2e  (&b0, &4e) &09 object_emerging_from_sucker/bush : green/yellow bird - the first npc we meet
+# &03	 4	&05f2 = &ec  &06f1 = &89  &098a = &88  &0a75 = &07  (&ec, &c0) &09 object_emerging_from_sucker/bush : green frogman (x 2)
+# &04	 5	&05f3 = &77  &06f2 = &89  &098b = &88  &0a76 = &2f  (&77, &54) &09 object_emerging_from_sucker/bush : white/yellow bird (x 2)
+# &05	 6	&05f4 = &64  &06f3 = &8a  &098c = &a0  &0a77 = &2d  (&64, &94) &0a object_emerging_from_pipe_end : red/cyan imp (x 8)
+# &06	 7	&05f5 = &9a  &06f4 = &46  &098d = &a6  &0a78 = &1f  (&9a, &80) &06 object_from_type : green/white turret
+# &07	 8	&05f6 = &af  &06f5 = &c6  &098e = &ae  &0a79 = &1f  (&af, &61) &06 object_from_type : green/white turret
+# &08	 9	&05f7 = &da  &06f6 = &06  &098f = &83  &0a7a = &0d  (&da, &80) &06 object_from_type : deadly sucker
+# &09	 a	&05f8 = &c6  &06f7 = &06  &0990 = &86  &0a7b = &0d  (&c6, &c0) &06 object_from_type : deadly sucker
+# &0a	 b	&05f9 = &36  &06f8 = &46  &0991 = &82  &0a7c = &0d  (&36, &8c) &06 object_from_type : deadly sucker
+# &0b	 c	&05fa = &9f  &06f9 = &05  &0992 = &80  &0a7d = &0c  (&9f, &c0) &05 object_from_type_half_wall : sucker
+# &0c	 d	&05fb = &2e  &06fa = &05  &0993 = &80  &0a7e = &60  (&2e, &94) &05 object_from_type_half_wall : mushroom immunity pull
+# &0d	 e	&05fc = &a9  &06fb = &00  &0994 = &ad  &0a7f = &2c  (&a9, &9c) &00: invisible switch (triggered by cyan/yellow imp)
+# &0e	 f	&05fd = &9c  &06fc = &c3  &0995 = &81  &0a80 = &00  (&9c, &3c) &03: door (type value is unused)
+# &0f	10	&05fe = &83  &06fd = &04  &0996 = &f7      n/a      (&83, &77) &04: stone door
 
-#   &10 : &05ff = &88  &06fe = &83  &0997 = &a1      n/a      (&88, &72) &03: door
-#   &11 : &0600 = &5f  &06ff = &84  &0998 = &f1      n/a      (&5f, &c0) &04: stone door
-#   &12 : &0601 = &57  &0700 = &84  &0999 = &f7      n/a      (&57, &94) &04: stone door
-#   &13 : &0602 = &bf  &0701 = &83  &099a = &81      n/a      (&bf, &80) &03: door
-#   &14 : &0603 = &9d  &0702 = &88  &099b = &8a      n/a      (&9d, &3b) &08: switch
-#   &15 : &0604 = &4d  &0703 = &48  &099c = &ac      n/a      (&4d, &80) &08: switch
-#   &16 : &0605 = &45  &0704 = &02  &099d = &d2      n/a      (&45, &4e) &02 object_from_data : 52 red/yellow/green key
-#   &17 : &0606 = &81  &0705 = &02  &099e = &df      n/a      (&81, &75) &02 object_from_data : 5f fire immunity device
-#   &18 : &0607 = &b3  &0706 = &42  &099f = &d4      n/a      (&b3, &??) &02 object_from_data : 54 yellow/white/red key
-#   &19 : &0608 = &3f  &0707 = &02  &09a0 = &a3      n/a      (&3f, &??) &02 object_from_data : 23 cyan clawed robot
-#   &1a : &0609 = &cb  &0708 = &7b      n/a          n/a      (&cb, &??) &3b scenery : brick wall, 3/4 filled bottom (unused)
-#   &1b : &060a = &40  &0709 = &22      n/a          n/a      (&40, &??) &22 scenery : transporter? (unused)
-#   &1c : &060b = &4c  &070a = &1e      n/a          n/a      (&4c, &??) &1e scenery : brick wall
+# &10	11	&05ff = &88  &06fe = &83  &0997 = &a1      n/a      (&88, &72) &03: door
+# &11	12	&0600 = &5f  &06ff = &84  &0998 = &f1      n/a      (&5f, &c0) &04: stone door
+# &12	13	&0601 = &57  &0700 = &84  &0999 = &f7      n/a      (&57, &94) &04: stone door
+# &13	14	&0602 = &bf  &0701 = &83  &099a = &81      n/a      (&bf, &80) &03: door
+# &14	15	&0603 = &9d  &0702 = &88  &099b = &8a      n/a      (&9d, &3b) &08: switch
+# &15	16	&0604 = &4d  &0703 = &48  &099c = &ac      n/a      (&4d, &80) &08: switch
+# &16	17	&0605 = &45  &0704 = &02  &099d = &d2      n/a      (&45, &4e) &02 object_from_data : 52 red/yellow/green key
+# &17	18	&0606 = &81  &0705 = &02  &099e = &df      n/a      (&81, &75) &02 object_from_data : 5f fire immunity device
+# &18	19	&0607 = &b3  &0706 = &42  &099f = &d4      n/a      (&b3, &??) &02 object_from_data : 54 yellow/white/red key
+# &19	1a	&0608 = &3f  &0707 = &02  &09a0 = &a3      n/a      (&3f, &??) &02 object_from_data : 23 cyan clawed robot
+# &1a		&0609 = &cb  &0708 = &7b      n/a          n/a      (&cb, &??) &3b scenery : brick wall, 3/4 filled bottom (unused)
+# &1b		&060a = &40  &0709 = &22      n/a          n/a      (&40, &??) &22 scenery : transporter? (unused)
+# &1c		&060b = &4c  &070a = &1e      n/a          n/a      (&4c, &??) &1e scenery : brick wall
 
-# 1:&1d : &060c = &ca  &070b = &06  &09a1 = &84  &0a81 = &0d  (&ca, &58) &06 object_from_type : deadly sucker
-#   &1e : &060d = &2f  &070c = &06  &09a2 = &85  &0a82 = &0d  (&2f, &94) &06 object_from_type : deadly sucker
-#   &1f : &060e = &a7  &070d = &c6  &09a3 = &ae  &0a83 = &1f  (&a7, &80) &06 object_from_type : green/white turret
+# range 1
+# &1d	1b	&060c = &ca  &070b = &06  &09a1 = &84  &0a81 = &0d  (&ca, &58) &06 object_from_type : deadly sucker
+# &1e	1c	&060d = &2f  &070c = &06  &09a2 = &85  &0a82 = &0d  (&2f, &94) &06 object_from_type : deadly sucker
+# &1f	1d	&060e = &a7  &070d = &c6  &09a3 = &ae  &0a83 = &1f  (&a7, &80) &06 object_from_type : green/white turret
 
-#   &20 : &060f = &56  &070e = &06  &09a4 = &80  &0a84 = &0d  (&56, &94) &06 object_from_type : deadly sucker
-#   &21 : &0610 = &34  &070f = &46  &09a5 = &80  &0a85 = &5c  (&34, &8c) &06 object_from_type : discharge device
-#   &22 : &0611 = &e3  &0710 = &46  &09a6 = &88  &0a86 = &0d  (&e3, &98) &06 object_from_type : deadly sucker
-#   &23 : &0612 = &3b  &0711 = &85  &09a7 = &ac  &0a87 = &20  (&3b, &c0) &05 object_from_type_half_wall : cyan/red turret
-#   &24 : &0613 = &e4  &0712 = &85  &09a8 = &c4  &0a88 = &05  (&e4, &80) &05 object_from_type_half_wall : big nest
-#   &25 : &0614 = &80  &0713 = &87  &09a9 = &c0  &0a89 = &04  (&80, &c5) &07 object_from_type_foliage : small nest
-#   &26 : &0615 = &e0  &0714 = &89  &09aa = &04  &0a8a = &06  (&e0, &98) &09 object_emerging_from_sucker/bush : red frogman
-#   &27 : &0616 = &64  &0715 = &89  &09ab = &a8  &0a8b = &31  (&64, &80) &09 object_emerging_from_sucker/bush : invisible bird (x 10)
-#   &28 : &0617 = &37  &0716 = &c7  &09ac = &c4  &0a8c = &05  (&37, &8c) &07 object_from_type_foliage : big nest
-#   &29 : &0618 = &47  &0717 = &0a  &09ad = &bc  &0a8d = &2a  (&47, &c0) &0a object_emerging_from_pipe_end : red/yellow imp (x 15)
-#   &2a : &0619 = &9f  &0718 = &8c  &09ae = &fd      n/a      (&9f, &3a) &0c: engine thruster
-#   &2b : &061a = &9c  &0719 = &03  &09af = &81      n/a      (&9c, &3d) &03: door
-#   &2c : &061b = &aa  &071a = &84  &09b0 = &c1      n/a      (&aa, &98) &04: stone door
-#   &2d : &061c = &9b  &071b = &83  &09b1 = &d1      n/a      (&9b, &80) &03: door
-#   &2e : &061d = &9a  &071c = &43  &09b2 = &91      n/a      (&9a, &5c) &03: door
-#   &2f : &061e = &5e  &071d = &84  &09b3 = &f1      n/a      (&5e, &c0) &04: stone door
+# &20	1e	&060f = &56  &070e = &06  &09a4 = &80  &0a84 = &0d  (&56, &94) &06 object_from_type : deadly sucker
+# &21	1f	&0610 = &34  &070f = &46  &09a5 = &80  &0a85 = &5c  (&34, &8c) &06 object_from_type : discharge device
+# &22	20	&0611 = &e3  &0710 = &46  &09a6 = &88  &0a86 = &0d  (&e3, &98) &06 object_from_type : deadly sucker
+# &23	21	&0612 = &3b  &0711 = &85  &09a7 = &ac  &0a87 = &20  (&3b, &c0) &05 object_from_type_half_wall : cyan/red turret
+# &24	22	&0613 = &e4  &0712 = &85  &09a8 = &c4  &0a88 = &05  (&e4, &80) &05 object_from_type_half_wall : big nest
+# &25	23	&0614 = &80  &0713 = &87  &09a9 = &c0  &0a89 = &04  (&80, &c5) &07 object_from_type_foliage : small nest
+# &26	24	&0615 = &e0  &0714 = &89  &09aa = &04  &0a8a = &06  (&e0, &98) &09 object_emerging_from_sucker/bush : red frogman
+# &27	25	&0616 = &64  &0715 = &89  &09ab = &a8  &0a8b = &31  (&64, &80) &09 object_emerging_from_sucker/bush : invisible bird (x 10)
+# &28	26	&0617 = &37  &0716 = &c7  &09ac = &c4  &0a8c = &05  (&37, &8c) &07 object_from_type_foliage : big nest
+# &29	27	&0618 = &47  &0717 = &0a  &09ad = &bc  &0a8d = &2a  (&47, &c0) &0a object_emerging_from_pipe_end : red/yellow imp (x 15)
+# &2a	28	&0619 = &9f  &0718 = &8c  &09ae = &fd      n/a      (&9f, &3a) &0c: engine thruster
+# &2b	29	&061a = &9c  &0719 = &03  &09af = &81      n/a      (&9c, &3d) &03: door
+# &2c	2a	&061b = &aa  &071a = &84  &09b0 = &c1      n/a      (&aa, &98) &04: stone door
+# &2d	2b	&061c = &9b  &071b = &83  &09b1 = &d1      n/a      (&9b, &80) &03: door
+# &2e	2c	&061d = &9a  &071c = &43  &09b2 = &91      n/a      (&9a, &5c) &03: door
+# &2f	2d	&061e = &5e  &071d = &84  &09b3 = &f1      n/a      (&5e, &c0) &04: stone door
 
-#   &30 : &061f = &c7  &071e = &84  &09b4 = &f1      n/a      (&c7, &c0) &04: stone door
-#   &31 : &0620 = &8a  &071f = &02  &09b5 = &da      n/a      (&8a, &71) &02 object_from_data : pistol
-#   &32 : &0621 = &60  &0720 = &01  &09b6 = &f7      n/a      (&60, &98) &01: teleport beam
-#   &33 : &0622 = &9d  &0721 = &41  &09b7 = &f3      n/a      (&9d, &49) &01: teleport beam
-#   &34 : &0623 = &a2  &0722 = &01  &09b8 = &d8      n/a      (&a2, &58) &01: teleport beam
-#   &35 : &0624 = &b2  &0723 = &01  &09b9 = &88      n/a      (&b2, &80) &01: teleport beam
-#   &36 : &0625 = &98  &0724 = &2e      n/a          n/a      (&98, &80) &2e scenery : half wall triangle
-#   &37 : &0626 = &a9  &0725 = &1e      n/a          n/a      (&a9, &80) &1e scenery : full brick wall
-#   &38 : &0627 = &db  &0726 = &3b      n/a          n/a      (&db, &80) &3b scenery : brick wall, top quarter empty
+# &30	2e	&061f = &c7  &071e = &84  &09b4 = &f1      n/a      (&c7, &c0) &04: stone door
+# &31	2f	&0620 = &8a  &071f = &02  &09b5 = &da      n/a      (&8a, &71) &02 object_from_data : pistol
+# &32	30	&0621 = &60  &0720 = &01  &09b6 = &f7      n/a      (&60, &98) &01: teleport beam
+# &33	31	&0622 = &9d  &0721 = &41  &09b7 = &f3      n/a      (&9d, &49) &01: teleport beam
+# &34	32	&0623 = &a2  &0722 = &01  &09b8 = &d8      n/a      (&a2, &58) &01: teleport beam
+# &35	33	&0624 = &b2  &0723 = &01  &09b9 = &88      n/a      (&b2, &80) &01: teleport beam
+# &36		&0625 = &98  &0724 = &2e      n/a          n/a      (&98, &80) &2e scenery : half wall triangle
+# &37		&0626 = &a9  &0725 = &1e      n/a          n/a      (&a9, &80) &1e scenery : full brick wall
+# &38		&0627 = &db  &0726 = &3b      n/a          n/a      (&db, &80) &3b scenery : brick wall, top quarter empty
 
-# 2:&39 : &0628 = &28  &0727 = &46  &09ba = &80  &0a8e = &09  (&28, &98) &06 object_from_type : red slime
-#   &3a : &0629 = &29  &0728 = &46  &09bb = &83  &0a8f = &0d  (&29, &98) &06 object_from_type : deadly sucker
-#   &3b : &062a = &3c  &0729 = &06  &09bc = &83  &0a90 = &0d  (&3c, &80) &06 object_from_type : deadly sucker
-#   &3c : &062b = &98  &072a = &c6  &09bd = &b0  &0a91 = &1f  (&98, &4e) &06 object_from_type : green/white turret
-#   &3d : &062c = &63  &072b = &06  &09be = &aa  &0a92 = &20  (&63, &c0) &06 object_from_type : cyan/red turret
-#   &3e : &062d = &cb  &072c = &06  &09bf = &80  &0a93 = &55  (&cb, &dc) &06 object_from_type : coronium boulder
-#   &3f : &062e = &61  &072d = &06  &09c0 = &80  &0a94 = &55  (&61, &c6) &06 object_from_type : coronium boulder
+# range 2
+# &39	34	&0628 = &28  &0727 = &46  &09ba = &80  &0a8e = &09  (&28, &98) &06 object_from_type : red slime
+# &3a	35	&0629 = &29  &0728 = &46  &09bb = &83  &0a8f = &0d  (&29, &98) &06 object_from_type : deadly sucker
+# &3b	36	&062a = &3c  &0729 = &06  &09bc = &83  &0a90 = &0d  (&3c, &80) &06 object_from_type : deadly sucker
+# &3c	37	&062b = &98  &072a = &c6  &09bd = &b0  &0a91 = &1f  (&98, &4e) &06 object_from_type : green/white turret
+# &3d	38	&062c = &63  &072b = &06  &09be = &aa  &0a92 = &20  (&63, &c0) &06 object_from_type : cyan/red turret
+# &3e	39	&062d = &cb  &072c = &06  &09bf = &80  &0a93 = &55  (&cb, &dc) &06 object_from_type : coronium boulder
+# &3f	3a	&062e = &61  &072d = &06  &09c0 = &80  &0a94 = &55  (&61, &c6) &06 object_from_type : coronium boulder
 
-#   &40 : &062f = &a3  &072e = &46  &09c1 = &87  &0a95 = &0d  (&a3, &c0) &06 object_from_type : deadly sucker
-#   &41 : &0630 = &ce  &072f = &06  &09c2 = &80  &0a96 = &63  (&ce, &d8) &06 object_from_type : radiation immunity pull
-#   &42 : &0631 = &e9  &0730 = &09  &09c3 = &30  &0a97 = &0f  (&e9, &98) &09 object_emerging_from_sucker/bush : worm (x 12)
-#   &43 : &0632 = &80  &0731 = &c9  &09c4 = &08  &0a98 = &2e  (&80, &88) &09 object_emerging_from_sucker/bush : green/yellow bird (x 2)
-#   &44 : &0633 = &2e  &0732 = &89  &09c5 = &10  &0a99 = &0a  (&2e, &98) &09 object_emerging_from_sucker/bush : green slime (x 4)
-#   &45 : &0634 = &4f  &0733 = &ca  &09c6 = &7c  &0a9a = &1b  (&4f, &80) &0a object_emerging_from_pipe_end : invisible hover ball (x 31)
-#   &46 : &0635 = &79  &0734 = &8a  &09c7 = &04  &0a9b = &37  (&79, &76) &0a object_emerging_from_pipe_end : fireball
-#   &47 : &0636 = &87  &0735 = &8a  &09c8 = &10  &0a9c = &29  (&87, &bf) &0a object_emerging_from_pipe_end : red/magenta imp (x 4)
-#   &48 : &0637 = &b6  &0736 = &0a  &09c9 = &a8  &0a9d = &1a  (&b6, &80) &0a object_emerging_from_pipe_end : hover ball (x 10)
-#   &49 : &0638 = &97  &0737 = &4a  &09ca = &90  &0a9e = &1a  (&97, &5c) &0a object_emerging_from_pipe_end : hover ball (x 4)
-#   &4a : &0639 = &2d  &0738 = &8a  &09cb = &04  &0a9f = &37  (&2d, &c7) &0a object_emerging_from_pipe_end : fireball
-#   &4b : &063a = &d6  &0739 = &04  &09cc = &c1      n/a      (&d6, &72) &04: stone door
-#   &4c : &063b = &5c  &073a = &44  &09cd = &f1      n/a      (&5c, &b8) &04: stone door
-#   &4d : &063c = &a0  &073b = &41  &09ce = &e1      n/a      (&a0, &63) &01: teleport beam
-#   &4e : &063d = &74  &073c = &01  &09cf = &95      n/a      (&74, &54) &01: teleport beam
-#   &4f : &063e = &6a  &073d = &c8  &09d0 = &bc      n/a      (&6a, &de) &08: switch
+# &40	3b	&062f = &a3  &072e = &46  &09c1 = &87  &0a95 = &0d  (&a3, &c0) &06 object_from_type : deadly sucker
+# &41	3c	&0630 = &ce  &072f = &06  &09c2 = &80  &0a96 = &63  (&ce, &d8) &06 object_from_type : radiation immunity pull
+# &42	3d	&0631 = &e9  &0730 = &09  &09c3 = &30  &0a97 = &0f  (&e9, &98) &09 object_emerging_from_sucker/bush : worm (x 12)
+# &43	3e	&0632 = &80  &0731 = &c9  &09c4 = &08  &0a98 = &2e  (&80, &88) &09 object_emerging_from_sucker/bush : green/yellow bird (x 2)
+# &44	3f	&0633 = &2e  &0732 = &89  &09c5 = &10  &0a99 = &0a  (&2e, &98) &09 object_emerging_from_sucker/bush : green slime (x 4)
+# &45	40	&0634 = &4f  &0733 = &ca  &09c6 = &7c  &0a9a = &1b  (&4f, &80) &0a object_emerging_from_pipe_end : invisible hover ball (x 31)
+# &46	41	&0635 = &79  &0734 = &8a  &09c7 = &04  &0a9b = &37  (&79, &76) &0a object_emerging_from_pipe_end : fireball
+# &47	42	&0636 = &87  &0735 = &8a  &09c8 = &10  &0a9c = &29  (&87, &bf) &0a object_emerging_from_pipe_end : red/magenta imp (x 4)
+# &48	43	&0637 = &b6  &0736 = &0a  &09c9 = &a8  &0a9d = &1a  (&b6, &80) &0a object_emerging_from_pipe_end : hover ball (x 10)
+# &49	44	&0638 = &97  &0737 = &4a  &09ca = &90  &0a9e = &1a  (&97, &5c) &0a object_emerging_from_pipe_end : hover ball (x 4)
+# &4a	45	&0639 = &2d  &0738 = &8a  &09cb = &04  &0a9f = &37  (&2d, &c7) &0a object_emerging_from_pipe_end : fireball
+# &4b	46	&063a = &d6  &0739 = &04  &09cc = &c1      n/a      (&d6, &72) &04: stone door
+# &4c	47	&063b = &5c  &073a = &44  &09cd = &f1      n/a      (&5c, &b8) &04: stone door
+# &4d	48	&063c = &a0  &073b = &41  &09ce = &e1      n/a      (&a0, &63) &01: teleport beam
+# &4e	49	&063d = &74  &073c = &01  &09cf = &95      n/a      (&74, &54) &01: teleport beam
+# &4f	4a	&063e = &6a  &073d = &c8  &09d0 = &bc      n/a      (&6a, &de) &08: switch
 
-#   &50 : &063f = &a1  &073e = &48  &09d1 = &b4      n/a      (&a1, &58) &08: switch
-#   &51 : &0640 = &9f  &073f = &cc  &09d2 = &fd      n/a      (&9f, &3b) &0c: engine thruster
-#   &52 : &0641 = &89  &0740 = &82  &09d3 = &a1      n/a      (&89, &72) &02 object_from_data : hovering robot
-#   &53 : &0642 = &85  &0741 = &02  &09d4 = &d6      n/a      (&85, &bf) &02 object_from_data : red/magenta/red key
-#   &54 : &0643 = &6b  &0742 = &02  &09d5 = &dd      n/a      (&6b, &88) &02 object_from_data : plasma gun
-#   &55 : &0644 = &ae  &0743 = &02  &09d6 = &e2      n/a      (&ae, &98) &02 object_from_data : whistle 2
-#   &56 : &0645 = &65  &0744 = &1e      n/a          n/a      (&65, &b4) &1e scenery : brick wall
+# &50	4b	&063f = &a1  &073e = &48  &09d1 = &b4      n/a      (&a1, &58) &08: switch
+# &51	4c	&0640 = &9f  &073f = &cc  &09d2 = &fd      n/a      (&9f, &3b) &0c: engine thruster
+# &52	4d	&0641 = &89  &0740 = &82  &09d3 = &a1      n/a      (&89, &72) &02 object_from_data : hovering robot
+# &53	4e	&0642 = &85  &0741 = &02  &09d4 = &d6      n/a      (&85, &bf) &02 object_from_data : red/magenta/red key
+# &54	4f	&0643 = &6b  &0742 = &02  &09d5 = &dd      n/a      (&6b, &88) &02 object_from_data : plasma gun
+# &55	50	&0644 = &ae  &0743 = &02  &09d6 = &e2      n/a      (&ae, &98) &02 object_from_data : whistle 2
+# &56		&0645 = &65  &0744 = &1e      n/a          n/a      (&65, &b4) &1e scenery : brick wall
 
-# 3:&57 : &0646 = &e2  &0745 = &89  &09d7 = &04  &0aa0 = &37  (&e2, &c0) &09 object_emerging_from_sucker/bush : fireball
-#   &58 : &0647 = &ed  &0746 = &09  &09d8 = &0c  &0aa1 = &0a  (&ed, &bc) &09 object_emerging_from_sucker/bush : green slime (x 3)
-#   &59 : &0648 = &80  &0747 = &0a  &09d9 = &04  &0aa2 = &37  (&80, &54) &0a object_emerging_from_pipe_end : fireball
-#   &5a : &0649 = &cd  &0748 = &4a  &09da = &20  &0aa3 = &4b  (&cd, &7c) &0a object_emerging_from_pipe_end : energy capsule (x 8)
-#   &5b : &064a = &a8  &0749 = &ca  &09db = &21  &0aa4 = &4b  (&a8, &68) &0a object_emerging_from_pipe_end : energy capsule (x 8)
-#   &5c : &064b = &2b  &074a = &4a  &09dc = &a0  &0aa5 = &2d  (&2b, &80) &0a object_emerging_from_pipe_end : red/cyan imp (x 8)
-#   &5d : &064c = &ab  &074b = &86  &09dd = &b0  &0aa6 = &1f  (&ab, &80) &06 object_from_type : green/white turret
-#   &5e : &064d = &9d  &074c = &46  &09de = &ac  &0aa7 = &20  (&9d, &6f) &06 object_from_type : cyan/red turret
-#   &5f : &064e = &62  &074d = &46  &09df = &83  &0aa8 = &0d  (&62, &c0) &06 object_from_type : deadly sucker
+# range 3
+# &57	51	&0646 = &e2  &0745 = &89  &09d7 = &04  &0aa0 = &37  (&e2, &c0) &09 object_emerging_from_sucker/bush : fireball
+# &58	52	&0647 = &ed  &0746 = &09  &09d8 = &0c  &0aa1 = &0a  (&ed, &bc) &09 object_emerging_from_sucker/bush : green slime (x 3)
+# &59	53	&0648 = &80  &0747 = &0a  &09d9 = &04  &0aa2 = &37  (&80, &54) &0a object_emerging_from_pipe_end : fireball
+# &5a	54	&0649 = &cd  &0748 = &4a  &09da = &20  &0aa3 = &4b  (&cd, &7c) &0a object_emerging_from_pipe_end : energy capsule (x 8)
+# &5b	55	&064a = &a8  &0749 = &ca  &09db = &21  &0aa4 = &4b  (&a8, &68) &0a object_emerging_from_pipe_end : energy capsule (x 8)
+# &5c	56	&064b = &2b  &074a = &4a  &09dc = &a0  &0aa5 = &2d  (&2b, &80) &0a object_emerging_from_pipe_end : red/cyan imp (x 8)
+# &5d	57	&064c = &ab  &074b = &86  &09dd = &b0  &0aa6 = &1f  (&ab, &80) &06 object_from_type : green/white turret
+# &5e	58	&064d = &9d  &074c = &46  &09de = &ac  &0aa7 = &20  (&9d, &6f) &06 object_from_type : cyan/red turret
+# &5f	59	&064e = &62  &074d = &46  &09df = &83  &0aa8 = &0d  (&62, &c0) &06 object_from_type : deadly sucker
 
-#   &60 : &064f = &e5  &074e = &46  &09e0 = &81  &0aa9 = &0d  (&e5, &bc) &06 object_from_type : deadly sucker
-#   &61 : &0650 = &70  &074f = &86  &09e1 = &84  &0aaa = &28  (&70, &88) &06 object_from_type : gargoyle
-#   &62 : &0651 = &ec  &0750 = &45  &09e2 = &80  &0aab = &55  (&ec, &bc) &05 object_from_type_half_wall : coronium boulder
-#   &63 : &0652 = &83  &0751 = &47  &09e3 = &c4  &0aac = &05  (&83, &5c) &07 object_from_type_foliage : big nest
-#   &64 : &0653 = &c1  &0752 = &00  &09e4 = &85  &0aad = &80  (&c1, &7c) &00: invisible switch (triggered by anything)
-#   &65 : &0654 = &c6  &0753 = &00  &09e5 = &95  &0aae = &00  (&c6, &7c) &00: invisible switch (triggered by player)
-#   &66 : &0655 = &67  &0754 = &00  &09e6 = &a3  &0aaf = &80  (&67, &da) &00: invisible switch (triggered by anything)
-#   &67 : &0656 = &eb  &0755 = &00  &09e7 = &b5  &0ab0 = &80  (&eb, &bc) &00: invisible switch (triggered by anything)
-#   &68 : &0657 = &2d  &0756 = &84  &09e8 = &f1      n/a      (&2d, &94) &04: stone door
-#   &69 : &0658 = &98  &0757 = &c3  &09e9 = &ad      n/a      (&98, &54) &03: door
-#   &6a : &0659 = &aa  &0758 = &44  &09ea = &c1      n/a      (&aa, &9c) &04: stone door
-#   &6b : &065a = &cc  &0759 = &43  &09eb = &81      n/a      (&cc, &7c) &03: door
-#   &6c : &065b = &a5  &075a = &43  &09ec = &89      n/a      (&a5, &80) &03: door
-#   &6d : &065c = &9e  &075b = &43  &09ed = &a0      n/a      (&9e, &6b) &03: door
-#   &6e : &065d = &a2  &075c = &44  &09ee = &c1      n/a      (&a2, &c0) &04: stone door
-#   &6f : &065e = &d7  &075d = &84  &09ef = &f1      n/a      (&d7, &c0) &04: stone door
+# &60	5a	&064f = &e5  &074e = &46  &09e0 = &81  &0aa9 = &0d  (&e5, &bc) &06 object_from_type : deadly sucker
+# &61	5b	&0650 = &70  &074f = &86  &09e1 = &84  &0aaa = &28  (&70, &88) &06 object_from_type : gargoyle
+# &62	5c	&0651 = &ec  &0750 = &45  &09e2 = &80  &0aab = &55  (&ec, &bc) &05 object_from_type_half_wall : coronium boulder
+# &63	5d	&0652 = &83  &0751 = &47  &09e3 = &c4  &0aac = &05  (&83, &5c) &07 object_from_type_foliage : big nest
+# &64	5e	&0653 = &c1  &0752 = &00  &09e4 = &85  &0aad = &80  (&c1, &7c) &00: invisible switch (triggered by anything)
+# &65	5f	&0654 = &c6  &0753 = &00  &09e5 = &95  &0aae = &00  (&c6, &7c) &00: invisible switch (triggered by player)
+# &66	60	&0655 = &67  &0754 = &00  &09e6 = &a3  &0aaf = &80  (&67, &da) &00: invisible switch (triggered by anything)
+# &67	61	&0656 = &eb  &0755 = &00  &09e7 = &b5  &0ab0 = &80  (&eb, &bc) &00: invisible switch (triggered by anything)
+# &68	62	&0657 = &2d  &0756 = &84  &09e8 = &f1      n/a      (&2d, &94) &04: stone door
+# &69	63	&0658 = &98  &0757 = &c3  &09e9 = &ad      n/a      (&98, &54) &03: door
+# &6a	64	&0659 = &aa  &0758 = &44  &09ea = &c1      n/a      (&aa, &9c) &04: stone door
+# &6b	65	&065a = &cc  &0759 = &43  &09eb = &81      n/a      (&cc, &7c) &03: door
+# &6c	66	&065b = &a5  &075a = &43  &09ec = &89      n/a      (&a5, &80) &03: door
+# &6d	67	&065c = &9e  &075b = &43  &09ed = &a0      n/a      (&9e, &6b) &03: door
+# &6e	68	&065d = &a2  &075c = &44  &09ee = &c1      n/a      (&a2, &c0) &04: stone door
+# &6f	69	&065e = &d7  &075d = &84  &09ef = &f1      n/a      (&d7, &c0) &04: stone door
 
-#   &70 : &065f = &e6  &075e = &44  &09f0 = &f1      n/a      (&e6, &bc) &04: stone door
-#   &71 : &0660 = &e7  &075f = &04  &09f1 = &c1      n/a      (&e7, &bc) &04: stone door
-#   &72 : &0661 = &94  &0760 = &01  &09f2 = &8c      n/a      (&94, &5c) &01: teleport beam
-#   &73 : &0662 = &7c  &0761 = &08  &09f3 = &a4      n/a      (&7c, &c0) &08: switch
-#   &74 : &0663 = &e3  &0762 = &08  &09f4 = &e4      n/a      (&e3, &9c) &08: switch
-#   &75 : &0664 = &45  &0763 = &02  &09f5 = &d7      n/a      (&45, &c0) &02 object_from_data : blue/cyan/green key
-#   &76 : &0665 = &9b  &0764 = &02  &09f6 = &9d      n/a      (&9b, &66) &02 object_from_data : red robot
-#   &77 : &0666 = &9f  &0765 = &82  &09f7 = &e1      n/a      (&9f, &73) &02 object_from_data : whistle 1
-#   &78 : &0667 = &c2  &0766 = &1e      n/a          n/a      (&c2, &7c) &1e scenery : brick wall
-#   &79 : &0668 = &71  &0767 = &2d      n/a          n/a      (&71, &88) &2d scenery : stone wall
+# &70	6a	&065f = &e6  &075e = &44  &09f0 = &f1      n/a      (&e6, &bc) &04: stone door
+# &71	6b	&0660 = &e7  &075f = &04  &09f1 = &c1      n/a      (&e7, &bc) &04: stone door
+# &72	6c	&0661 = &94  &0760 = &01  &09f2 = &8c      n/a      (&94, &5c) &01: teleport beam
+# &73	6d	&0662 = &7c  &0761 = &08  &09f3 = &a4      n/a      (&7c, &c0) &08: switch
+# &74	6e	&0663 = &e3  &0762 = &08  &09f4 = &e4      n/a      (&e3, &9c) &08: switch
+# &75	6f	&0664 = &45  &0763 = &02  &09f5 = &d7      n/a      (&45, &c0) &02 object_from_data : blue/cyan/green key
+# &76	70	&0665 = &9b  &0764 = &02  &09f6 = &9d      n/a      (&9b, &66) &02 object_from_data : red robot
+# &77	71	&0666 = &9f  &0765 = &82  &09f7 = &e1      n/a      (&9f, &73) &02 object_from_data : whistle 1
+# &78		&0667 = &c2  &0766 = &1e      n/a          n/a      (&c2, &7c) &1e scenery : brick wall
+# &79		&0668 = &71  &0767 = &2d      n/a          n/a      (&71, &88) &2d scenery : stone wall
 
-# 4:&7a : &0669 = &67  &0768 = &46  &09f8 = &a6  &0ab1 = &20  (&67, &c8) &06 object_from_type : cyan/red turret
-#   &7b : &066a = &4f  &0769 = &46  &09f9 = &81  &0ab2 = &28  (&4f, &b8) &06 object_from_type : gargoyle
-#   &7c : &066b = &cf  &076a = &45  &09fa = &85  &0ab3 = &0d  (&cf, &b8) &05 object_from_type_half_wall : deadly sucker
-#   &7d : &066c = &d2  &076b = &46  &09fb = &83  &0ab4 = &0d  (&d2, &9d) &06 object_from_type : deadly sucker
-#   &7e : &066d = &e2  &076c = &c6  &09fc = &83  &0ab5 = &28  (&e2, &b8) &06 object_from_type : gargoyle
-#   &7f : &066e = &7a  &076d = &89  &09fd = &d0  &0ab6 = &27  (&7a, &94) &09 object_emerging_from_sucker/bush : maggot (x 20)
+# range 4
+# &7a	72	&0669 = &67  &0768 = &46  &09f8 = &a6  &0ab1 = &20  (&67, &c8) &06 object_from_type : cyan/red turret
+# &7b	73	&066a = &4f  &0769 = &46  &09f9 = &81  &0ab2 = &28  (&4f, &b8) &06 object_from_type : gargoyle
+# &7c	74	&066b = &cf  &076a = &45  &09fa = &85  &0ab3 = &0d  (&cf, &b8) &05 object_from_type_half_wall : deadly sucker
+# &7d	75	&066c = &d2  &076b = &46  &09fb = &83  &0ab4 = &0d  (&d2, &9d) &06 object_from_type : deadly sucker
+# &7e	76	&066d = &e2  &076c = &c6  &09fc = &83  &0ab5 = &28  (&e2, &b8) &06 object_from_type : gargoyle
+# &7f	77	&066e = &7a  &076d = &89  &09fd = &d0  &0ab6 = &27  (&7a, &94) &09 object_emerging_from_sucker/bush : maggot (x 20)
 
-#   &80 : &066f = &62  &076e = &c9  &09fe = &a8  &0ab7 = &31  (&62, &72) &09 object_emerging_from_sucker/bush : invisible bird (x 10)
-#   &81 : &0670 = &da  &076f = &49  &09ff = &04  &0ab8 = &0e  (&da, &d8) &09 object_emerging_from_sucker/bush : big fish
-#   &82 : &0671 = &76  &0770 = &89  &0a00 = &04  &0ab9 = &08  (&76, &94) &09 object_emerging_from_sucker/bush : cyan frogman
-#   &83 : &0672 = &b2  &0771 = &ca  &0a01 = &d0  &0aba = &11  (&b2, &8d) &0a object_emerging_from_pipe_end : wasp (x 20)
-#   &84 : &0673 = &66  &0772 = &ca  &0a02 = &88  &0abb = &39  (&66, &66) &0a object_emerging_from_pipe_end : moving fireball (x 2)
-#   &85 : &0674 = &d7  &0773 = &8a  &0a03 = &04  &0abc = &37  (&d7, &6e) &0a object_emerging_from_pipe_end : fireball
-#   &86 : &0675 = &83  &0774 = &8a  &0a04 = &04  &0abd = &37  (&83, &78) &0a object_emerging_from_pipe_end : fireball
-#   &87 : &0676 = &84  &0775 = &8a  &0a05 = &04  &0abe = &37  (&84, &6c) &0a object_emerging_from_pipe_end : fireball
-#   &88 : &0677 = &80  &0776 = &0a  &0a06 = &08  &0abf = &2a  (&80, &75) &0a object_emerging_from_pipe_end : red/yellow imp (x 2)
-#   &89 : &0678 = &87  &0777 = &00  &0a07 = &bd  &0ac0 = &80  (&87, &77) &00: invisible switch (triggered by player)
-#   &8a : &0679 = &9b  &0778 = &00  &0a08 = &8a  &0ac1 = &4a  (&9b, &3b) &00: invisible switch (triggered by destinator)
-#   &8b : &067a = &50  &0779 = &c4  &0a09 = &f1      n/a      (&50, &60) &04: stone door
-#   &8c : &067b = &ae  &077a = &43  &0a0a = &d1      n/a      (&ae, &62) &03: door
-#   &8d : &067c = &64  &077b = &04  &0a0b = &f1      n/a      (&64, &c8) &04: stone door
-#   &8e : &067d = &a3  &077c = &43  &0a0c = &b1      n/a      (&a3, &69) &03: door
-#   &8f : &067e = &63  &077d = &84  &0a0d = &f1      n/a      (&63, &cc) &04: stone door
+# &80	78	&066f = &62  &076e = &c9  &09fe = &a8  &0ab7 = &31  (&62, &72) &09 object_emerging_from_sucker/bush : invisible bird (x 10)
+# &81	79	&0670 = &da  &076f = &49  &09ff = &04  &0ab8 = &0e  (&da, &d8) &09 object_emerging_from_sucker/bush : big fish
+# &82	7a	&0671 = &76  &0770 = &89  &0a00 = &04  &0ab9 = &08  (&76, &94) &09 object_emerging_from_sucker/bush : cyan frogman
+# &83	7b	&0672 = &b2  &0771 = &ca  &0a01 = &d0  &0aba = &11  (&b2, &8d) &0a object_emerging_from_pipe_end : wasp (x 20)
+# &84	7c	&0673 = &66  &0772 = &ca  &0a02 = &88  &0abb = &39  (&66, &66) &0a object_emerging_from_pipe_end : moving fireball (x 2)
+# &85	7d	&0674 = &d7  &0773 = &8a  &0a03 = &04  &0abc = &37  (&d7, &6e) &0a object_emerging_from_pipe_end : fireball
+# &86	7e	&0675 = &83  &0774 = &8a  &0a04 = &04  &0abd = &37  (&83, &78) &0a object_emerging_from_pipe_end : fireball
+# &87	7f	&0676 = &84  &0775 = &8a  &0a05 = &04  &0abe = &37  (&84, &6c) &0a object_emerging_from_pipe_end : fireball
+# &88	80	&0677 = &80  &0776 = &0a  &0a06 = &08  &0abf = &2a  (&80, &75) &0a object_emerging_from_pipe_end : red/yellow imp (x 2)
+# &89	81	&0678 = &87  &0777 = &00  &0a07 = &bd  &0ac0 = &80  (&87, &77) &00: invisible switch (triggered by player)
+# &8a	82	&0679 = &9b  &0778 = &00  &0a08 = &8a  &0ac1 = &4a  (&9b, &3b) &00: invisible switch (triggered by destinator)
+# &8b	83	&067a = &50  &0779 = &c4  &0a09 = &f1      n/a      (&50, &60) &04: stone door
+# &8c	84	&067b = &ae  &077a = &43  &0a0a = &d1      n/a      (&ae, &62) &03: door
+# &8d	85	&067c = &64  &077b = &04  &0a0b = &f1      n/a      (&64, &c8) &04: stone door
+# &8e	86	&067d = &a3  &077c = &43  &0a0c = &b1      n/a      (&a3, &69) &03: door
+# &8f	87	&067e = &63  &077d = &84  &0a0d = &f1      n/a      (&63, &cc) &04: stone door
 
-#   &90 : &067f = &b8  &077e = &44  &0a0e = &c1      n/a      (&b8, &c5) &04: stone door
-#   &91 : &0680 = &7f  &077f = &04  &0a0f = &c1      n/a      (&7f, &94) &04: stone door
-#   &92 : &0681 = &82  &0780 = &44  &0a10 = &c1      n/a      (&82, &c3) &04: stone door
-#   &93 : &0682 = &e0  &0781 = &84  &0a11 = &c1      n/a      (&e0, &b8) &04: stone door
-#   &94 : &0683 = &9c  &0782 = &41  &0a12 = &e2      n/a      (&9c, &66) &01: teleport beam
-#   &95 : &0684 = &61  &0783 = &01  &0a13 = &e4      n/a      (&61, &d9) &01: teleport beam
-#   &96 : &0685 = &9d  &0784 = &01  &0a14 = &dc      n/a      (&9d, &58) &01: teleport beam
-#   &97 : &0686 = &29  &0785 = &01  &0a15 = &a0      n/a      (&29, &c6) &01: teleport beam
-#   &98 : &0687 = &46  &0786 = &c8  &0a16 = &c2      n/a      (&46, &56) &08: switch
-#   &99 : &0688 = &9f  &0787 = &42  &0a17 = &cb      n/a      (&9f, &6b) &02 object_from_data : energy capsule
-#   &9a : &0689 = &9a  &0788 = &82  &0a18 = &b8      n/a      (&9a, &66) &02 object_from_data : inactive chatter
-#   &9b : &068a = &74  &0789 = &3b      n/a          n/a      (&74, &94) &3b scenery : brick wall, top quarter empty
-#   &9c : &068b = &75  &078a = &11      n/a          n/a      (&75, &94) &11 scenery : grass frond
-#   &9d : &068c = &77  &078b = &3b      n/a          n/a      (&77, &94) &3b scenery : brick wall, top quarter empty
+# &90	88	&067f = &b8  &077e = &44  &0a0e = &c1      n/a      (&b8, &c5) &04: stone door
+# &91	89	&0680 = &7f  &077f = &04  &0a0f = &c1      n/a      (&7f, &94) &04: stone door
+# &92	8a	&0681 = &82  &0780 = &44  &0a10 = &c1      n/a      (&82, &c3) &04: stone door
+# &93	8b	&0682 = &e0  &0781 = &84  &0a11 = &c1      n/a      (&e0, &b8) &04: stone door
+# &94	8c	&0683 = &9c  &0782 = &41  &0a12 = &e2      n/a      (&9c, &66) &01: teleport beam
+# &95	8d	&0684 = &61  &0783 = &01  &0a13 = &e4      n/a      (&61, &d9) &01: teleport beam
+# &96	8e	&0685 = &9d  &0784 = &01  &0a14 = &dc      n/a      (&9d, &58) &01: teleport beam
+# &97	8f	&0686 = &29  &0785 = &01  &0a15 = &a0      n/a      (&29, &c6) &01: teleport beam
+# &98	90	&0687 = &46  &0786 = &c8  &0a16 = &c2      n/a      (&46, &56) &08: switch
+# &99	91	&0688 = &9f  &0787 = &42  &0a17 = &cb      n/a      (&9f, &6b) &02 object_from_data : energy capsule
+# &9a	92	&0689 = &9a  &0788 = &82  &0a18 = &b8      n/a      (&9a, &66) &02 object_from_data : inactive chatter
+# &9b		&068a = &74  &0789 = &3b      n/a          n/a      (&74, &94) &3b scenery : brick wall, top quarter empty
+# &9c		&068b = &75  &078a = &11      n/a          n/a      (&75, &94) &11 scenery : grass frond
+# &9d		&068c = &77  &078b = &3b      n/a          n/a      (&77, &94) &3b scenery : brick wall, top quarter empty
 
-# 5:&9e : &068d = &b2  &078c = &89  &0a19 = &a8  &0ac2 = &10  (&b2, &c2) &09 object_emerging_from_sucker/bush : pirahna (x 10)
-#   &9f : &068e = &e4  &078d = &c9  &0a1a = &10  &0ac3 = &2f  (&e4, &b4) &09 object_emerging_from_sucker/bush : white/yellow bird (x 4)
+# range 5
+# &9e	93	&068d = &b2  &078c = &89  &0a19 = &a8  &0ac2 = &10  (&b2, &c2) &09 object_emerging_from_sucker/bush : pirahna (x 10)
+# &9f	94	&068e = &e4  &078d = &c9  &0a1a = &10  &0ac3 = &2f  (&e4, &b4) &09 object_emerging_from_sucker/bush : white/yellow bird (x 4)
 
-#   &a0 : &068f = &62  &078e = &ca  &0a1b = &98  &0ac4 = &30  (&62, &a2) &0a object_emerging_from_pipe_end : red/magenta bird (x 6)
-#   &a1 : &0690 = &63  &078f = &8a  &0a1c = &a0  &0ac5 = &30  (&63, &b5) &0a object_emerging_from_pipe_end : red/magenta bird (x 8)
-#   &a2 : &0691 = &82  &0790 = &c6  &0a1d = &80  &0ac6 = &09  (&82, &bf) &06 object_from_type : red slime
-#   &a3 : &0692 = &61  &0791 = &06  &0a1e = &83  &0ac7 = &0d  (&61, &c7) &06 object_from_type : deadly sucker
-#   &a4 : &0693 = &d4  &0792 = &c6  &0a1f = &80  &0ac8 = &09  (&d4, &bf) &06 object_from_type : red slime
-#   &a5 : &0694 = &d3  &0793 = &c6  &0a20 = &80  &0ac9 = &09  (&d3, &be) &06 object_from_type : red slime
-#   &a6 : &0695 = &77  &0794 = &06  &0a21 = &80  &0aca = &4f  (&77, &aa) &06 object_from_type : cannon control device
-#   &a7 : &0696 = &2e  &0795 = &06  &0a22 = &80  &0acb = &24  (&2e, &d6) &06 object_from_type : green clawed robot
-#   &a8 : &0697 = &64  &0796 = &85  &0a23 = &00  &0acc = &4a  (&64, &d6) &05 object_from_type_half_wall : destinator
-#   &a9 : &0698 = &86  &0797 = &47  &0a24 = &c4  &0acd = &04  (&86, &56) &07 object_from_type_foliage : small nest
-#   &aa : &0699 = &a5  &0798 = &4a  &0a25 = &40  &0ace = &1a  (&a5, &e7) &0a object_emerging_from_pipe_end : hover ball (x 16)
-#   &ab : &069a = &a0  &0799 = &ca  &0a26 = &84  &0acf = &39  (&a0, &bf) &0a object_emerging_from_pipe_end : moving fireball
-#   &ac : &069b = &d1  &079a = &8a  &0a27 = &28  &0ad0 = &10  (&d1, &d3) &0a object_emerging_from_pipe_end : pirahna (x 10)
-#   &ad : &069c = &b4  &079b = &00  &0a28 = &75  &0ad1 = &00  (&b4, &c2) &00: invisible switch (triggered by player)
-#   &ae : &069d = &7f  &079c = &00  &0a29 = &bc  &0ad2 = &4c  (&7f, &77) &00: invisible switch (triggered by empty flask)
-#   &af : &069e = &a3  &079d = &44  &0a2a = &f1      n/a      (&a3, &63) &04: stone door
+# &a0	95	&068f = &62  &078e = &ca  &0a1b = &98  &0ac4 = &30  (&62, &a2) &0a object_emerging_from_pipe_end : red/magenta bird (x 6)
+# &a1	96	&0690 = &63  &078f = &8a  &0a1c = &a0  &0ac5 = &30  (&63, &b5) &0a object_emerging_from_pipe_end : red/magenta bird (x 8)
+# &a2	97	&0691 = &82  &0790 = &c6  &0a1d = &80  &0ac6 = &09  (&82, &bf) &06 object_from_type : red slime
+# &a3	98	&0692 = &61  &0791 = &06  &0a1e = &83  &0ac7 = &0d  (&61, &c7) &06 object_from_type : deadly sucker
+# &a4	99	&0693 = &d4  &0792 = &c6  &0a1f = &80  &0ac8 = &09  (&d4, &bf) &06 object_from_type : red slime
+# &a5	9a	&0694 = &d3  &0793 = &c6  &0a20 = &80  &0ac9 = &09  (&d3, &be) &06 object_from_type : red slime
+# &a6	9b	&0695 = &77  &0794 = &06  &0a21 = &80  &0aca = &4f  (&77, &aa) &06 object_from_type : cannon control device
+# &a7	9c	&0696 = &2e  &0795 = &06  &0a22 = &80  &0acb = &24  (&2e, &d6) &06 object_from_type : green clawed robot
+# &a8	9d	&0697 = &64  &0796 = &85  &0a23 = &00  &0acc = &4a  (&64, &d6) &05 object_from_type_half_wall : destinator
+# &a9	9e	&0698 = &86  &0797 = &47  &0a24 = &c4  &0acd = &04  (&86, &56) &07 object_from_type_foliage : small nest
+# &aa	9f	&0699 = &a5  &0798 = &4a  &0a25 = &40  &0ace = &1a  (&a5, &e7) &0a object_emerging_from_pipe_end : hover ball (x 16)
+# &ab	a0	&069a = &a0  &0799 = &ca  &0a26 = &84  &0acf = &39  (&a0, &bf) &0a object_emerging_from_pipe_end : moving fireball
+# &ac	a1	&069b = &d1  &079a = &8a  &0a27 = &28  &0ad0 = &10  (&d1, &d3) &0a object_emerging_from_pipe_end : pirahna (x 10)
+# &ad	a2	&069c = &b4  &079b = &00  &0a28 = &75  &0ad1 = &00  (&b4, &c2) &00: invisible switch (triggered by player)
+# &ae	a3	&069d = &7f  &079c = &00  &0a29 = &bc  &0ad2 = &4c  (&7f, &77) &00: invisible switch (triggered by empty flask)
+# &af	a4	&069e = &a3  &079d = &44  &0a2a = &f1      n/a      (&a3, &63) &04: stone door
 
-#   &b0 : &069f = &9f  &079e = &43  &0a2b = &d1      n/a      (&9f, &71) &03: door
-#   &b1 : &06a0 = &99  &079f = &c3  &0a2c = &a9      n/a      (&99, &4c) &03: door
-#   &b2 : &06a1 = &80  &07a0 = &44  &0a2d = &f1      n/a      (&80, &77) &04: stone door
-#   &b3 : &06a2 = &67  &07a1 = &44  &0a2e = &c0      n/a      (&67, &ce) &04: stone door
-#   &b4 : &06a3 = &da  &07a2 = &04  &0a2f = &c1      n/a      (&da, &6d) &04: stone door
-#   &b5 : &06a4 = &89  &07a3 = &41  &0a30 = &8f      n/a      (&89, &71) &01: teleport beam
-#   &b6 : &06a5 = &95  &07a4 = &c8  &0a31 = &94      n/a      (&95, &5d) &08: switch
-#   &b7 : &06a6 = &8b  &07a5 = &88  &0a32 = &c2      n/a      (&8b, &71) &08: switch
-#   &b8 : &06a7 = &ab  &07a6 = &c8  &0a33 = &ca      n/a      (&ab, &6b) &08: switch
-#   &b9 : &06a8 = &c4  &07a7 = &c8  &0a34 = &fa      n/a      (&c4, &c4) &08: switch
-#   &ba : &06a9 = &9d  &07a8 = &02  &0a35 = &9c      n/a      (&9d, &5d) &02 object_from_data : magenta robot
-#   &bb : &06aa = &aa  &07a9 = &8c  &0a36 = &fe      n/a      (&aa, &61) &0c: engine thruster
+# &b0	a5	&069f = &9f  &079e = &43  &0a2b = &d1      n/a      (&9f, &71) &03: door
+# &b1	a6	&06a0 = &99  &079f = &c3  &0a2c = &a9      n/a      (&99, &4c) &03: door
+# &b2	a7	&06a1 = &80  &07a0 = &44  &0a2d = &f1      n/a      (&80, &77) &04: stone door
+# &b3	a8	&06a2 = &67  &07a1 = &44  &0a2e = &c0      n/a      (&67, &ce) &04: stone door
+# &b4	a9	&06a3 = &da  &07a2 = &04  &0a2f = &c1      n/a      (&da, &6d) &04: stone door
+# &b5	aa	&06a4 = &89  &07a3 = &41  &0a30 = &8f      n/a      (&89, &71) &01: teleport beam
+# &b6	ab	&06a5 = &95  &07a4 = &c8  &0a31 = &94      n/a      (&95, &5d) &08: switch
+# &b7	ac	&06a6 = &8b  &07a5 = &88  &0a32 = &c2      n/a      (&8b, &71) &08: switch
+# &b8	ad	&06a7 = &ab  &07a6 = &c8  &0a33 = &ca      n/a      (&ab, &6b) &08: switch
+# &b9	ae	&06a8 = &c4  &07a7 = &c8  &0a34 = &fa      n/a      (&c4, &c4) &08: switch
+# &ba	af	&06a9 = &9d  &07a8 = &02  &0a35 = &9c      n/a      (&9d, &5d) &02 object_from_data : magenta robot
+# &bb	b0	&06aa = &aa  &07a9 = &8c  &0a36 = &fe      n/a      (&aa, &61) &0c: engine thruster
 
-# 6:&bc : &06ab = &bb  &07aa = &49  &0a37 = &10  &0ad3 = &0a  (&bb, &c3) &09 object_emerging_from_sucker/bush : green slime (x 4)
-#   &bd : &06ac = &47  &07ab = &89  &0a38 = &14  &0ad4 = &2f  (&47, &59) &09 object_emerging_from_sucker/bush : white/yellow bird (x 5)
-#   &be : &06ad = &8a  &07ac = &0a  &0a39 = &90  &0ad5 = &29  (&8a, &78) &0a object_emerging_from_pipe_end : red/magenta imp (x 4)
-#   &bf : &06ae = &a7  &07ad = &0a  &0a3a = &98  &0ad6 = &2c  (&a7, &9a) &0a object_emerging_from_pipe_end : cyan/yellow imp (x 6)
+# range 6
+# &bc	b1	&06ab = &bb  &07aa = &49  &0a37 = &10  &0ad3 = &0a  (&bb, &c3) &09 object_emerging_from_sucker/bush : green slime (x 4)
+# &bd	b2	&06ac = &47  &07ab = &89  &0a38 = &14  &0ad4 = &2f  (&47, &59) &09 object_emerging_from_sucker/bush : white/yellow bird (x 5)
+# &be	b3	&06ad = &8a  &07ac = &0a  &0a39 = &90  &0ad5 = &29  (&8a, &78) &0a object_emerging_from_pipe_end : red/magenta imp (x 4)
+# &bf	b4	&06ae = &a7  &07ad = &0a  &0a3a = &98  &0ad6 = &2c  (&a7, &9a) &0a object_emerging_from_pipe_end : cyan/yellow imp (x 6)
 
-#   &c0 : &06af = &61  &07ae = &8a  &0a3b = &04  &0ad7 = &37  (&61, &d7) &0a object_emerging_from_pipe_end : fireball
-#   &c1 : &06b0 = &9e  &07af = &c6  &0a3c = &a4  &0ad8 = &20  (&9e, &51) &06 object_from_type : cyan/red turret
-#   &c2 : &06b1 = &2e  &07b0 = &06  &0a3d = &80  &0ad9 = &3a  (&2e, &c8) &06 object_from_type : giant wall
-#   &c3 : &06b2 = &d6  &07b1 = &06  &0a3e = &83  &0ada = &0d  (&d6, &a1) &06 object_from_type : deadly sucker
-#   &c4 : &06b3 = &7e  &07b2 = &47  &0a3f = &c6  &0adb = &05  (&7e, &76) &07 object_from_type_foliage : big nest
-#   &c5 : &06b4 = &da  &07b3 = &87  &0a40 = &c4  &0adc = &05  (&da, &6e) &07 object_from_type_foliage : big nest
-#   &c6 : &06b5 = &aa  &07b4 = &cc  &0a41 = &fe      n/a      (&aa, &62) &0c: engine thruster
-#   &c7 : &06b6 = &ab  &07b5 = &41  &0a42 = &aa      n/a      (&ab, &69) &01: teleport beam
-#   &c8 : &06b7 = &45  &07b6 = &01  &0a43 = &90      n/a      (&45, &57) &01: teleport beam
-#   &c9 : &06b8 = &67  &07b7 = &08  &0a44 = &ec      n/a      (&67, &cb) &08: switch
-#   &ca : &06b9 = &d4  &07b8 = &08  &0a45 = &dc      n/a      (&d4, &6f) &08: switch
-#   &cb : &06ba = &29  &07b9 = &08  &0a46 = &9e      n/a      (&29, &c8) &08: switch
-#   &cc : &06bb = &b8  &07ba = &08  &0a47 = &f4      n/a      (&b8, &c3) &08: switch
-#   &cd : &06bc = &6b  &07bb = &c4  &0a48 = &f7      n/a      (&6b, &e1) &04: stone door
-#   &ce : &06bd = &69  &07bc = &84  &0a49 = &f1      n/a      (&69, &de) &04: stone door
-#   &cf : &06be = &9d  &07bd = &43  &0a4a = &f1      n/a      (&9d, &56) &03: door
+# &c0	b5	&06af = &61  &07ae = &8a  &0a3b = &04  &0ad7 = &37  (&61, &d7) &0a object_emerging_from_pipe_end : fireball
+# &c1	b6	&06b0 = &9e  &07af = &c6  &0a3c = &a4  &0ad8 = &20  (&9e, &51) &06 object_from_type : cyan/red turret
+# &c2	b7	&06b1 = &2e  &07b0 = &06  &0a3d = &80  &0ad9 = &3a  (&2e, &c8) &06 object_from_type : giant wall
+# &c3	b8	&06b2 = &d6  &07b1 = &06  &0a3e = &83  &0ada = &0d  (&d6, &a1) &06 object_from_type : deadly sucker
+# &c4	b9	&06b3 = &7e  &07b2 = &47  &0a3f = &c6  &0adb = &05  (&7e, &76) &07 object_from_type_foliage : big nest
+# &c5	ba	&06b4 = &da  &07b3 = &87  &0a40 = &c4  &0adc = &05  (&da, &6e) &07 object_from_type_foliage : big nest
+# &c6	bb	&06b5 = &aa  &07b4 = &cc  &0a41 = &fe      n/a      (&aa, &62) &0c: engine thruster
+# &c7	bc	&06b6 = &ab  &07b5 = &41  &0a42 = &aa      n/a      (&ab, &69) &01: teleport beam
+# &c8	bd	&06b7 = &45  &07b6 = &01  &0a43 = &90      n/a      (&45, &57) &01: teleport beam
+# &c9	be	&06b8 = &67  &07b7 = &08  &0a44 = &ec      n/a      (&67, &cb) &08: switch
+# &ca	bf	&06b9 = &d4  &07b8 = &08  &0a45 = &dc      n/a      (&d4, &6f) &08: switch
+# &cb	c0	&06ba = &29  &07b9 = &08  &0a46 = &9e      n/a      (&29, &c8) &08: switch
+# &cc	c1	&06bb = &b8  &07ba = &08  &0a47 = &f4      n/a      (&b8, &c3) &08: switch
+# &cd	c2	&06bc = &6b  &07bb = &c4  &0a48 = &f7      n/a      (&6b, &e1) &04: stone door
+# &ce	c3	&06bd = &69  &07bc = &84  &0a49 = &f1      n/a      (&69, &de) &04: stone door
+# &cf	c4	&06be = &9d  &07bd = &43  &0a4a = &f1      n/a      (&9d, &56) &03: door
 
-#   &d0 : &06bf = &94  &07be = &43  &0a4b = &81      n/a      (&94, &5f) &03: door
-#   &d1 : &06c0 = &63  &07bf = &84  &0a4c = &f1      n/a      (&63, &ca) &04: stone door
-#   &d2 : &06c1 = &b4  &07c0 = &04  &0a4d = &f1      n/a      (&b4, &c3) &04: stone door
-#   &d3 : &06c2 = &a1  &07c1 = &83  &0a4e = &b1      n/a      (&a1, &6b) &03: door
-#   &d4 : &06c3 = &9f  &07c2 = &82  &0a4f = &db      n/a      (&9f, &57) &02 object_from_data : icer
-#   &d5 : &06c4 = &a0  &07c3 = &82  &0a50 = &9e      n/a      (&a0, &6b) &02 object_from_data : blue robot
-#   &d6 : &06c5 = &57  &07c4 = &0d      n/a          n/a      (&57, &69) &0d: water
-#   &d7 : &06c6 = &e1  &07c5 = &0d      n/a          n/a      (&e1, &73) &0d: water
+# &d0	c5	&06bf = &94  &07be = &43  &0a4b = &81      n/a      (&94, &5f) &03: door
+# &d1	c6	&06c0 = &63  &07bf = &84  &0a4c = &f1      n/a      (&63, &ca) &04: stone door
+# &d2	c7	&06c1 = &b4  &07c0 = &04  &0a4d = &f1      n/a      (&b4, &c3) &04: stone door
+# &d3	c8	&06c2 = &a1  &07c1 = &83  &0a4e = &b1      n/a      (&a1, &6b) &03: door
+# &d4	c9	&06c3 = &9f  &07c2 = &82  &0a4f = &db      n/a      (&9f, &57) &02 object_from_data : icer
+# &d5	ca	&06c4 = &a0  &07c3 = &82  &0a50 = &9e      n/a      (&a0, &6b) &02 object_from_data : blue robot
+# &d6		&06c5 = &57  &07c4 = &0d      n/a          n/a      (&57, &69) &0d: water
+# &d7		&06c6 = &e1  &07c5 = &0d      n/a          n/a      (&e1, &73) &0d: water
 
-# 7:&d8 : &06c7 = &7f  &07c6 = &46  &0a51 = &84  &0add = &0d  (&7f, &c1) &06 object_from_type : deadly sucker
-#   &d9 : &06c8 = &a6  &07c7 = &06  &0a52 = &ac  &0ade = &20  (&a6, &69) &06 object_from_type : cyan/red turret
-#   &da : &06c9 = &b4  &07c8 = &06  &0a53 = &80  &0adf = &0d  (&b4, &c5) &06 object_from_type : deadly sucker
-#   &db : &06ca = &53  &07c9 = &06  &0a54 = &80  &0ae0 = &0d  (&53, &95) &06 object_from_type : deadly sucker
-#   &dc : &06cb = &61  &07ca = &06  &0a55 = &80  &0ae1 = &48  (&61, &d8) &06 object_from_type : maggot machine
-#   &dd : &06cc = &d4  &07cb = &45  &0a56 = &80  &0ae2 = &51  (&d4, &73) &05 object_from_type_half_wall : cyan/yellow/green key
-#   &de : &06cd = &82  &07cc = &45  &0a57 = &80  &0ae3 = &0c  (&82, &c5) &05 object_from_type_half_wall : sucker
-#   &df : &06ce = &e3  &07cd = &45  &0a58 = &80  &0ae4 = &55  (&e3, &b5) &05 object_from_type_half_wall : coronium boulder
+# range 7
+# &d8	cb	&06c7 = &7f  &07c6 = &46  &0a51 = &84  &0add = &0d  (&7f, &c1) &06 object_from_type : deadly sucker
+# &d9	cc	&06c8 = &a6  &07c7 = &06  &0a52 = &ac  &0ade = &20  (&a6, &69) &06 object_from_type : cyan/red turret
+# &da	cd	&06c9 = &b4  &07c8 = &06  &0a53 = &80  &0adf = &0d  (&b4, &c5) &06 object_from_type : deadly sucker
+# &db	ce	&06ca = &53  &07c9 = &06  &0a54 = &80  &0ae0 = &0d  (&53, &95) &06 object_from_type : deadly sucker
+# &dc	cf	&06cb = &61  &07ca = &06  &0a55 = &80  &0ae1 = &48  (&61, &d8) &06 object_from_type : maggot machine
+# &dd	d0	&06cc = &d4  &07cb = &45  &0a56 = &80  &0ae2 = &51  (&d4, &73) &05 object_from_type_half_wall : cyan/yellow/green key
+# &de	d1	&06cd = &82  &07cc = &45  &0a57 = &80  &0ae3 = &0c  (&82, &c5) &05 object_from_type_half_wall : sucker
+# &df	d2	&06ce = &e3  &07cd = &45  &0a58 = &80  &0ae4 = &55  (&e3, &b5) &05 object_from_type_half_wall : coronium boulder
 
-#   &e0 : &06cf = &75  &07ce = &06  &0a59 = &80  &0ae5 = &22  (&75, &87) &06 object_from_type : magenta clawed robot
-#   &e1 : &06d0 = &c3  &07cf = &07  &0a5a = &c0  &0ae6 = &04  (&c3, &c5) &07 object_from_type_foliage : small nest
-#   &e2 : &06d1 = &84  &07d0 = &89  &0a5b = &04  &0ae7 = &2e  (&84, &69) &09 object_emerging_from_sucker/bush : green/yellow bird
-#   &e3 : &06d2 = &9e  &07d1 = &09  &0a5c = &08  &0ae8 = &2f  (&9e, &69) &09 object_emerging_from_sucker/bush : white/yellow bird (x 2)
-#   &e4 : &06d3 = &c6  &07d2 = &8a  &0a5d = &90  &0ae9 = &2b  (&c6, &be) &0a object_emerging_from_pipe_end : blue/cyan imp (x 4)
-#   &e5 : &06d4 = &64  &07d3 = &4a  &0a5e = &a2  &0aea = &2a  (&64, &c6) &0a object_emerging_from_pipe_end : red/yellow imp (x 8)
-#   &e6 : &06d5 = &a2  &07d4 = &4a  &0a5f = &04  &0aeb = &21  (&a2, &5b) &0a object_emerging_from_pipe_end : hovering robot
-#   &e7 : &06d6 = &28  &07d5 = &ca  &0a60 = &04  &0aec = &02  (&28, &d8) &0a object_emerging_from_pipe_end : pericles crew member
-#   &e8 : &06d7 = &29  &07d6 = &ca  &0a61 = &04  &0aed = &02  (&29, &d8) &0a object_emerging_from_pipe_end : pericles crew member
-#   &e9 : &06d8 = &9d  &07d7 = &4a  &0a62 = &20  &0aee = &1a  (&9d, &5b) &0a object_emerging_from_pipe_end : hover ball (x 8)
-#   &ea : &06d9 = &83  &07d8 = &00  &0a63 = &bc  &0aef = &80  (&83, &76) &00: invisible switch (triggered by anything)
-#   &eb : &06da = &a8  &07d9 = &00  &0a64 = &53  &0af0 = &4b  (&a8, &69) &00: invisible switch (triggered by energy capsule)
-#   &ec : &06db = &80  &07da = &00  &0a65 = &9d  &0af1 = &80  (&80, &c2) &00: invisible switch (triggered by anything)
-#   &ed : &06dc = &aa  &07db = &48  &0a66 = &84      n/a      (&aa, &63) &08: switch
-#   &ee : &06dd = &d5  &07dc = &08  &0a67 = &da      n/a      (&d5, &73) &08: switch
-#   &ef : &06de = &a0  &07dd = &82  &0a68 = &cb      n/a      (&a0, &67) &02 object_from_data : energy capsule
+# &e0	d3	&06cf = &75  &07ce = &06  &0a59 = &80  &0ae5 = &22  (&75, &87) &06 object_from_type : magenta clawed robot
+# &e1	d4	&06d0 = &c3  &07cf = &07  &0a5a = &c0  &0ae6 = &04  (&c3, &c5) &07 object_from_type_foliage : small nest
+# &e2	d5	&06d1 = &84  &07d0 = &89  &0a5b = &04  &0ae7 = &2e  (&84, &69) &09 object_emerging_from_sucker/bush : green/yellow bird
+# &e3	d6	&06d2 = &9e  &07d1 = &09  &0a5c = &08  &0ae8 = &2f  (&9e, &69) &09 object_emerging_from_sucker/bush : white/yellow bird (x 2)
+# &e4	d7	&06d3 = &c6  &07d2 = &8a  &0a5d = &90  &0ae9 = &2b  (&c6, &be) &0a object_emerging_from_pipe_end : blue/cyan imp (x 4)
+# &e5	d8	&06d4 = &64  &07d3 = &4a  &0a5e = &a2  &0aea = &2a  (&64, &c6) &0a object_emerging_from_pipe_end : red/yellow imp (x 8)
+# &e6	d9	&06d5 = &a2  &07d4 = &4a  &0a5f = &04  &0aeb = &21  (&a2, &5b) &0a object_emerging_from_pipe_end : hovering robot
+# &e7	da	&06d6 = &28  &07d5 = &ca  &0a60 = &04  &0aec = &02  (&28, &d8) &0a object_emerging_from_pipe_end : pericles crew member
+# &e8	db	&06d7 = &29  &07d6 = &ca  &0a61 = &04  &0aed = &02  (&29, &d8) &0a object_emerging_from_pipe_end : pericles crew member
+# &e9	dc	&06d8 = &9d  &07d7 = &4a  &0a62 = &20  &0aee = &1a  (&9d, &5b) &0a object_emerging_from_pipe_end : hover ball (x 8)
+# &ea	dd	&06d9 = &83  &07d8 = &00  &0a63 = &bc  &0aef = &80  (&83, &76) &00: invisible switch (triggered by anything)
+# &eb	de	&06da = &a8  &07d9 = &00  &0a64 = &53  &0af0 = &4b  (&a8, &69) &00: invisible switch (triggered by energy capsule)
+# &ec	df	&06db = &80  &07da = &00  &0a65 = &9d  &0af1 = &80  (&80, &c2) &00: invisible switch (triggered by anything)
+# &ed	e0	&06dc = &aa  &07db = &48  &0a66 = &84      n/a      (&aa, &63) &08: switch
+# &ee	e1	&06dd = &d5  &07dc = &08  &0a67 = &da      n/a      (&d5, &73) &08: switch
+# &ef	e2	&06de = &a0  &07dd = &82  &0a68 = &cb      n/a      (&a0, &67) &02 object_from_data : energy capsule
 
-#   &f0 : &06df = &9f  &07de = &82  &0a69 = &de      n/a      (&9f, &51) &02 object_from_data : protection suit
-#   &f1 : &06e0 = &d6  &07df = &82  &0a6a = &c5      n/a      (&d6, &73) &02 object_from_data : rock 
-#   &f2 : &06e1 = &62  &07e0 = &02  &0a6b = &a5      n/a      (&62, &cc) &02 object_from_data : red clawed robot
-#   &f3 : &06e2 = &69  &07e1 = &c4  &0a6c = &c1      n/a      (&69, &d1) &04: stone door
-#   &f4 : &06e3 = &2c  &07e2 = &c4  &0a6d = &f1      n/a      (&2c, &d6) &04: stone door
-#   &f5 : &06e4 = &a5  &07e3 = &0b  &0a6e = &70      n/a      (&a5, &64) &0b: fixed wind: downdraught
+# &f0	e3	&06df = &9f  &07de = &82  &0a69 = &de      n/a      (&9f, &51) &02 object_from_data : protection suit
+# &f1	e4	&06e0 = &d6  &07df = &82  &0a6a = &c5      n/a      (&d6, &73) &02 object_from_data : rock 
+# &f2	e5	&06e1 = &62  &07e0 = &02  &0a6b = &a5      n/a      (&62, &cc) &02 object_from_data : red clawed robot
+# &f3	e6	&06e2 = &69  &07e1 = &c4  &0a6c = &c1      n/a      (&69, &d1) &04: stone door
+# &f4	e7	&06e3 = &2c  &07e2 = &c4  &0a6d = &f1      n/a      (&2c, &d6) &04: stone door
+# &f5	e8	&06e4 = &a5  &07e3 = &0b  &0a6e = &70      n/a      (&a5, &64) &0b: fixed wind: downdraught
 
-# 8:&f6 : &06e5 = &b8  &07e4 = &0b  &0a6f = &d0      n/a      (&b8, &aa) &0b: fixed wind: updraught
-#   &f7 : &06e6 = &b9  &07e5 = &0b  &0a70 = &80      n/a      (&b9, &de) &0b: fixed wind: updraught
-#   &f8 : &06e7 = &d9  &07e6 = &d1      n/a          n/a      (&d9, &57) &11 scenery : leaf
-#   &f9 : &06e8 = &59  &07e7 = &91      n/a          n/a      (&59, &8c) &11 scenery : leaf
-#   &fa : &06e9 = &79  &07e8 = &d1      n/a          n/a      (&79, &53) &11 scenery : leaf
-#   &fb : &06ea = &39  &07e9 = &d1      n/a          n/a      (&39, &80) &11 scenery : leaf
-#   &fc : &06eb = &48  &07ea = &91      n/a          n/a      (&48, &7d) &11 scenery : leaf
-#   &fd : &06ec = &e8  &07eb = &91      n/a          n/a      (&e8, &80) &11 scenery : leaf
+# range 8
+# &f6	e9	&06e5 = &b8  &07e4 = &0b  &0a6f = &d0      n/a      (&b8, &aa) &0b: fixed wind: updraught
+# &f7	ea	&06e6 = &b9  &07e5 = &0b  &0a70 = &80      n/a      (&b9, &de) &0b: fixed wind: updraught
+# &f8		&06e7 = &d9  &07e6 = &d1      n/a          n/a      (&d9, &57) &11 scenery : leaf
+# &f9		&06e8 = &59  &07e7 = &91      n/a          n/a      (&59, &8c) &11 scenery : leaf
+# &fa		&06e9 = &79  &07e8 = &d1      n/a          n/a      (&79, &53) &11 scenery : leaf
+# &fb		&06ea = &39  &07e9 = &d1      n/a          n/a      (&39, &80) &11 scenery : leaf
+# &fc		&06eb = &48  &07ea = &91      n/a          n/a      (&48, &7d) &11 scenery : leaf
+# &fd		&06ec = &e8  &07eb = &91      n/a          n/a      (&e8, &80) &11 scenery : leaf
 #
 ###############################################################################
 
@@ -3293,6 +3311,8 @@ f $FE                        ; white bg, cyan bg
 &1714: 60               RTS			; 
 
 ; determine_background
+; on entry, &95 is the x square
+;			&97 is the y square
 ; returns A = background type for square
 &1715: a2 00            LDX #&00
 &1717: 86 bd            STX &bd ; new_object_data_pointer
@@ -4372,12 +4392,12 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 ; reserve_object_high_priority
 &1e5a: a0 00            LDY #&00
-&1e5c: 2c a0 01         BIT &01a0
+&1e5c: 2c a0 01         BIT &01a0								# nop
 ; reserve_object
 #1e5d:    a0 01         LDY #&01
-&1e5f: 2c a0 04         BIT &04a0
+&1e5f: 2c a0 04         BIT &04a0								# nop
 ; reserve_object_low_priority
-#1e60:    a0 04         LDY #&04 
+#1e60:    a0 04         LDY #&04				
 ; reserve_objects
 ; A = type of object to create
 ; Y = number of slots that must be free for success
@@ -4490,7 +4510,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1f05: b5 40            LDA &40,X   	# X = 2, &42 = acceleration_y ; X = 0, &40 = acceleration_x
 &1f07: 08               PHP
 &1f08: 75 43            ADC (&43,X) 	# X = 2, &45 = this_object_vel_y ; X = 0, &43 = this_object_vel_x
-&1f0a: 20 7f 32         JSR &327f ; prevent_overflow
+&1f0a: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &1f0d: a8               TAY
 &1f0e: 28               PLP
 &1f0f: 20 56 32         JSR &3256 ; make_positive
@@ -4936,7 +4956,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2239: 90 02            BCC &223d
 &223b: 49 ff            EOR #&ff
 &223d: 75 b6            ADC (&b6,X)     # X = &fe, &b4 velocity_x ; X = &00, &b6 velocity_y
-&223f: 20 7f 32         JSR &327f ; prevent_overflow
+&223f: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &2242: 48               PHA
 &2243: a5 da            LDA &da ; timer_2
 &2245: 39 0d 02         AND &020d,Y ; particle_x_randomness_table
@@ -4965,7 +4985,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2271: c9 ca            CMP #&ca
 &2273: bd d6 28         LDA &28d6,X ; particle_stack_velocity_x
 &2276: 79 43 00         ADC &0043,Y
-&2279: 20 7f 32         JSR &327f ; prevent_overflow
+&2279: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &227c: 9d d6 28         STA &28d6,X ; particle_stack_velocity_x
 &227f: 88               DEY
 &2280: 88               DEY
@@ -5644,7 +5664,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2682: a5 db            LDA &db ; timer_3
 &2684: 29 70            AND #&70
 &2686: d0 40            BNE &26c8 ; no_emerging_objects                         # if not, objects less likely to emerge
-&2688: a0 01            LDY #&01                                # slot 1 ?
+&2688: a0 01            LDY #&01                                # indicates background object id 1 (a worm) 
 &268a: 20 87 25         JSR &2587 ; increment_timers
 &268d: c9 08            CMP #&08                                # set if >&8
 &268f: 6a               ROR
@@ -5654,8 +5674,8 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2698: 20 56 32         JSR &3256 ; make_positive
 &269b: 0a               ASL
 &269c: 90 01            BCC &269f
-&269e: c8               INY
-&269f: 84 bd            STY &bd ; new_object_data_pointer
+&269e: c8               INY										# use background object 2 instead (a maggot)
+&269f: 84 bd            STY &bd ; new_object_data_pointer		
 &26a1: 84 be            STY &be ; new_object_type_pointer
 &26a3: b9 86 09         LDA &0986,Y ; background_objects_data
 &26a6: 0a               ASL
@@ -5753,9 +5773,12 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &275f: 60               RTS
 
 ; store_stack_pointer_and_pull_in_tertiary_object
+; on entry, Y is the background object data pointer
+;			&be is the index for the background_objects_type list
+; on exit, C is clear if successful and set if failed
 &2760: ba               TSX
 &2761: 86 26            STX &26 ; copy_of_stack_pointer
-&2763: a2 06            LDX #&06
+&2763: a2 06            LDX #&06												# value for priority parameter of reserve_objects
 &2765: 4c 4f 3e         JMP &3e4f ; into_tertiary_pull_in
 
 ; find_a_target_and_fire_at_it
@@ -5792,7 +5815,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2798: 30 2e            BMI &27c8
 &279a: a5 43            LDA &43 ; this_object_vel_x
 &279c: e5 b4            SBC &b4 ; velocity_x
-&279e: 20 7f 32         JSR &327f ; prevent_overflow
+&279e: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &27a1: 45 37            EOR &37 ; this_object_angle
 &27a3: 10 22            BPL &27c7
 &27a5: 8a               TXA
@@ -6276,7 +6299,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2bcb: 46 9f            LSR &9f ; collision_velocity_flags	                # &0c (x direction) or &03 (y direction)
 &2bcd: b0 05            BCS &2bd4				                # only add if it's the right direction
 &2bcf: 75 a2            ADC (&a2,X) 	# X = 0, &a2 collision_velocity_out_this; X = 2, &a3 collision_velocity_out_other
-&2bd1: 20 7f 32         JSR &327f ; prevent_overflow
+&2bd1: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &2bd4: 24 9e            BIT &9e ; support_weight_direction
 &2bd6: 30 08            BMI &2be0
 &2bd8: 20 4c 32         JSR &324c ; make_negative
@@ -6288,7 +6311,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2be4: 68               PLA
 &2be5: 18               CLC
 &2be6: 75 a0            ADC (&a0,X) 	# X = 0, &a0 collision_velocity_this; X = 2, &a1 collision_velocity_other
-&2be8: 20 7f 32         JSR &327f ; prevent_overflow
+&2be8: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &2beb: 95 a0            STA &a0,X	# X = 0, &a0 collision_velocity_this; X = 2, &a1 collision_velocity_other
 &2bed: 60               RTS
 ; do_momentum_exchange
@@ -7086,14 +7109,16 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &31f3: f0 f5            BEQ &31ea
 &31f5: 60               RTS
 ; speed_up
+; on entry, A is the current velocity
+;			X is 0 to change the X aspect, or 2 to change the y aspect
 &31f6: 38               SEC
 &31f7: f5 43            SBC &43,X	# X = 2, &45 this_object_vel_y ; X = 0, &43 this_object_vel_x
 &31f9: 20 01 32         JSR &3201 ; speed_limit
-&31fc: 75 43            ADC (&43,X) 	# X = 2, &45 this_object_vel_y ; X = 0, &43 this_object_vel_x
+&31fc: 75 43            ADC &43,X 	# X = 2, &45 this_object_vel_y ; X = 0, &43 this_object_vel_x
 &31fe: 95 43            STA &43,X	# X = 2, &45 this_object_vel_y ; X = 0, &43 this_object_vel_x
 &3200: 60               RTS
 ; speed_limit
-&3201: 20 7f 32         JSR &327f ; prevent_overflow
+&3201: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &3204: 08               PHP
 &3205: 20 56 32         JSR &3256 ; make_positive
 &3208: 4a               LSR
@@ -7185,7 +7210,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &327d: 6a               ROR
 &327e: 60               RTS
 
-; prevent_overflow
+; prevent_overflow_of_signed_number
+; on entry, A is the signed value to examine after a calculation
+; on exit, A will contain the same number if V is clear
+;      or  A will equal 0x7f (+127) if C clear, or 0x80 (-128) if C is set
 &327f: 50 04            BVC &3285			# do nothing if V clear
 &3281: a9 7f            LDA #&7f			# reset to 7f
 &3283: 69 00            ADC #&00			# possibly add 1
@@ -7258,12 +7286,12 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &32f8: a5 b6            LDA &b6 ; velocity_y			                # if not,
 &32fa: 18               CLC
 &32fb: 65 45            ADC &45 ; this_object_vel_y                             # add the y velocity to the firer's
-&32fd: 20 7f 32         JSR &327f ; prevent_overflow
+&32fd: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &3300: 9d f6 08         STA &08f6,X ; object_stack_vel_y
 &3303: a5 b4            LDA &b4 ; velocity_x                                    # add the x velocity to the firer's
 &3305: 18               CLC
 &3306: 65 43            ADC &43 ; this_object_vel_x
-&3308: 20 7f 32         JSR &327f ; prevent_overflow
+&3308: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &330b: 9d e6 08         STA &08e6,X ; object_stack_vel_x
 &330e: 60               RTS
 
@@ -7278,7 +7306,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; setup_bullet_velocities_with_velocities
 &331d: a5 43            LDA &43 ; this_object_vel_x
 &331f: 65 b4            ADC &b4 ; velocity_x                                    # the new x velocity is relative
-&3321: 20 7f 32         JSR &327f ; prevent_overflow                            
+&3321: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number                            
 &3324: 08               PHP
 &3325: 20 56 32         JSR &3256 ; make_positive
 &3328: c9 50            CMP #&50                                                # use this_object_vel_x + velocity_x
@@ -7286,7 +7314,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &332c: a5 43            LDA &43 ; this_object_vel_x
 &332e: 20 56 32         JSR &3256 ; make_positive
 &3331: 69 20            ADC #&20
-&3333: 20 7f 32         JSR &327f ; prevent_overflow
+&3333: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &3336: c9 50            CMP #&50                                                # else, use this_object_vel_x + &20
 &3338: b0 02            BCS &333c                                               # unless > &50
 &333a: a9 50            LDA #&50                                                # in which case, use &50
@@ -7346,7 +7374,7 @@ e336d: 90 02            BCC &3371
 &3391: a8               TAY
 &3392: bd e6 08         LDA &08e6,X ; object_stack_vel_x
 &3395: 65 b4            ADC &b4 ; velocity_x
-&3397: 20 7f 32         JSR &327f ; prevent_overflow
+&3397: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &339a: 85 b4            STA &b4 ; velocity_x
 &339c: 20 56 32         JSR &3256 ; make_positive
 &339f: 20 c1 3b         JSR &3bc1 ; get_biggest_of_a_and_y
@@ -7397,7 +7425,7 @@ e336d: 90 02            BCC &3371
 &33e5: a5 43            LDA &43 ; this_object_vel_x
 &33e7: 38               SEC
 &33e8: e5 b4            SBC &b4 ; velocity_x
-&33ea: 20 7f 32         JSR &327f ; prevent_overflow
+&33ea: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &33ed: 85 9d            STA &9d ; tmp_vx
 &33ef: 45 43            EOR &43 ; this_object_vel_x
 &33f1: 18               CLC
@@ -8869,65 +8897,72 @@ maggot x = &06 a = &08
 # A, X = &bc this_object_data
 # Y = &bd new_object_data_pointer; CPY #&00
 &3e1b: f0 6b            BEQ &3e88						# is object_data_pointer = 0? if so, leave
-&3e1d: a2 05            LDX #&05
+&3e1d: a2 05            LDX #&05						# initial value that might be passed to reserve_objects in Y?
 &3e1f: a5 2d            LDA &2d ; background_processing_flag
-&3e21: 29 90            AND #&90
-&3e23: f0 23            BEQ &3e48
-&3e25: 10 02            BPL &3e29
-&3e27: a2 00            LDX #&00
+&3e21: 29 90            AND #&90						# bits 4 (time passing) and 7 (something display related) are of interest
+&3e23: f0 23            BEQ &3e48 ; randomly_emit_object	# branch if neither set, then &2d is probably &20 and the player is in the square
+&3e25: 10 02            BPL &3e29						# if &2d = &10 then branch over next line
+&3e27: a2 00            LDX #&00						# reset value for reserve_objects to highest priority
 
 &3e29: a5 09            LDA &09 ; square_orientation
-&3e2b: 0a               ASL								# move left/right flip into Carry
+&3e2b: 0a               ASL								# move left/right flip flag into Carry
 &3e2c: b9 86 09         LDA &0986,Y ; background_objects_data
-&3e2f: 10 1c            BPL &3e4d						# is the object already present?
-&3e31: 08               PHP
+&3e2f: 10 1c            BPL &3e4d ; should_emit_object	# branch if the object already present
+&3e31: 08               PHP								# save value of C (left/right flip) and N which is always set
 &3e32: 8a               TXA
-&3e33: 48               PHA
-&3e34: a9 40            LDA #&40						# &40 = bush
-&3e36: 20 42 40         JSR &4042 ; pull_objects_in_from_tertiary_stack
+&3e33: 48               PHA								# save value of parameter for reserve_object
+&3e34: a9 40            LDA #&40						# &40 = tree
+&3e36: 20 42 40         JSR &4042 ; pull_objects_in_from_tertiary_stack	# bring the background object on-screen as a tree
 &3e39: a9 40            LDA #&40
-&3e3b: 99 a3 08         STA &08a3,Y ; object_stack_y_low
-&3e3e: 99 80 08         STA &0880,Y ; object_stack_x_low
-&3e41: a4 bd            LDY &bd ; new_object_data_pointer
+&3e3b: 99 a3 08         STA &08a3,Y ; object_stack_y_low	# set x position within square
+&3e3e: 99 80 08         STA &0880,Y ; object_stack_x_low	# set y position within square
+&3e41: a4 bd            LDY &bd ; new_object_data_pointer	# restore value of Y
 &3e43: 68               PLA
-&3e44: aa               TAX
-&3e45: 28               PLP
-&3e46: 30 05            BMI &3e4d
+&3e44: aa               TAX								# restore value of parameter for reserve_object
+&3e45: 28               PLP								# restore value of C (left/right flip) and set N
+&3e46: 30 05            BMI &3e4d ; should_emit_object	# N will always be set, so this is a JMP
 
-&3e48: 20 87 25         JSR &2587 ; increment_timers
-&3e4b: c9 f7            CMP #&f7
+; randomly_emit_object 
+&3e48: 20 87 25         JSR &2587 ; increment_timers	# get a random value
+&3e4b: c9 f7            CMP #&f7						# set a high threshold - carry will be cleared about 97% of the time
 
-&3e4d: 90 39            BCC &3e88						# branch to RTS
+; should_emit_object
+&3e4d: 90 39            BCC &3e88						# if here through randomly_emit_object then branch to RTS most of the time
+														# otherwise branch to RTS if left/right flag clear
+
 ; into_tertiary_pull_in
-&3e4f: 86 a2            STX &a2
+; on entry, X is a value for the priority parameter of reserve_objects
+;			Y is the background object data pointer
+;			&be is the index for the background_objects_type list
+&3e4f: 86 a2            STX &a2							# store the priority for reserve_objects
 &3e51: b9 86 09         LDA &0986,Y ; background_objects_data
-&3e54: 85 a3            STA &a3
-&3e56: 0a               ASL
-&3e57: c9 08            CMP #&08
-&3e59: 90 2d            BCC &3e88
-&3e5b: 29 06            AND #&06
-&3e5d: d0 29            BNE &3e88
+&3e54: 85 a3            STA &a3							# store the current background object data
+&3e56: 0a               ASL								# multiply by 2 in order to ignore the on/off screen flag
+&3e57: c9 08            CMP #&08						# this is a test against the number of objects still to emerge
+&3e59: 90 2d            BCC &3e88						# RTS if there are no more objects to emerge
+&3e5b: 29 06            AND #&06						# get background object data bits 0 and 1
+&3e5d: d0 29            BNE &3e88						# RTS if either bits 0 and 1 are set
 &3e5f: a6 be            LDX &be ; new_object_type_pointer
-&3e61: bd 71 0a         LDA &0a71,X ; background_objects_type
-&3e64: a4 a2            LDY &a2
-&3e66: 85 a2            STA &a2
-&3e68: 20 54 40         JSR &4054 ; pull_objects_in_from_tertiary_stack_alt
-&3e6b: a5 a3            LDA &a3
-&3e6d: e9 03            SBC #&03
+&3e61: bd 71 0a         LDA &0a71,X ; background_objects_type	# get the type of object to emerge
+&3e64: a4 a2            LDY &a2							# restore the priority
+&3e66: 85 a2            STA &a2							# set the type of object to create
+&3e68: 20 54 40         JSR &4054 ; pull_objects_in_from_tertiary_stack_alt	# create the object
+&3e6b: a5 a3            LDA &a3							# get the background object data
+&3e6d: e9 03            SBC #&03						# subtract 4 (carry will be clear) to decrement the object count
 &3e6f: 9d 86 09         STA &0986,X ; background_objects_data
 &3e72: a9 05            LDA #&05
-&3e74: 99 c6 08         STA &08c6,Y ; object_stack_flags
-&3e77: a6 a2            LDX &a2
-&3e79: bd 8a 02         LDA &028a,X ; object_sprite_lookup
+&3e74: 99 c6 08         STA &08c6,Y ; object_stack_flags	# emerged object flags are 1 and 5 (just like at &4064)
+&3e77: a6 a2            LDX &a2								# get the object type
+&3e79: bd 8a 02         LDA &028a,X ; object_sprite_lookup	# get the object sprite
 &3e7c: aa               TAX
-&3e7d: bd 0c 5e         LDA &5e0c,X ; sprite_width_lookup
-&3e80: 49 ff            EOR #&ff
-&3e82: 4a               LSR
-&3e83: 99 80 08         STA &0880,Y ; object_stack_x_low
-&3e86: 18               CLC
+&3e7d: bd 0c 5e         LDA &5e0c,X ; sprite_width_lookup	# how wide is the sprite?
+&3e80: 49 ff            EOR #&ff							# negate the value
+&3e82: 4a               LSR									# and halve it
+&3e83: 99 80 08         STA &0880,Y ; object_stack_x_low	# centre the object's initial position in the square
+&3e86: 18               CLC									# indicate success
 &3e87: 60               RTS
 
-&3e88: 38               SEC
+&3e88: 38               SEC									# indicate failure
 &3e89: 60               RTS
 
 ; handle_background_engine_thruster
@@ -8944,13 +8979,13 @@ maggot x = &06 a = &08
 # called with:
 # A, X = &bc this_object_data
 # Y = &bd new_object_data_pointer; CPY #&00
-&3e95: a9 3e            LDA #&3e 						# &3e = horizontal stone door
+&3e95: a9 3e            LDA #&3e 						# &3e = object type is horizontal stone door
 &3e97: 2c               BIT ....
 ; handle_background_door
 # called with:
 # A, X = &bc this_object_data
 # Y = &bd new_object_data_pointer; CPY #&00
-&3e98: a9 85            LDA #&3c						# &3c = horizontal door
+&3e98: a9 85            LDA #&3c						# &3c = object type is horizontal door
 &3e9a: 85 9c            STA &9c ; door_type
 
 &3e9c: cc 99 35         CPY &3599 ; door_data_pointer_store   # is new_object_data_pointer = door_data_pointer_store
@@ -9087,7 +9122,8 @@ maggot x = &06 a = &08
 &3f4c: 0a               ASL
 &3f4d: 85 b4            STA &b4 ; velocity_x
 &3f4f: 20 1b 40         JSR &401b ; reserve_object_for_background
-&3f52: d0 62            BNE &3fb6			# if so, leave
+&3f52: d0 62            BNE &3fb6			# if successful, leave
+
 &3f54: a2 02            LDX #&02
 &3f56: a4 38            LDY &38 ; this_object_weight
 &3f58: c0 04            CPY #&04
@@ -9113,7 +9149,7 @@ maggot x = &06 a = &08
 &3f7b: b0 39            BCS &3fb6			                        # if so, leave
 &3f7d: a0 6e            LDY #&6e                                                # &6e = wind particles
 ; add_wind_like_particles
-&3f7f: a2 02            LDX #&02
+&3f7f: a2 02            LDX #&02		# initialise loop counter for 2 passes, when X = 2 the Y co-ordinate will be calculated, and when X = 0 the X co-ordinate will be calculated
 &3f81: b5 4f            LDA &4f,X       # X = 2, &51 this_object_y_low ; X = 0, &4f this_object_x_low
 &3f83: e9 40            SBC #&40
 &3f85: 95 87            STA &87,X       # X = 2, &89 this_object_y_centre_low; X = 0, &87 this_object_x_centre_low
@@ -9128,11 +9164,12 @@ maggot x = &06 a = &08
 &3f94: a9 0c            LDA #&0c
 &3f96: 85 9c            STA &9c
 &3f98: b5 b4            LDA &b4,X ; velocity_[x|y]
-&3f9a: 4c f6 31         JMP &31f6
+&3f9a: 4c f6 31         JMP &31f6 ; speed_up									
 
 &3f9d: a5 c0            LDA &c0 ; loop_counter
 &3f9f: 29 10            AND #&10
 &3fa1: d0 13            BNE &3fb6
+
 ; handle_background_object_water                                                # A = &0d, water
 # called with:
 # A, X = &bc this_object_data
@@ -9229,9 +9266,10 @@ maggot x = &06 a = &08
 ; reserve_object_for_background
 &401b: a2 35            LDX #&35                                                # &35 = engine fire
 ; reserve_object_for_background_type_X
-&401d: a9 10            LDA #&10
+; on entry, X specifies the type of object
+&401d: a9 10            LDA #&10												# compare to time passing / process_events
 &401f: 24 2d            BIT &2d ; background_processing_flag
-&4021: f0 1e            BEQ &4041				                # if so, leave
+&4021: f0 1e            BEQ &4041												# if so, leave
 &4023: 8a               TXA
 &4024: 48               PHA
 &4025: 20 18 3c         JSR &3c18 ; count_objects_of_type_a_in_stack            # how many are there already?
@@ -9250,23 +9288,31 @@ maggot x = &06 a = &08
 
 ; pull_objects_in_from_tertiary_stack
 ; on entry, A is the type of object to create
-;			if &bd is non-zero, it indicates the background object id to show
-;			if &bd is zero
+;			if &bd is non-zero, it indicates the background object id to show. 
+;				If the background object is already on screen then the stack pointer will be reset.
+;			if &bd is zero then a new (temporary) object will be created
 &4042: a0 00            LDY #&00									# set for reserve_objects
-&4044: 2c a0 08         BIT &08a0
-	#4045:    a0 08         LDY #&08	# ?
+&4044: 2c a0 08         BIT &08a0									# nop (could be part of LDY #&08 but doesn't seem to be used)
 &4047: 85 a2            STA &a2 ; new_object_type					# store the type of object to create
 
 &4049: a6 bd            LDX &bd ; new_object_data_pointer				# get data pointer
-&404b: f0 07            BEQ &4054 ; pull_objects_in_from_tertiary_stack_alt		# if data pointer is 0, then this is a new object
+&404b: f0 07            BEQ &4054 ; pull_objects_in_from_tertiary_stack_alt		# if data pointer is 0, then create a new temporary object
 
 &404d: bd 86 09         LDA &0986,X ; background_objects_data			# is the object on screen already?
 &4050: 10 3f            BPL &4091 ; restore_stack_pointer			# if so, leave
 
 &4052: a5 a2            LDA &a2 ; new_object_type
 ; pull_objects_in_from_tertiary_stack_alt
+; on entry, Y will be passed into reserve_objects to indicate how many slots must be free for success
+;			&a2 is the type of object to create
+;			&09 is the orientation of the object
+;			&bd is the background object data pointer
+; on exit, C will be clear if successful, and:
+;	X is the new_object_data_pointer value from &bd
+;	Y is the slot the new object occupies on the primary stack
+;	A is the object's background data value now it is on-screen
 &4054: 20 62 1e         JSR &1e62 ; reserve_objects 				# find a slot for it 
-										# (Y is 0 so every effort will be made to find a slot on the primary object stack
+										# (if Y is 0 then every effort will be made to find a slot on the primary object stack
 										#  on return carry will be clear if successful and Y will indicate the slot to use)
 &4057: b0 38            BCS &4091 ; restore_stack_pointer			# if no free slots, leave
 &4059: 20 67 28         JSR &2867 ; set_object_x_y_tx_ty_to_square_x_y	# set location for new object
@@ -9276,30 +9322,30 @@ maggot x = &06 a = &08
 &4061: aa               TAX
 
 &4062: a5 09            LDA &09 ; square_orientation				# get orientation (bits 6 and 7)
-&4064: 09 05            ORA #&05						# set bits 0 and 2 (bit 2 for marking damaged, don't yet know for bit 0)
+&4064: 09 05            ORA #&05									# set bits 0 and 2 (bit 2 for marking damaged?, don't yet know for bit 0)
 &4066: 99 c6 08         STA &08c6,Y ; object_stack_flags			# store flags
 
-&4069: a9 00            LDA #&00
+&4069: a9 00            LDA #&00									# object_stack_x_low will be left aligned if orientation bit 7 = 0
 &406b: 24 09            BIT &09 ; square_orientation
-&406d: 10 03            BPL &4072									# branch if flipped left/right
-&406f: fd 0c 5e         SBC &5e0c,X ; sprite_width_lookup
+&406d: 10 03            BPL &4072									# branch over if bit 7 not set
+&406f: fd 0c 5e         SBC &5e0c,X ; sprite_width_lookup			# object_stack_x_low will be right aligned otherwise
 
 &4072: 99 80 08         STA &0880,Y ; object_stack_x_low			# store x position low byte
 
-&4075: a9 00            LDA #&00
+&4075: a9 00            LDA #&00									# object_stack_y_low will be top aligned if orientation bit 6 = 1
 &4077: 24 09            BIT &09 ; square_orientation
 &4079: 70 03            BVS &407e									# branch if flipped up/down
-&407b: fd 89 5e         SBC &5e89,X ; sprite_height_lookup
+&407b: fd 89 5e         SBC &5e89,X ; sprite_height_lookup			# object_stack_y_low will be bottom aligned if orientation bit 6 = 0
 
 &407e: 99 a3 08         STA &08a3,Y ; object_stack_y_low			# store y position high byte
 
-&4081: a5 bd            LDA &bd ; new_object_data_pointer		# get pointer to the object data
+&4081: a5 bd            LDA &bd ; new_object_data_pointer			# get pointer to the object data
 &4083: 99 66 09         STA &0966,Y ; object_stack_data_pointer		# store data pointer (might be 0)
 
 &4086: aa               TAX
-&4087: bd 86 09         LDA &0986,X ; background_objects_data			# mark the object as being onscreen
-&408a: 29 7f            AND #&7f
-&408c: 9d 86 09         STA &0986,X ; background_objects_data
+&4087: bd 86 09         LDA &0986,X ; background_objects_data		# mark the object as being onscreen
+&408a: 29 7f            AND #&7f									# by clearing bit 7
+&408c: 9d 86 09         STA &0986,X ; background_objects_data		# and storing the new value
 &408f: 18               CLC
 &4090: 60               RTS
 
@@ -9997,7 +10043,7 @@ maggot x = &06 a = &08
 
 ; handle_imp
 # called with:
-# X = this_object_data
+# X = this_objfect_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
 &44ef: a5 6f            LDA &6f ; this_object_flags
@@ -11089,6 +11135,7 @@ invisible switches
 &4c1d: e8               INX
 &4c1e: e8               INX
 &4c1f: 86 bc            STX &bc ; this_object_data
+
 &4c21: a5 dc            LDA &dc ; timer_4
 &4c23: c5 11            CMP &11 ; this_object_extra
 &4c25: 90 53            BCC &4c7a
@@ -11137,6 +11184,7 @@ invisible switches
 &4c76: d0 06            BNE &4c7e
 ; turn_thruster_off
 &4c78: 85 11            STA &11 ; this_object_extra
+
 &4c7a: a0 00            LDY #&00					        # 0 colour = off
 &4c7c: a9 40            LDA #&40
 &4c7e: 84 73            STY &73 ; this_object_palette			        # change colour
@@ -11223,7 +11271,7 @@ invisible switches
 &4cf2: 38               SEC
 &4cf3: e5 9c            SBC &9c
 &4cf5: 50 44            BVC &4d3b
-&4cf7: 20 7f 32         JSR &327f ; prevent_overflow		# reset A to 7f or 80 if carry set
+&4cf7: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number		# reset A to 7f or 80 if carry set
 &4cfa: a8               TAY
 &4cfb: 10 0c            BPL &4d09						# 
 &4cfd: 8a               TXA
@@ -11306,7 +11354,7 @@ indexed by key, bits 4 to 6 of the door data
 4 : blue, magenta bg & red bg
 5 : red, magenta bg & red bg
 6 : green, cyan bg & blue bg
-7 : blue, white bg & magenta bg
+7 : blue, white bg & magenta bg (used for tile doors)
 
 #4d82: 52 63 35 21 ; teleport_beam_palettes
 

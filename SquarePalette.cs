@@ -52,7 +52,7 @@ namespace ExileMappedBackground
                 {
                     {GameColour.BlackForeground, Color.Black},
                     {GameColour.RedForeground, Color.Red},
-                    {GameColour.GreenForeground, Color.Green},
+                    {GameColour.GreenForeground, Color.Lime},
                     {GameColour.YellowForeground, Color.Yellow},
                     {GameColour.BlueForeground, Color.Blue},
                     {GameColour.MagentaForeground, Color.Magenta},
@@ -61,7 +61,7 @@ namespace ExileMappedBackground
 
                     {GameColour.BlackBackground, Color.Black},
                     {GameColour.RedBackground, Color.Red},
-                    {GameColour.GreenBackground, Color.Green},
+                    {GameColour.GreenBackground, Color.Lime},
                     {GameColour.YellowBackground, Color.Yellow},
                     {GameColour.BlueBackground, Color.Blue},
                     {GameColour.MagentaBackground, Color.Magenta},

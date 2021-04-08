@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -18,10 +19,9 @@ namespace ExileMappedBackground
         private readonly CalculateBackground _mapper = new CalculateBackground();
         private readonly SpriteBuilder _spriteBuilder = new SpriteBuilder();
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
-        private readonly byte[] _backgroundSpriteLookup = BuildBackgroundSpriteLookup();
-        private readonly byte[] _backgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
         private static readonly string[] BackgroundHandlerTypeList = BuildBackgroundHandlerTypeList();
         private static readonly string[] ObjectTypeList = BuildObjectTypeList();
+        private static readonly List<WaterLevel> WaterLevelList = BuildWaterLevelsList();
         private decimal _zoom;
         private byte lookFor = 0xff;
         private bool _highlightMappedDataSquares;
@@ -44,7 +44,18 @@ namespace ExileMappedBackground
             this.map.ColumnCount = 256;
             this.map.RowCount = 256;
 
-            var items = new Dictionary<decimal, string> {{0.5m, "50%"}, {1.0m, "100%"}, {2.0m, "200%"}};
+            var items = new Dictionary<decimal, string>
+            {
+                {0.5m, "50%"}, 
+                {1.0m, "100%"}, 
+                {2.0m, "200%"}, 
+                {3.0m, "300%"}, 
+                {4.0m, "400%"}, 
+                {5.0m, "500%"}, 
+                {6.0m, "600%"},
+                {7.0m, "700%"},
+                {8.0m, "800%"}
+            };
             cboZoomLevel.DisplayMember = "Value";
             cboZoomLevel.ValueMember = "Key";
             cboZoomLevel.DataSource = new BindingSource(items, null);
@@ -136,6 +147,7 @@ namespace ExileMappedBackground
             data.IsHashDefault = backgroundProperties.isHashDefault;
 
             byte background = (byte) (data.BackgroundAfterHashing & 0x3f);
+            byte orientation = (byte) (data.BackgroundAfterHashing & 0xc0);
             if (data.IsBackgroundEvent)
                 {
                 data.BackgroundHandlerType = BackgroundHandlerTypeList[background];
@@ -143,18 +155,17 @@ namespace ExileMappedBackground
                     {
                     data.BackgroundType = backgroundProperties.type;
                     data.BackgroundData = backgroundProperties.data;
-                    data.BackgroundDescription = DescribeBackground(background, backgroundProperties.type, backgroundProperties.data);
+                    data.BackgroundDescription = DescribeBackground(background, backgroundProperties.type, backgroundProperties.data, orientation);
                     }
                 }
 
-            byte orientation = (byte) (data.BackgroundAfterHashing & 0xc0);
             (data.BackgroundPalette, data.DisplayedPalette) = _mapper.GetPalette(ref background, ref orientation, x, y);
             data.BackgroundAfterPalette = (byte) (background ^ orientation);
 
             this._squareProperties[x, y] = data;
             }
 
-        private static string DescribeBackground(byte backgroundHandler, byte? type, byte? data)
+        private static string DescribeBackground(byte backgroundHandler, byte? type, byte? data, byte orientation)
             {
             switch (backgroundHandler)
                 {
@@ -182,9 +193,34 @@ namespace ExileMappedBackground
                     Debug.Assert(data.HasValue);
                     Debug.Assert(type.HasValue);
                     int countOfObjects = (data.Value & 0x7c) >> 2;
-                    return $"{countOfObjects} x {ObjectTypeList[type.Value]}";
+                    string displayType;
+
+                    bool spawnedObjectEmergesImmediately = (orientation & 0x80) != 0;
+                    bool hasTree = (data.Value & 0x80) != 0;
+                    bool enabled = (data.Value & 0x03) != 0;
+
+                    if (spawnedObjectEmergesImmediately && hasTree)
+                        displayType = "emerges immediately from tree";
+                    else if (spawnedObjectEmergesImmediately)
+                        displayType = "emerges immediately";
+                    else if (hasTree)
+                        displayType = "emerges randomly from tree";
+                    else
+                        displayType = "emerges randomly";
+                    var enabledDisplay = enabled ? "enabled" : "disabled";
+
+                    return $"{countOfObjects} x {ObjectTypeList[type.Value]} {displayType} {enabledDisplay}";
                 case 0xb:
-                    return "*** fixed wind tbd ***";
+                    {
+                    Debug.Assert(data.HasValue);
+                    int yVelocity = data.Value;
+                    if (yVelocity >= 128)
+                        yVelocity -= 256;
+                    int xVelocity = ((data.Value << 4) & 0xff);
+                    if (xVelocity >= 128)
+                        xVelocity -= 256;
+                    return $"Fixed wind velocity ({xVelocity}, {yVelocity})";
+                    }
                 case 0xc:
                     return "*** engine tbd ***";
                 case 0xd:
@@ -216,20 +252,60 @@ namespace ExileMappedBackground
 
             var squareProperties = this._squareProperties[e.ColumnIndex, e.RowIndex];
 
-            byte background = (byte) (squareProperties.BackgroundAfterPalette & 0x3f);
-            byte sprite = (byte) (this._backgroundSpriteLookup[background] & 0x7f);
+            var waterLevelType = GetWaterLevelType(squareProperties.X, squareProperties.Y);
+            this._spriteBuilder.Clear(waterLevelType);
 
-            bool rightAlign = (squareProperties.BackgroundAfterPalette & 0x80) != 0;
+            switch (squareProperties.BackgroundAfterPalette & 0x3f)
+                {
+                case 0:
+                    this._spriteBuilder.AddBitmap(Resource1.HiddenSwitch);
+                    break;
 
-            bool bottomAlign = (squareProperties.BackgroundAfterPalette & 0x40) != 0;
+                case 2:     
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundData.Value, squareProperties.BackgroundAfterPalette);
+                    break;
 
-            byte offsetAlongY = (byte) (this._backgroundYOffsetLookup[background] & 0xf0);
-                
-            var squarePalette = SquarePalette.FromByte(squareProperties.DisplayedPalette);
-            var image = this._spriteBuilder.BuildSprite(sprite, squarePalette, rightAlign, bottomAlign, offsetAlongY);
+                case 3:
+                case 4:
+                    this._spriteBuilder.BuildDoor(squareProperties.BackgroundAfterPalette, squareProperties.BackgroundData.Value);
+                    break;
+
+                case 5:
+                case 7:
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundType.Value, squareProperties.BackgroundAfterPalette);
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
+                    break;
+
+                case 6:
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundType.Value, squareProperties.BackgroundAfterPalette);
+                    break;
+                   
+                case 9:
+                case 0xa:
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
+                    if (squareProperties.BackgroundObjectId.HasValue && (squareProperties.BackgroundData.Value & 0x80) != 0)
+                        {
+                        this._spriteBuilder.BuildObjectSprite(0x40, squareProperties.BackgroundAfterPalette, (0x40, 0x40));
+                        }
+                    break;
+
+                case 0xb:
+                    this._spriteBuilder.AddBitmap(Resource1.FixedWind);
+                    break;
+
+                case 0xe:
+                    this._spriteBuilder.AddBitmap(Resource1.RandomWind);
+                    break;
+
+                default:
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
+                    break;
+                }
 
             Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, (int) (32 * _zoom), (int) (32 * _zoom));
-            e.Graphics.DrawImage(image, destinationRectangle);
+            e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+            e.Graphics.PixelOffsetMode = PixelOffsetMode.None; 
+            e.Graphics.DrawImage(this._spriteBuilder.Sprite, destinationRectangle);
 
             if (DoesSquareRequireAnimating(squareProperties))
                 {
@@ -263,7 +339,7 @@ namespace ExileMappedBackground
 
                 if (this._highlightDisplayElement && (squareProperties.BackgroundAfterPalette & 0x3f) == this._displayElementToHighlight)
                     {
-                    using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Silver)))
+                    using (Brush brush = new SolidBrush(Color.FromArgb(0x40, Color.Silver)))
                         {
                         using (Pen pen = new Pen(brush, squareProperties.AnimationFrame))
                             {
@@ -296,6 +372,24 @@ namespace ExileMappedBackground
                 }
 
             e.Handled = true;
+            }
+
+        private WaterLevelType GetWaterLevelType(byte x, byte y)
+            {
+            var i = WaterLevelList.Count;
+            while (true)
+                {
+                i--;
+                var waterLevel = WaterLevelList[i];
+                if (x >= waterLevel.xSquareFrom)
+                    {
+                    if (y > waterLevel.yWaterLevel)
+                        return WaterLevelType.BelowWater;
+                    if (y == waterLevel.yWaterLevel)
+                        return WaterLevelType.AtWaterLine;
+                    return WaterLevelType.AboveWater;
+                    }
+                }
             }
 
         private void AdvanceAnimation(SquareProperties squareProperties, TimeSpan timeElapsed)
@@ -406,34 +500,6 @@ namespace ExileMappedBackground
                 }
             }
 
-        private static byte[] BuildBackgroundSpriteLookup()
-            {
-            var map = new byte[]
-                {
-                /* & &7f = sprite
-                   & &80 = not relevant
-                */
-                0xC6,0xCE,0xC6,0xC6,0xC6,0xBB,0xC6,0x18,0x2D,0x70,0x6A,0xC6,0x23,0x39,0xC6,0x62,
-                0xC0,0x8E,0x39,0x44,0x47,0x26,0x48,0x49,0xDF,0xC6,0x99,0x9A,0x25,0x2B,0x39,0x3B,
-                0x3C,0x55,0x8E,0x43,0x34,0x35,0x27,0x28,0x29,0x2A,0x42,0xBF,0x40,0x3D,0x38,0x36,
-                0x37,0x3E,0x33,0x31,0x2F,0x30,0x2C,0x24,0x32,0x41,0x45,0x3A,0x6A,0x23,0x60,0xCC
-                };
-            var result = map.Select(item => (byte) (item & 0x7f)).ToArray();
-            return result;
-            }
-
-        private static byte[] BuildBackgroundYOffsetLookup()
-            {
-            var result = new byte[]
-                {
-                0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xD0,0xC5,0xB0,0xC7,0x00,0x06,0x00,0x00,0xC0, // 00
-                0xB0,0xA0,0x07,0x08,0x00,0x04,0x80,0xC0,0x70,0x00,0xB0,0x80,0x99,0x08,0x00,0x80, // 10
-                0xC0,0x00,0xA0,0x03,0x02,0x82,0x01,0x41,0x81,0xC1,0x04,0xF0,0xB0,0x00,0x03,0x02, // 20
-                0x82,0x70,0x06,0xC0,0xC5,0x04,0x80,0x06,0x80,0x04,0x99,0x30,0xC7,0x06,0xA9,0x00  // 30
-                };
-            return result;
-            }
-
         private void map_SelectionChanged(object sender, EventArgs e)
             {
             var squareValue = this._squareProperties[this.map.CurrentCell.ColumnIndex, this.map.CurrentCell.RowIndex];
@@ -505,12 +571,12 @@ namespace ExileMappedBackground
 
         private void SetSpriteInfo(SquareProperties squareValue)
             {
-            byte sprite = (byte) (_backgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);
+            byte sprite = (byte) (SpriteBuilder.BackgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);
             string spriteInfo =
                 $"Sprite number: {sprite:X2}\r\n" +
                 "Orientation on sprite sheet: ";
-            var isSpriteFlippedHorizontally = this._spriteBuilder.FlipSpriteHorizontally[sprite];
-            var isSpriteFlippedVertically = this._spriteBuilder.FlipSpriteVertically[sprite];
+            var isSpriteFlippedHorizontally = SpriteBuilder.FlipSpriteHorizontally[sprite];
+            var isSpriteFlippedVertically = SpriteBuilder.FlipSpriteVertically[sprite];
             if (isSpriteFlippedHorizontally && isSpriteFlippedVertically)
                 spriteInfo += "flipped both ways";
             else if (isSpriteFlippedHorizontally)
@@ -519,7 +585,7 @@ namespace ExileMappedBackground
                 spriteInfo += "flipped vertically";
             else
                 spriteInfo += "not flipped";
-            byte offsetAlongY = (byte) (this._backgroundYOffsetLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0xf0);
+            byte offsetAlongY = (byte) (SpriteBuilder.BackgroundYOffsetLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0xf0);
             spriteInfo += "\r\n" +
                           $"Y offset: {offsetAlongY:X2}\r\n";
 
@@ -650,6 +716,30 @@ namespace ExileMappedBackground
                 h = this.ClientSize.Height - 10 - textBox.Top;
                 }
             textBox.Height = h;
+            }
+
+        private static List<WaterLevel> BuildWaterLevelsList()
+            {
+            var result = new List<WaterLevel>
+                {
+                new WaterLevel(0x0, 0xce),
+                new WaterLevel(0x54, 0xdf),
+                new WaterLevel(0x74, 0xc1),
+                new WaterLevel(0xa0, 0xc1)
+                };
+            return result;
+            }
+
+        private readonly struct WaterLevel
+            {
+            public readonly byte xSquareFrom;
+            public readonly byte yWaterLevel;
+
+            public WaterLevel(byte xSquareFrom, byte yWaterLevel)
+                {
+                this.xSquareFrom = xSquareFrom;
+                this.yWaterLevel = yWaterLevel;
+                }
             }
 
         private static string[] BuildBackgroundHandlerTypeList()
@@ -809,7 +899,12 @@ namespace ExileMappedBackground
         private void cboZoomLevel_SelectedIndexChanged(object sender, EventArgs e)
             {
             this._zoom = (decimal) this.cboZoomLevel.SelectedValue;
+            if (map.FirstDisplayedCell == null)
+                return;
+            var row = map.FirstDisplayedCell.RowIndex;
+            var column = map.FirstDisplayedCell.ColumnIndex;
             this.ResetGrid();
+            map.FirstDisplayedCell = map.Rows[row].Cells[column];
             }
 
         private void chkHighlightMappedData_CheckedChanged(object sender, EventArgs e)
@@ -914,23 +1009,17 @@ namespace ExileMappedBackground
             {
             var stateImageList = new ImageList();
 
-            for (int i = 0; i < 3; i++)
+            var checkBoxStates = new[]
+                {
+                System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal,
+                System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal,
+                System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal
+                };
+            foreach (var checkBoxState in checkBoxStates)
                 {
                 Bitmap bmp = new Bitmap(16, 16);
                 Graphics chkGraphics = Graphics.FromImage(bmp);
-                switch (i)
-                    {
-                    case 0:
-                        CheckBoxRenderer.DrawCheckBox(chkGraphics, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.UncheckedNormal);
-                        break;
-                    case 1:
-                        CheckBoxRenderer.DrawCheckBox(chkGraphics, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.CheckedNormal);
-                        break;
-                    case 2:
-                        CheckBoxRenderer.DrawCheckBox(chkGraphics, new Point(0, 1), System.Windows.Forms.VisualStyles.CheckBoxState.MixedNormal);
-                        break;
-                    }
-
+                CheckBoxRenderer.DrawCheckBox(chkGraphics, new Point(0, 1), checkBoxState);
                 stateImageList.Images.Add(bmp);
                 }
 

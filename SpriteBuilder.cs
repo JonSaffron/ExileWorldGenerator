@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 
 namespace ExileMappedBackground
@@ -10,22 +12,56 @@ namespace ExileMappedBackground
         private static readonly byte[] SpriteData = BuildSpriteSheet();
         private static readonly byte[] SpriteHeightLookup = BuildSpriteHeightLookup();
         private static readonly Dictionary<byte, Rectangle> SpritePositions = BuildSpritePositions();
-        private static readonly byte[] BackgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
-        public readonly bool[] FlipSpriteHorizontally = BuildFlipSpriteHorizontally();
-        public readonly bool[] FlipSpriteVertically = BuildFlipSpriteVertically();
+        public static readonly byte[] BackgroundSpriteLookup = BuildBackgroundSpriteLookup();
+        public static readonly byte[] BackgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
+        public static readonly bool[] FlipSpriteHorizontally = BuildFlipSpriteHorizontally();
+        public static readonly bool[] FlipSpriteVertically = BuildFlipSpriteVertically();
+        private static readonly byte[] ObjectSpriteLookup = BuildObjectSpriteLookups();
+        private static readonly byte[] ObjectPaletteLookup = BuildObjectPaletteLookups();
+        private static readonly byte[] DoorPalettes = BuildDoorPalettes();
 
-        public Bitmap BuildSprite(byte sprite, SquarePalette palette, bool flipHorizontallyAndRightAlign, bool flipVerticallyAndBottomAlign, byte offsetAlongY)
+        private static readonly Size SquareSize = new Size(16, 32);
+
+        public Bitmap Sprite { get; } = new Bitmap(SquareSize.Width, SquareSize.Height);
+
+        public void Clear(WaterLevelType waterLevelType)
             {
-            if (sprite > 0x7f)
-                throw new ArgumentOutOfRangeException(nameof(sprite), "sprite should be in the range 0 to 0x7f");
-            var result = new Bitmap(16,32);
-            using (Graphics g = Graphics.FromImage(result))
+            using (Graphics g = Graphics.FromImage(this.Sprite))
                 {
                 using (SolidBrush b = new SolidBrush(Color.Black))
                     {
-                    g.FillRectangle(b, 0, 0, 16, 32);
+                    g.FillRectangle(b, 0, 0, SquareSize.Width, SquareSize.Height);
+                    }
+
+                if (waterLevelType != WaterLevelType.AboveWater)
+                    {
+                    using (SolidBrush b = new SolidBrush(Color.FromArgb(0x80, Color.Blue)))
+                        {
+                        var top = (waterLevelType == WaterLevelType.AtWaterLine) ? 3 : 0;
+                        g.FillRectangle(b, 0, top, SquareSize.Width, SquareSize.Height);
+                        }
+                    }
+
+                if (waterLevelType == WaterLevelType.AtWaterLine)
+                    {
+                    using (SolidBrush b = new SolidBrush(Color.FromArgb(0x80, Color.Cyan)))
+                        {
+                        g.FillRectangle(b, 0, 2, SquareSize.Width, 1);
+                        }
                     }
                 }
+            }
+
+        public void BuildBackgroundSprite(byte backgroundAndOrientation, byte displayPalette)
+            {
+            byte background = (byte) (backgroundAndOrientation & 0x3f);
+            bool flipHorizontallyAndRightAlign = (backgroundAndOrientation & 0x80) != 0;
+            bool flipVerticallyAndBottomAlign = (backgroundAndOrientation & 0x40) != 0;
+
+            byte sprite = (byte) (BackgroundSpriteLookup[background]);
+            byte offsetAlongY = (byte) (BackgroundYOffsetLookup[background] & 0xf0);
+                
+            SquarePalette palette = SquarePalette.FromByte(displayPalette);
 
             var sourceRectangle = SpritePositions[sprite];
             bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
@@ -43,12 +79,12 @@ namespace ExileMappedBackground
                 }
             else if (!isSourceFlippedHorizontally) // && flipHorizontallyAndRightAlign
                 {
-                int width = result.Width - 1;
+                int width = SquareSize.Width - 1;
                 toX = x => width - x;
                 }
             else // if flipHorizontallyAndRightAlign && isSourceFlippedHorizontally
                 {
-                var left = result.Width - sourceRectangle.Width;
+                var left = SquareSize.Width - sourceRectangle.Width;
                 toX = x => left + x;
                 }
 
@@ -75,18 +111,248 @@ namespace ExileMappedBackground
                 {
                 for (int x = 0; x < sourceRectangle.Width; x++)
                     {
-                    int paletteIndex = GetSpriteData(x + sourceRectangle.X, y + sourceRectangle.Y);
+                    int paletteIndex = GetPixelColour(x + sourceRectangle.X, y + sourceRectangle.Y);
                     Color pixelColour = palette[paletteIndex];
+                    if (paletteIndex == 0)
+                        {
+                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        continue;
+                        }
                     int x2 = toX(x);
                     int y2 = toY(y);
-                    result.SetPixel(x2, y2, pixelColour);
+                    this.Sprite.SetPixel(x2, y2, pixelColour);
                     }
                 }
-
-            return result;
             }
 
-        private static int GetSpriteData(int x, int y)
+        public void BuildObjectFromDataSprite(byte data, byte orientation)
+            {
+            data = (byte) (data & 0x7f);
+            byte sprite = ObjectSpriteLookup[data];
+            byte objectPalette = ObjectPaletteLookup[data];
+            var palette = SquarePalette.FromByte(objectPalette);
+
+            var sourceRectangle = SpritePositions[sprite];
+            bool flipHorizontallyAndRightAlign = (orientation & 0x80) != 0;
+            bool flipVerticallyAndTopAlign = (orientation & 0x40) != 0;
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
+            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
+            
+            Func<int, int> toX;
+            if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
+                {
+                toX = x => x;
+                }
+            else if (!flipHorizontallyAndRightAlign) // && isSourceFlippedHorizontally
+                {
+                int right = sourceRectangle.Width - 1;
+                toX = x => right - x;
+                }
+            else if (!isSourceFlippedHorizontally) // && flipHorizontallyAndRightAlign
+                {
+                int width = SquareSize.Width - 1;
+                toX = x => width - x;
+                }
+            else // if flipHorizontallyAndRightAlign && isSourceFlippedHorizontally
+                {
+                var left = SquareSize.Width - sourceRectangle.Width;
+                toX = x => left + x;
+                }
+
+            Func<int, int> toY;
+            if (!flipVerticallyAndTopAlign && !isSourceFlippedVertically)     // so bottom aligned and no flip
+                {
+                int yOffset = SquareSize.Height - sourceRectangle.Height;
+                toY = y => y + yOffset;
+                }
+            else if (!isSourceFlippedVertically) // so top align with flip
+                {
+                var height = sourceRectangle.Height - 1;
+                toY = y => height - y;
+                }
+            else if (!flipVerticallyAndTopAlign) // so bottom align with flip
+                {
+                int bottom = sourceRectangle.Height - 1;
+                toY = y => bottom - y;
+                }
+            else            // so top align with flip
+                {
+                toY = y => y;
+                }
+
+            for (int y = 0; y < sourceRectangle.Height; y++)
+                {
+                for (int x = 0; x < sourceRectangle.Width; x++)
+                    {
+                    int paletteIndex = GetPixelColour(x + sourceRectangle.X, y + sourceRectangle.Y);
+                    Color pixelColour = palette[paletteIndex];
+                    if (paletteIndex == 0)
+                        {
+                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        continue;
+                        }
+                    int x2 = toX(x);
+                    int y2 = toY(y);
+                    this.Sprite.SetPixel(x2, y2, pixelColour);
+                    }
+                }
+            }
+
+        public void BuildObjectSprite(byte data, byte orientation, (byte x, byte y) offset)
+            {
+            data = (byte) (data & 0x7f);
+            byte sprite = ObjectSpriteLookup[data];
+            byte objectPalette = ObjectPaletteLookup[data];
+            var palette = SquarePalette.FromByte(objectPalette);
+
+            var sourceRectangle = SpritePositions[sprite];
+            bool flipHorizontally = (orientation & 0x80) != 0;
+            bool flipVertically = (orientation & 0x40) != 0;
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
+            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
+            
+            Func<int, int> toX;
+            if (flipHorizontally == isSourceFlippedHorizontally)
+                {
+                toX = x => x;
+                }
+            else 
+                {
+                int right = sourceRectangle.Width - 1;
+                toX = x => right - x;
+                }
+
+            Func<int, int> toY;
+            if (flipVertically == isSourceFlippedVertically)
+                {
+                toY = y => y;
+                }
+            else 
+                {
+                int height = sourceRectangle.Height - 1;
+                toY = y => height - y;
+                }
+
+            offset.x >>= 4;
+            offset.y >>= 3;
+
+            for (int y = 0; y < sourceRectangle.Height; y++)
+                {
+                for (int x = 0; x < sourceRectangle.Width; x++)
+                    {
+                    int paletteIndex = GetPixelColour(x + sourceRectangle.X, y + sourceRectangle.Y);
+                    Color pixelColour = palette[paletteIndex];
+                    if (paletteIndex == 0)
+                        {
+                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        continue;
+                        }
+                    int x2 = toX(x) + offset.x;
+                    int y2 = toY(y) + offset.y;
+                    this.Sprite.SetPixel(x2, y2, pixelColour);
+                    }
+                }
+            }
+        
+        public void BuildDoor(byte backgroundAndOrientation, byte data)
+            {
+            var backgroundObjectType = backgroundAndOrientation & 0x3f;
+            Debug.Assert(backgroundObjectType == 3 || backgroundObjectType == 4);
+
+            bool flipHorizontallyAndRightAlign = (backgroundAndOrientation & 0x80) != 0;
+            bool bottomAlign = (backgroundAndOrientation & 0x40) == 0;
+            var doorIsHorizontal = flipHorizontallyAndRightAlign ^ bottomAlign;
+            byte sprite;
+            switch (backgroundObjectType)
+                {
+                case 3:
+                    sprite = (byte) (doorIsHorizontal ? 0x4a : 0x4b);
+                    break;
+                case 4:
+                    sprite = (byte) (doorIsHorizontal ? 0x3c : 0x41);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(backgroundAndOrientation));
+                }
+
+            byte key = (byte) ((data >> 4) & 0b111);
+            SquarePalette palette = SquarePalette.FromByte(DoorPalettes[key]);
+
+            var sourceRectangle = SpritePositions[sprite];
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
+            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
+            
+            Func<int, int> toX;
+            if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
+                {
+                toX = x => x;
+                }
+            else if (!flipHorizontallyAndRightAlign) // && isSourceFlippedHorizontally
+                {
+                int right = sourceRectangle.Width - 1;
+                toX = x => right - x;
+                }
+            else if (!isSourceFlippedHorizontally) // && flipHorizontallyAndRightAlign
+                {
+                int width = SquareSize.Width - 1;
+                toX = x => width - x;
+                }
+            else // if flipHorizontallyAndRightAlign && isSourceFlippedHorizontally
+                {
+                var left = SquareSize.Width - sourceRectangle.Width;
+                toX = x => left + x;
+                }
+
+            Func<int, int> toY;
+            if (!bottomAlign && !isSourceFlippedVertically)
+                {
+                toY = y => y;
+                }
+            else if (!isSourceFlippedVertically) // && bottomAlign
+                {
+                int yOffset = SquareSize.Height - sourceRectangle.Height;
+                toY = y => y + yOffset;
+                }
+            else if (!bottomAlign) // && isSourceFlippedVertically
+                {
+                int bottom = sourceRectangle.Height - 1;
+                toY = y => bottom - y;
+                }
+            else
+                {
+                var bottom = SquareSize.Height - sourceRectangle.Height;
+                toY = y => bottom + y;
+                }
+
+            for (int y = 0; y < sourceRectangle.Height; y++)
+                {
+                for (int x = 0; x < sourceRectangle.Width; x++)
+                    {
+                    int paletteIndex = GetPixelColour(x + sourceRectangle.X, y + sourceRectangle.Y);
+                    Color pixelColour = palette[paletteIndex];
+                    if (paletteIndex == 0)
+                        {
+                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        continue;
+                        }
+                    int x2 = toX(x);
+                    int y2 = toY(y);
+                    this.Sprite.SetPixel(x2, y2, pixelColour);
+                    }
+                }
+            }
+
+        public void AddBitmap(Bitmap bitmap)
+            {
+            using (Graphics g = Graphics.FromImage(this.Sprite))
+                {
+                g.CompositingMode = CompositingMode.SourceOver;
+                bitmap.MakeTransparent(Color.Black);
+                g.DrawImage(bitmap, new Point(0, 0));
+                }
+            }
+
+        private static int GetPixelColour(int x, int y)
             {
             if (x < 0 || x >= 128)
                 throw new ArgumentOutOfRangeException(nameof(x));
@@ -330,6 +596,22 @@ namespace ExileMappedBackground
             return result;
             }
 
+         private static byte[] BuildBackgroundSpriteLookup()
+            {
+            var map = new byte[]
+                {
+                /* & &7f = sprite
+                   & &80 = not relevant
+                */
+                0xC6,0xCE,0xC6,0xC6,0xC6,0xBB,0xC6,0x18,0x2D,0x70,0x6A,0xC6,0x23,0x39,0xC6,0x62,
+                0xC0,0x8E,0x39,0x44,0x47,0x26,0x48,0x49,0xDF,0xC6,0x99,0x9A,0x25,0x2B,0x39,0x3B,
+                0x3C,0x55,0x8E,0x43,0x34,0x35,0x27,0x28,0x29,0x2A,0x42,0xBF,0x40,0x3D,0x38,0x36,
+                0x37,0x3E,0x33,0x31,0x2F,0x30,0x2C,0x24,0x32,0x41,0x45,0x3A,0x6A,0x23,0x60,0xCC
+                };
+            var result = map.Select(item => (byte) (item & 0x7f)).ToArray();
+            return result;
+            }
+
         private static byte[] BuildBackgroundYOffsetLookup()
             {
             var result = new byte[]
@@ -340,6 +622,46 @@ namespace ExileMappedBackground
                 0x82,0x70,0x06,0xC0,0xC5,0x04,0x80,0x06,0x80,0x04,0x99,0x30,0xC7,0x06,0xA9,0x00  // 30
                 };
             return result;
+            }
+
+        private static byte[] BuildObjectSpriteLookups()
+            {
+            var result = new byte[]
+                {
+                0x04, 0x14, 0x04, 0x75, 0x1e, 0x1b, 0x10, 0x10, 0x10, 0x1c, 0x1c, 0x20, 0x70, 0x70, 0x61, 0x52, 
+                0x72, 0x4f, 0x21, 0x08, 0x08, 0x21, 0x21, 0x08, 0x08, 0x21, 0x78, 0x78, 0x13, 0x13, 0x13, 0x5e, 
+                0x5e, 0x15, 0x16, 0x16, 0x16, 0x16, 0x04, 0x52, 0x45, 0x64, 0x64, 0x64, 0x64, 0x64, 0x59, 0x59, 
+                0x59, 0x59, 0x6d, 0x63, 0x63, 0x0b, 0x0f, 0x17, 0x14, 0x17, 0x39, 0x17, 0x4a, 0x4b, 0x3c, 0x41, 
+                0x1a, 0x71, 0x2e, 0x5d, 0x17, 0x20, 0x56, 0x57, 0x47, 0x22, 0x60, 0x7b, 0x76, 0x76, 0x58, 0x58, 
+                0x21, 0x4d, 0x4d, 0x4d, 0x4d, 0x20, 0x4d, 0x4d, 0x22, 0x6b, 0x6c, 0x6c, 0x79, 0x6c, 0x04, 0x7a, 
+                0x63, 0x7c, 0x7c, 0x79, 0x77
+                };
+            return result;
+            }
+
+        private static byte[] BuildObjectPaletteLookups()
+            {
+            // bit 7 indicates object can be picked up
+            var data = new byte[]
+                {
+                0x3e, 0x1b, 0x2e, 0xf2, 0x32, 0x32, 0x53, 0x05, 0x0f, 0x14, 0x29, 0xbc, 0x65, 0x65, 0xf7, 0x97, 
+                0xd3, 0xc7, 0xef, 0x7e, 0x5f, 0x3c, 0x5a, 0x11, 0x2d, 0x34, 0xe1, 0x80, 0x55, 0x1b, 0x4c, 0x59, 
+                0x23, 0x72, 0x2e, 0x7b, 0x77, 0x33, 0x39, 0x8b, 0x44, 0x51, 0x0d, 0x46, 0x2b, 0x53, 0x35, 0x3c, 
+                0x02, 0x01, 0x70, 0x9c, 0xcf, 0x00, 0x14, 0x10, 0x4b, 0x10, 0x0c, 0x34, 0x6b, 0x6b, 0x42, 0x42, 
+                0x31, 0x6f, 0x15, 0x2e, 0x12, 0xcb, 0x33, 0xb1, 0x62, 0x00, 0xdb, 0x9f, 0x8f, 0xcf, 0xe5, 0x8e, 
+                0xef, 0xab, 0xad, 0x95, 0x9c, 0x91, 0x92, 0xa6, 0x91, 0xb1, 0x8e, 0xe0, 0xa2, 0xb5, 0xb3, 0xe3, 
+                0xd5, 0xe3, 0xd7, 0xf0, 0xf1
+                };
+            return data.Select(p => (byte) (p & 0x7f)).ToArray();
+            }
+
+        private static byte[] BuildDoorPalettes()
+            {
+            var data = new byte[]
+                {
+                0x2b, 0x2d, 0x15, 0x1c, 0x42, 0x12, 0x26, 0x4e
+                };
+            return data;
             }
         }
     }
