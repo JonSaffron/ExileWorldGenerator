@@ -514,23 +514,18 @@ data byte format: xnnnnnee
 data type indicates the type of the object that is created
 
 handle_background_door:
-data byte format: xkkks??l 
-where kkk is the key required
-      l is set if locked
-	  s is set means the door opens & closes slowly and stays open until touched
-6 when opening or opened
-4 when closing
+data byte format: xkkksaol 
+where l is set if locked
+	  o is set to trigger the door to open and remains set whilst door is opening or is latched in the open position. When cleared it triggers the door to start closing.
+	  a is probably the active flag and is set whilst the door is not fully closed
+	  s when set means the door opens & closes really slowly
+	  kkk is the key required - if kkk is x00 then the door opens then closes, otherwise it latches open
 
-example for background object id 29:
-	offscreen data is AD		1010 1101
-	onscreen it becomes 29		0010 1001
-	becomes A9 when offscreen	1010 1001
-	destoryed becomes 2D again and remains so
-
-	whilst opening 2E			0010 1110
-	whilst closing 2C			0010 1100
-	closed and unlocked	28		0010 1000
-
+handle_background_teleport:
+data byte format: xkkdddda
+where a is set if active
+	  dddd is the destination index into teleport_destinations_x and teleport_destinations_y
+	  kk + 3 is the key required to activate/deactivate the transporter
 
 handle_background_object_from_type:
 data type indicates the type of the object e.g. nest
@@ -984,10 +979,10 @@ These are a list of square_x values in sections delimited by background_objects_
 #0807: 00 ; red/yellow/green key
 #0808: 00 ; green/yellow/red key
 #0809: 00 ; yellow/white/red key
-#080a: 00 ; (unused)
+#080a: 00 ; (unused - no key available for tile door)
 #080b: 00 ; red/magenta/red key
 #080c: 00 ; blue/cyan/green key
-#080d: 00 ; (unused)
+#080d: 00 ; (unused - no key available for tile door)
 
 #080e: 00 ; booster_collected
 #080f: 00 ; pistol
@@ -1001,9 +996,9 @@ These are a list of square_x values in sections delimited by background_objects_
 #0817: 00 ; whistle2_collected
 #0818: 00 ; radiation_pill_collected
 
-#0819: 00 ; door_timer
-#081a: 00 ; red_mushroom_daze
-#081b: 00 ; blue_mushroom_daze
+#0819: 00 ; door_timer					# counts down to 0
+#081a: 00 ; red_mushroom_daze			# counts down to 0
+#081b: 00 ; blue_mushroom_daze			# counts down to 0
 #081c: 00 ; chatter_energy_level
 #081d: 00 ; explosion_timer
 #081e: 00 ; endgame_value
@@ -1069,7 +1064,7 @@ These are a list of square_x values in sections delimited by background_objects_
 ; 20 set = remove from display
 ; 10 set = teleporting
 ; 08 set = damaged
-; 04 set = ???? but it's done at 1ed6
+; 04 set = ???? but it's set at 1ed6 - checked at 4daf
 ; 02 set = collision detected
 ; 01 set at load positon?
 #08c6: 81 11 01 01 01 01 01 01 01 01 01 01 01 01 01 01 ; object_stack_flags
@@ -2841,27 +2836,27 @@ f $FE                        ; white bg, cyan bg
 
 ; play_sound2
 &13f8: 38               SEC
-&13f9: 24 18            BIT &18 ; wall_collision_bottom_minus_top
+&13f9: 24 18            BIT &18							# nop
 ; play_sound
-&13fa: 18		CLC
+&13fa: 18				CLC
 &13fb: 85 98            STA &98 ; temp_a                # store registers
 &13fd: 86 99            STX &99 ; temp_x
 &13ff: 84 9a            STY &9a ; temp_y
 &1401: 08               PHP                             # push processor status
 &1402: 68               PLA                             # and pull it back again
 &1403: aa               TAX                             # X is processor status
-&1404: 68               PLA                             
-&1405: 85 9b            STA &9b ; sound_data_l          # &9b is lsb of sound data
+&1404: 68               PLA                             # get lsb-1 of return address (stack stores return address - 1)
+&1405: 85 9b            STA &9b ; sound_data_l          # set &9b to lsb - 1 of sound data
 &1407: 18               CLC
-&1408: 69 04            ADC #&04
-&140a: a8               TAY                             # Y is lsb of new return address
-&140b: 68               PLA
+&1408: 69 04            ADC #&04						# add 4 bytes to return address
+&140a: a8               TAY                             # store in Y the new lsb of new return address
+&140b: 68               PLA								# get msb of return address 
 &140c: 85 9c            STA &9c ; sound_data_h          # &9c is msb of sound data
-&140e: 69 00            ADC #&00
+&140e: 69 00            ADC #&00						# add any carry from adding 4
 &1410: 48               PHA                             # push msb of new return address
-&1411: 98               TYA
+&1411: 98               TYA								# restore lsb of new return address
 &1412: 48               PHA                             # push lsb of new return address
-&1413: 8a               TXA
+&1413: 8a               TXA								# restore processor status to A
 &1414: 48               PHA                             # push processor status
 &1415: 20 59 35         JSR &3559 ; get_object_distance_from_screen_centre
 &1418: c9 10            CMP #&10                        # is it too far away?
@@ -3781,12 +3776,14 @@ f $FE                        ; white bg, cyan bg
 &19c9: 20 97 1f         JSR &1f97 ; process_screen_background_flash
 &19cc: 20 0b 1a         JSR &1a0b ; process_objects
 &19cf: 20 9a 25         JSR &259a ; process_events
-&19d2: a2 02            LDX #&02
-&19d4: bd 19 08         LDA &0819,X ; actually mushroom_daze		        # decrease mushroom_daze if not zero
-&19d7: f0 03            BEQ &19dc
-&19d9: de 19 08         DEC &0819,X ; actually mushroom_daze            
-&19dc: ca               DEX                                                     # for both red and blue dazes
-&19dd: 10 f5            BPL &19d4
+
+&19d2: a2 02            LDX #&02												# initialise loop counter
+&19d4: bd 19 08         LDA &0819,X ; door_timer / mushroom_daze				# get current value
+&19d7: f0 03            BEQ &19dc												# branch over decrement if zero
+&19d9: de 19 08         DEC &0819,X ; door_timer / mushroom_daze				# decrement value
+&19dc: ca               DEX                                                     # decrement loop counter
+&19dd: 10 f5            BPL &19d4												# loop until X = &FF
+
 &19df: ad 1d 08         LDA &081d ; explosion_timer			        # increase explosion_timer if not zero
 &19e2: f0 03            BEQ &19e7
 &19e4: ee 1d 08         INC &081d ; explosion_timer
@@ -7059,31 +7056,34 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 ; toggle_door_locked_state
 ; on entry, A = 0x40 if toggling a door or A = 0 if toggling a teleport
-&31ac: 69 40            ADC #&40				# set overflow if toggling door
+&31ac: 69 40            ADC #&40				# set overflow flag if toggling door
 &31ae: a5 bc            LDA &bc ; this_object_data
-&31b0: 70 04            BVS &31b6				# branch if toggling door
-&31b2: 69 60            ADC #&60
-&31b4: 4a               LSR A
-&31b5: b8               CLV
+&31b0: 70 04            BVS &31b6 ; extract_key_required	# branch over if toggling door
+&31b2: 69 60            ADC #&60				# add &60 to teleport data
+&31b4: 4a               LSR A					# shift right
+&31b5: b8               CLV						# clear overflow to indicate toggling teleport
 
+; extract_key_required
 &31b6: 4a               LSR A
 &31b7: 4a               LSR A
 &31b8: 4a               LSR A
-&31b9: 4a               LSR A
+&31b9: 4a               LSR A					# A now has the key
 &31ba: aa               TAX
-&31bb: bd 06 08         LDA &0806,X ; keys_collected	                        # have we got the right key?
+&31bb: bd 06 08         LDA &0806,X ; keys_collected	            # have we got the right key?
 &31be: 10 17            BPL &31d7			                        # if not, rts
 
-&31c0: a5 bc            LDA &bc ; this_object_data	
-&31c2: 49 01            EOR #&01                                                # toggle its state
-&31c4: 50 08            BVC &31ce						# branch if toggling teleport
-&31c6: 4a               LSR A							# bit 0 to carry
-&31c7: 29 fe            AND #&fe						# mask bits 1 to 7
-&31c9: b0 02            BCS &31cd						# branch if carry set
-&31cb: 09 01            ORA #&01						# set bit 0
+&31c0: a5 bc            LDA &bc ; this_object_data		# get object data
+&31c2: 49 01            EOR #&01                        # toggle its locked status flag
+&31c4: 50 08            BVC &31ce ; store_teleport_status	# branch if toggling teleport
 
-&31cd: 2a               ROL								# shift left, carry to bit 0
+&31c6: 4a               LSR A							# new lock bit value to carry
+&31c7: 29 fe            AND #&fe						# set bit 0 (which was bit 1) to 0
+&31c9: b0 02            BCS &31cd						# branch if carry set (which is the new lock value)
+&31cb: 09 01            ORA #&01						# set bit 0 (this happens when lock bit not set)
 
+&31cd: 2a               ROL								# move lock bit back in. So we end up with xxxxxx01 (close and locked) or xxxxxx10 (open and unlocked)
+
+; store_teleport_status
 &31ce: 85 bc            STA &bc ; this_object_data
 &31d0: 20 fa 13         JSR &13fa ; play_sound
 #31d3: 94 64 ba c6 ; sound_data
@@ -8973,7 +8973,7 @@ maggot x = &06 a = &08
 &3e8c: a9 3b            LDA #&3b						# &3b = engine thruster
 &3e8e: 4c 42 40         JMP &4042 ; pull_objects_in_from_tertiary_stack
 
-#3e91: 17 19 2a 19 ; door_square_sprite_lookup
+#3e91: 17 19 2a 19 ; door_square_sprite_lookup	# corresponds to the entries in background_sprite_lookup
 
 ; handle_background_stone_door
 # called with:
@@ -8994,38 +8994,38 @@ maggot x = &06 a = &08
 &3ea1: a5 09            LDA &09 ; square_orientation
 &3ea3: 0a               ASL A			# bit 7 (flipped left/right) to carry flag
 &3ea4: 2a               ROL A			# carry (flipped left/right) to bit 0, upside down to carry
-&3ea5: 69 00            ADC #&00		# add carry flag
+&3ea5: 69 00            ADC #&00		# add carry flag (and clear carry)
 &3ea7: 29 01            AND #&01		# get bit 0
 &3ea9: 48               PHA				# store. bit 0 will be set if either flipped vertically or horizontally, but not both
 
 &3eaa: b9 86 09         LDA &0986,Y ; background_objects_data
 &3ead: 30 01            BMI &3eb0		# branch if door is off-screen
 
-&3eaf: 4a               LSR A			# bit 0 to carry
+&3eaf: 4a               LSR A			# shift right (lock bit goes to carry)
 
-&3eb0: 29 02            AND #&02		# mask for current bit 1
-&3eb2: 4a               LSR A			# will clear carry, bit 1 to bit 0
-&3eb3: e9 00            SBC #&00		# will subtract 1, carry set if result = 0
-&3eb5: 85 a3            STA &a3			# store 0 or FF
+&3eb0: 29 02            AND #&02		# mask to get active flag (on-screen) or open flag (off-screen)
+&3eb2: 4a               LSR A			# will clear carry, active flag (on-screen) or open flag (off-screen) now in bit 0
+&3eb3: e9 00            SBC #&00		# will subtract 1. carry will be set if result is 0, and clear if result is ff
+&3eb5: 85 a3            STA &a3			# store 0 (if active or open/opening) or FF (if inactive or closed/closing)
 
 &3eb7: a5 2d            LDA &2d ; background_processing_flag
-&3eb9: 30 09            BMI &3ec4		# branch if bit 7 set
+&3eb9: 30 09            BMI &3ec4		# branch if bit 7 set (display related)
 
 &3ebb: 68               PLA				# restore v_flip ^ h_flip value in bit 0
-&3ebc: 48               PHA
+&3ebc: 48               PHA				# store it again
 
-&3ebd: 2a               ROL	A			# bit 0 to bit 1, carry to bit 0
+&3ebd: 2a               ROL	A			# set a = 0 for closed horizontal door, a = 1 for open horizontal door, a = 2 for closed vertical door, a = 3 for open vertical door
 &3ebe: aa               TAX
 &3ebf: bd 91 3e         LDA &3e91,X ; door_square_sprite_lookup
 &3ec2: 85 08            STA &08 ; square_sprite
 
 &3ec4: 68               PLA				# restore v_flip ^ h_flip value in bit 0
 &3ec5: 24 2d            BIT &2d ; background_processing_flag
-&3ec7: 70 19            BVS &3ee2					        # if bit 6 set, leave
+&3ec7: 70 19            BVS &3ee2					        # if bit 6 set (in sight), leave
 
 &3ec9: 48               PHA
 &3eca: 18               CLC
-&3ecb: 65 9c            ADC &9c ; door_type
+&3ecb: 65 9c            ADC &9c ; door_type		(can result in &3c to &3f)
 &3ecd: 20 42 40         JSR &4042 ; pull_objects_in_from_tertiary_stack
 
 &3ed0: 68               PLA				# restore v_flip ^ h_flip value in bit 0
@@ -9038,7 +9038,7 @@ maggot x = &06 a = &08
 &3eda: 99 76 09         STA &0976,Y ; object_stack_extra	# sets the square occupied by the door in the open position
 
 &3edd: a5 a3            LDA &a3
-&3edf: 99 16 09         STA &0916,Y ; object_stack_tx
+&3edf: 99 16 09         STA &0916,Y ; object_stack_tx		# set target to 0 (if active/open/opening) or ff (if inactive/closed/closing)
 
 &3ee2: 60               RTS
 
@@ -9049,9 +9049,9 @@ maggot x = &06 a = &08
 &3ee3: a9 41            LDA #&41 					        # &41 = teleport beam
 &3ee5: 20 42 40         JSR &4042 ; pull_objects_in_from_tertiary_stack
 &3ee8: a9 40            LDA #&40
-&3eea: 99 80 08         STA &0880,Y ; object_stack_x_low
+&3eea: 99 80 08         STA &0880,Y ; object_stack_x_low	# x within square is &40
 &3eed: 0a               ASL
-&3eee: 99 a3 08         STA &08a3,Y ; object_stack_y_low
+&3eee: 99 a3 08         STA &08a3,Y ; object_stack_y_low	# y within square starts at &80 
 &3ef1: 60               RTS
 
 ; handle_background_invisible_switch
@@ -9737,7 +9737,7 @@ maggot x = &06 a = &08
 &4313: 4c db 40         JMP &40db ; explode_object			        
 ; grenade_still_ticking
 &4316: e6 12            INC &12 ; this_object_timer			
-&4318: 20 d4 4d         JSR &4dd4 ; rotate_colour                               # cycle its colour
+&4318: 20 d4 4d         JSR &4dd4 ; set_object_colour                               # cycle its colour
 &431b: 8a               TXA
 &431c: d0 07            BNE &4325                                               # once every four ticks
 &431e: 20 fa 13         JSR &13fa ; play_sound				        # sound the grenade claxon
@@ -9887,7 +9887,7 @@ maggot x = &06 a = &08
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&43e7: 20 d2 4d         JSR &4dd2 ; rotate_colour_6                             # cycle the colour of the hover ball
+&43e7: 20 d2 4d         JSR &4dd2 ; set_colour_via_rotator                             # cycle the colour of the hover ball
 &43ea: 98               TYA
 ; handle_hover_ball_invisible
 # called with:
@@ -11214,117 +11214,126 @@ invisible switches
 
 &4c9e: 20 c5 0b         JSR &0bc5 ; has_object_been_hit_by_rcd_beam
 &4ca1: b0 05            BCS &4ca8                                               # branch if it has not been hit by the rcd beam
-&4ca3: a9 40            LDA #&40
-&4ca5: 20 ac 31         JSR &31ac ; toggle_door_locked_state                    # if so, toggle its lock
+&4ca3: a9 40            LDA #&40												# specifies toggling door lock (as opposed to a teleport)
+&4ca5: 20 ac 31         JSR &31ac ; toggle_door_locked_state                    # toggle the door lock
 
-&4ca8: 6e 99 35         ROR &3599 ; door_data_pointer_store			# bit 7 will be set if the rcd beam is not hitting the door
+&4ca8: 6e 99 35         ROR &3599 ; door_data_pointer_store			# bit 7 will be set if the rcd beam is not hitting the door, or if the door lock is toggled
 &4cab: a5 bc            LDA &bc ; this_object_data					# get current door status
-&4cad: 09 04            ORA #&04									# set bit 2
+&4cad: 09 04            ORA #&04									# set bit 2, the "active" flag
 &4caf: 48               PHA											# save new status
-&4cb0: 4a               LSR A				# shift right, bit 0 to carry, bit 7 cleared
-&4cb1: 6a               ROR A				# shift right, carry to bit 0, carry cleared
-&4cb2: 6a               ROR A				# shift right, ba0hgfed   carry = c
-&4cb3: 85 9f            STA &9f				# and store in temporary location
-&4cb5: 4a               LSR A				# shift right, 0ba0hgfe, carry = d
-&4cb6: 29 07            AND #&07			# mask to get key required
-&4cb8: 85 9e            STA &9e				# store in temporary location
-&4cba: 29 03            AND #&03			# mask to get bottom 2 bits of key required
-&4cbc: aa               TAX					# x = bottom 2 bits of key
+&4cb0: 4a               LSR A				# shift right: bit 0 (lock flag) to carry, bit 7 cleared
+&4cb1: 6a               ROR A				# shift right: carry (lock flag) to bit 7, carry gets open flag
+&4cb2: 6a               ROR A				# shift right: open flag into bit 7, carry gets active flag which is set
+&4cb3: 85 9f            STA &9f				# and store current value into temporary location
+&4cb5: 4a               LSR A				# shift right: speed flag into carry, bit 7 cleared. Bottom 3 bits now equal the key for the door.
+&4cb6: 29 07            AND #&07			# mask to get the 3 bit key required to lock/unlock door
+&4cb8: 85 9e            STA &9e				# store key in temporary location
+&4cba: 29 03            AND #&03			# mask to get bottom 2 bits of key required. If 0 then the door opens then closes, otherwise it latches in the open position
+&4cbc: aa               TAX					# x gets the latch status
 
 &4cbd: 08               PHP					# store carry which has bit 3 of the status byte
-&4cbe: a5 15            LDA &15 ; this_object_energy
-&4cc0: dd 76 4d         CMP &4d76,X ; unknown_doors_lookup		# set carry if this_object_energy >= unknown_doors_lookup[x]
+&4cbe: a5 15            LDA &15 ; this_object_energy			# default energy for a door is &ff
+&4cc0: dd 76 4d         CMP &4d76,X ; door_minimum_energy_threshold		# set carry if this_object_energy >= unknown_doors_lookup[x]
 &4cc3: a9 ff            LDA #&ff			# to set door energy to FF
-&4cc5: b0 0e            BCS &4cd5			# branch where door has more energy
+&4cc5: b0 0e            BCS &4cd5 ; set_door_energy		# branch where door has more energy and set maximum energy
 
-&4cc7: 28               PLP					# retrieve bit 3 of the status byte
+&4cc7: 28               PLP					# retrieve bit 3 of the status byte into carry which is the speed flag
 &4cc8: 08               PHP					# keep it safe
-&4cc9: a9 00            LDA #&00			# to set door energy to 0
-&4ccb: b0 08            BCS &4cd5			# branch if bit 3 of the status byte set
+&4cc9: a9 00            LDA #&00			# to set door energy to 0 and destroy the door
+&4ccb: b0 08            BCS &4cd5 ; set_door_energy		# branch if bit 3 of the status byte set (so the door is slow)
 
-&4ccd: 28               PLP					# retrieve bit 3 of the status byte
-&4cce: 68               PLA					# get new door status
-&4ccf: 09 08            ORA #&08			# set bit 3
-&4cd1: 48               PHA					# restore new door status
-&4cd2: 08               PHP					# restore bit 3 of status byte
+	# not sure what the point of this next bit is. 
+&4ccd: 28               PLP					# retrieve bit 3 of the status byte again into carry
+&4cce: 68               PLA					# get new door status (which is the current status with the active flag set)
+&4ccf: 09 08            ORA #&08			# set bit 3 (the speed flag)
+&4cd1: 48               PHA					# push revised door status
+&4cd2: 08               PHP					# push bit 3 of status byte
 &4cd3: b0 02            BCS &4cd7			# ??? can't ever branch - bcs is earlier and value of carry can't change ???
 
-&4cd5: 85 15            STA &15 ; this_object_energy
+; set_door_energy
+&4cd5: 85 15            STA &15 ; this_object_energy	# will either store 0 or &ff
 
-&4cd7: bd 72 4d         LDA &4d72,X ; unknown_doors_two		# get lookup value
+&4cd7: bd 72 4d         LDA &4d72,X ; door_speed		# get lookup value
 &4cda: 28               PLP					# get bit 3 of status byte into carry
 
-&4cdb: 90 02            BCC &4cdf			# branch over if standard door behaviour (fast and not latching)
-&4cdd: a9 01            LDA #&01			# use value of 1 instead of unknown_doors_two lookup
+&4cdb: 90 02            BCC &4cdf			# branch over if standard door behaviour (branch when normal speed)
+&4cdd: a9 01            LDA #&01			# use value of 1 instead of door_speed lookup
 
-&4cdf: 24 9f            BIT &9f				# retrieve door status byte ba0hgfed
-&4ce1: 30 09            BMI &4cec			# branch if open???
-&4ce3: 4a               LSR A				# shift right, with bit 0 to carry, bit 7 = 0
-&4ce4: 49 ff            EOR #&ff			# reverse all remaining bits
-&4ce6: 24 3b            BIT &3b ; this_object_supporting	# test if switch is being pressed
-&4ce8: 30 02            BMI &4cec							# branch if not being pressed
-&4cea: a9 ff            LDA #&ff			# reset when being touched
+&4cdf: 24 9f            BIT &9f				# test door status saved earlier - bit 7 has opening flag
+&4ce1: 30 09            BMI &4cec			# branch if opening or open
+&4ce3: 4a               LSR A				# shift right, to halve speed
+&4ce4: 49 ff            EOR #&ff			# negate the value (approximately)
+&4ce6: 24 3b            BIT &3b ; this_object_supporting	# test if door is being touched
+&4ce8: 30 02            BMI &4cec							# branch if not being touched
+&4cea: a9 ff            LDA #&ff			# use a slow speed when being touched
 
-&4cec: 85 9c            STA &9c
-&4cee: a5 14            LDA &14 ; this_object_tx
-&4cf0: 49 80            EOR #&80
+
+&4cec: 85 9c            STA &9c				# store door_speed
+&4cee: a5 14            LDA &14 ; this_object_tx	# 0 (if active/open/opening) or ff (if inactive/closed/closing)
+&4cf0: 49 80            EOR #&80			# toggle msb, to get &80 -128 if opening or &7f +127 if closing
 &4cf2: 38               SEC
-&4cf3: e5 9c            SBC &9c
-&4cf5: 50 44            BVC &4d3b
+&4cf3: e5 9c            SBC &9c				# subtract speed (a +ve number if opening, or -ve if closing)
+&4cf5: 50 44            BVC &4d3b ; move_door_alt				# door already in motion - continue moving???
 &4cf7: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number		# reset A to 7f or 80 if carry set
 &4cfa: a8               TAY
-&4cfb: 10 0c            BPL &4d09						# 
+&4cfb: 10 0c            BPL &4d09 ; mark_door_fully_shut			# branch when door has reached it's closed position
 &4cfd: 8a               TXA
-&4cfe: d0 0d            BNE &4d0d
-&4d00: ad 19 08         LDA &0819 ; door_timer
-&4d03: c9 14            CMP #&14
-&4d05: b0 06            BCS &4d0d
-&4d07: 90 19            BCC &4d22
+&4cfe: d0 0d            BNE &4d0d ; check_if_door_touched
+&4d00: ad 19 08         LDA &0819 ; door_timer						# get the door timer
+&4d03: c9 14            CMP #&14									
+&4d05: b0 06            BCS &4d0d ; check_if_door_touched			# if 14 or more than wait to see if manually closed
+&4d07: 90 19            BCC &4d22 ; open_or_shut_door				# start automatically closing door
 
+; mark_door_fully_shut
 &4d09: 68               PLA
-&4d0a: 29 fb            AND #&fb				# clear bit 2
+&4d0a: 29 fb            AND #&fb				# clear bit 2 (the active flag)
 &4d0c: 48               PHA
 
+; check_if_door_touched
 &4d0d: 24 3b            BIT &3b ; this_object_supporting	# test if door is being touched
-&4d0f: 30 29            BMI &4d3a							# branch if it isn't
-&4d11: 24 9f            BIT &9f								# set overflow for locked/unlocked state
-&4d13: 70 25            BVS &4d3a							# branch when locked
-&4d15: 8a               TXA									# x = bottom 2 bits of key & also set Z flag
-&4d16: d0 0a            BNE &4d22							# branch if key isn't 0 or 4
-&4d18: ad 19 08         LDA &0819 ; door_timer
-&4d1b: d0 1d            BNE &4d3a							# branch if door_timer <> 0
-&4d1d: a9 3c            LDA #&3c
-&4d1f: 8d 19 08         STA &0819 ; door_timer				# reset door_timer to 3c
+&4d0f: 30 29            BMI &4d3a ; move_door				# branch if it isn't
+&4d11: 24 9f            BIT &9f								# set overflow flag for locked/unlocked state
+&4d13: 70 25            BVS &4d3a ; move_door				# branch when locked - can't open or close door when locked
+&4d15: 8a               TXA									# x = bottom 2 bits of key which gives latching behaviour
+&4d16: d0 0a            BNE &4d22 ; open_or_shut_door		# branch if key isn't 0 or 4 - door latches so open and close are both manual events
+&4d18: ad 19 08         LDA &0819 ; door_timer				# non-latching doors will have a timer started when they start to open
+&4d1b: d0 1d            BNE &4d3a ; move_door				# branch if door_timer <> 0, door will automatically shut
+&4d1d: a9 3c            LDA #&3c							# door_timer for non-latching doors starts from 3c
+&4d1f: 8d 19 08         STA &0819 ; door_timer				# start door_timer counting down
 
+; open_or_shut_door
 &4d22: 68               PLA
-&4d23: 49 02            EOR #&02							# toggle bit 1
+&4d23: 49 02            EOR #&02							# toggle bit 1 (open flag)
 &4d25: 48               PHA
-&4d26: 29 02            AND #&02							# mask for bit 1
-&4d28: f0 09            BEQ &4d33							# branch if about to shut
+&4d26: 29 02            AND #&02							# get bit 1 (open flag)
+&4d28: f0 09            BEQ &4d33							# branch if shutting
 &4d2a: 20 fa 13         JSR &13fa ; play_sound				# play open sound
 #4d2d: c7 c3 c1 13 ; sound data
-&4d31: b0 07            BCS &4d3a
+&4d31: b0 07            BCS &4d3a							# jump always
 &4d33: 20 fa 13         JSR &13fa ; play_sound				# play close sound
 #4d36: c7 c3 c1 03 ; sound data
 
+; move_door
 &4d3a: 98               TYA
 
+; move_door_alt
 &4d3b: 49 80            EOR #&80
-&4d3d: a6 16            LDX &16 ; this_object_ty
+&4d3d: a6 16            LDX &16 ; this_object_ty			# set X to 0 if a horizontal door, or 2 for a vertical door
 &4d3f: a8               TAY
 &4d40: 38               SEC
 &4d41: e5 14            SBC &14 ; this_object_tx
 &4d43: c9 80            CMP #&80
 &4d45: 6a               ROR
-&4d46: 95 43            STA &43,X
+&4d46: 95 43            STA &43,X ; this_object_vel_x for horizontal door, or this_object_vel_y for a vertical door
 &4d48: 98               TYA
 &4d49: 85 14            STA &14 ; this_object_tx
 &4d4b: 18               CLC
 &4d4c: 69 10            ADC #&10
-&4d4e: 95 4f            STA &4f,X
+&4d4e: 95 4f            STA &4f,X ; this_object_x_low for horizontal door, or this_object_y_low for a vertical door
 &4d50: a5 11            LDA &11 ; this_object_extra
 &4d52: 69 00            ADC #&00
-&4d54: 95 53            STA &53,X
+&4d54: 95 53            STA &53,X ; this_object_x for horizontal door, or this_object_y for a vertical door
+
 &4d56: 68               PLA
 &4d57: a4 15            LDY &15 ; this_object_energy
 &4d59: d0 02            BNE &4d5d
@@ -11337,78 +11346,89 @@ invisible switches
 &4d66: bd 7a 4d         LDA &4d7a,X ; door_palettes						# get palette for key
 &4d69: 24 9f            BIT &9f											# set overflow for locked/unlocked state
 &4d6b: 70 02            BVS &4d6f										# branch when locked
-&4d6d: 29 0f            AND #&0f										# clear primary colour for when unlocked
+&4d6d: 29 0f            AND #&0f										# clear primary colour from palette when unlocked
 
 &4d6f: 85 73            STA &73 ; this_object_palette			        # set colour scheme
 &4d71: 60               RTS
 
-#4d72: 20 10 08 20 ; unknown_doors_two
-#4d76: 80 74 c0 80 ; unknown_doors_lookup
+#4d72: 20 10 08 20 ; door_speed
+#4d76: 80 74 c0 80 ; door_minimum_energy_threshold		# if the energy of the door goes below this value then the door will be destroyed
 
 #4d7a: 2b 2d 15 1c 42 12 26 4e ; door_palettes
 indexed by key, bits 4 to 6 of the door data
-0 : green, yellow bg & cyan bg
-1 : green, yellow bg & red bg
-2 : red, yellow bg & green bg
-3 : red, white bg & yellow bg
-4 : blue, magenta bg & red bg
-5 : red, magenta bg & red bg
-6 : green, cyan bg & blue bg
-7 : blue, white bg & magenta bg (used for tile doors)
+door	palette												speed	min_energy
+0		green, yellow bg & cyan bg							20		80
+1		green, yellow bg & red bg							10		74
+2		red, yellow bg & green bg							08		c0
+3		red, white bg & yellow bg							20		80
+4		blue, magenta bg & red bg (used for tile doors)		20		80
+5		red, magenta bg & red bg							10		74
+6		green, cyan bg & blue bg							08		c0
+7		blue, white bg & magenta bg (used for tile doors)	20		80
 
 #4d82: 52 63 35 21 ; teleport_beam_palettes
+	52	magenta primary / magenta bg, red bg
+	63  cyan primary / cyan bg, red bg
+	35  yellow primary / yellow bg, green bg
+	21  green primary / green bg, red bg
 
 ; handle_teleport_beam
 # called with:
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&4d86: 4a               LSR						        # data & &01 = teleporter inactive
-&4d87: 29 0f            AND #&0f                                                # data & &1e = teleport number * 2
-&4d89: aa               TAX                                                     # X = teleport number
-&4d8a: a9 b0            LDA #&b0					        # &b0 = beam sitting in teleporter base
-&4d8c: b0 2f            BCS &4dbd ; stationary_beam
-&4d8e: 98               TYA						
-&4d8f: 30 1c            BMI &4dad ; deal_with_the_beam_itself		        # is the beam touching something?
-&4d91: b9 c6 08         LDA &08c6,Y ; object_stack_flags
-&4d94: 29 10            AND #&10                                                # if so, is it already teleporting?
-&4d96: d0 15            BNE &4dad ; deal_with_the_beam_itself                   # if so, ignore it; otherwise
-&4d98: bd 4a 31         LDA &314a,X ; teleport_destinations_x
-&4d9b: 99 16 09         STA &0916,Y ; object_stack_tx		                # start teleporting the object
-&4d9e: bd 5a 31         LDA &315a,X ; teleport_destinations_y
-&4da1: 99 36 09         STA &0936,Y ; object_stack_ty
-&4da4: 20 f0 0c         JSR &0cf0 ; mark_stack_object_as_teleporting
-&4da7: 20 a9 0b         JSR &0ba9 ; set_object_velocities		        # set the object velocities to those of the beam
+&4d86: 4a               LSR												# move bit 0 active/inactive flag to carry
+&4d87: 29 0f            AND #&0f                                                # teleport destination is bits 1 to 4
+&4d89: aa               TAX                                                     # set X = teleport number
+&4d8a: a9 b0            LDA #&b0										# &b0 = position where beam sitting in teleporter base
+&4d8c: b0 2f            BCS &4dbd ; set_beam_position
+
+&4d8e: 98               TYA												# set a to index of object touching beam (if any)
+&4d8f: 30 1c            BMI &4dad ; animate_beam						# branch over if the beam isn't touching something
+
+&4d91: b9 c6 08         LDA &08c6,Y ; object_stack_flags				# get the stack flags of the object touching the beam
+&4d94: 29 10            AND #&10                                        # mask for the 'currently teleporting' flag
+&4d96: d0 15            BNE &4dad ; animate_beam						# branch over if it is already teleporting
+
+&4d98: bd 4a 31         LDA &314a,X ; teleport_destinations_x				# get the teleport destination x square
+&4d9b: 99 16 09         STA &0916,Y ; object_stack_tx		                # store it
+&4d9e: bd 5a 31         LDA &315a,X ; teleport_destinations_y				# get the teleport destination y square
+&4da1: 99 36 09         STA &0936,Y ; object_stack_ty						# store it
+&4da4: 20 f0 0c         JSR &0cf0 ; mark_stack_object_as_teleporting		# start teleporting
+&4da7: 20 a9 0b         JSR &0ba9 ; set_object_velocities					# set the object velocities to those of the beam
 &4daa: 20 0d 44         JSR &440d ; play_teleport_noise
-; deal_with_the_beam_itself
+
+; animate_beam
 &4dad: a5 6f            LDA &6f ; this_object_flags
 &4daf: 29 04            AND #&04                                                # is the beam active?
 &4db1: d0 15            BNE &4dc8 ; no_beam_motion                              # if not, don't move it
+
 &4db3: a5 11            LDA &11 ; this_object_extra                             # this_object_extra = beam position
-&4db5: 69 20            ADC #&20
-&4db7: c9 b1            CMP #&b1                                                # scan beam through teleporter
-&4db9: 90 02            BCC &4dbd
-&4dbb: e9 b0            SBC #&b0                                                # restarting when it gets to the bottom
-; stationary_beam
-&4dbd: 85 11            STA &11 ; this_object_extra			        # this_object_extra = beam position
-&4dbf: 24 39            BIT &39 ; this_object_flags_lefted
+&4db5: 69 20            ADC #&20												# position moves 1 pixel at a time
+&4db7: c9 b1            CMP #&b1                                                # has beam reached end point
+&4db9: 90 02            BCC &4dbd												# branch if it hasn't
+&4dbb: e9 b0            SBC #&b0                                                # restart it when it gets to the end
+
+; set_beam_position
+&4dbd: 85 11            STA &11 ; this_object_extra			        # store beam position
+&4dbf: 24 39            BIT &39 ; this_object_flags_lefted			# set N flag from bit 7 (bit 6 of object flags is vertical invert flag)
 &4dc1: 20 4c 32         JSR &324c ; make_negative
-&4dc4: 85 51            STA &51 ; this_object_y_low
-&4dc6: c6 51            DEC &51 ; this_object_y_low
+&4dc4: 85 51            STA &51 ; this_object_y_low					# set y within square
+&4dc6: c6 51            DEC &51 ; this_object_y_low					# decrement it for some reason
 ; no_beam_motion
-&4dc8: 20 c5 0b         JSR &0bc5 ; has_object_been_hit_by_rcd_beam             # has the beam been hit by the rcd beam?
-&4dcb: b0 05            BCS &4dd2 ; rotate_colour_6                             
-&4dcd: a9 00            LDA #&00
-&4dcf: 20 ac 31         JSR &31ac ; toggle_door_locked_state                    # if so, toggle its state
-; rotate_colour_6
-&4dd2: a5 06            LDA &06 ; current_object_rotator
-; rotate_colour
-&4dd4: 4a               LSR
-&4dd5: 4a               LSR
-&4dd6: 29 03            AND #&03
-&4dd8: aa               TAX
-&4dd9: bd 82 4d         LDA &4d82,X ; teleport_beam_palettes
-&4ddc: 85 73            STA &73 ; this_object_palette		                # change colour
+&4dc8: 20 c5 0b         JSR &0bc5 ; has_object_been_hit_by_rcd_beam             # has the beam been hit by the rcd beam? carry clear if yes
+&4dcb: b0 05            BCS &4dd2 ; set_colour_via_rotator                             # jump over if not
+&4dcd: a9 00            LDA #&00												# indicates setting state of teleport
+&4dcf: 20 ac 31         JSR &31ac ; toggle_door_locked_state                    # toggle its on/off state
+; set_colour_via_rotator
+&4dd2: a5 06            LDA &06 ; current_object_rotator						# get current rotator value: 0 to ff
+; set_object_colour
+&4dd4: 4a               LSR														# divide by 2: 0 to 7f
+&4dd5: 4a               LSR														# divide by 2 again: 0 to 3f
+&4dd6: 29 03            AND #&03												# get bottom two bits
+&4dd8: aa               TAX														# copy value to indexer reg
+&4dd9: bd 82 4d         LDA &4d82,X ; teleport_beam_palettes					# get resulting palette
+&4ddc: 85 73            STA &73 ; this_object_palette							# change colour
 &4dde: 60               RTS
 
 ; flash_palette

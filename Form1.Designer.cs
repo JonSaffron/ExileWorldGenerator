@@ -69,9 +69,8 @@
             treeNode17,
             treeNode18});
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
-            this.splitContainer1 = new System.Windows.Forms.SplitContainer();
+            this.Splitter = new System.Windows.Forms.SplitContainer();
             this.map = new System.Windows.Forms.DataGridView();
-            this.tableLayoutPanel1 = new System.Windows.Forms.TableLayoutPanel();
             this.tabControl1 = new System.Windows.Forms.TabControl();
             this.tabProperties = new System.Windows.Forms.TabPage();
             this.panelProperties = new System.Windows.Forms.Panel();
@@ -96,42 +95,44 @@
             this.label1 = new System.Windows.Forms.Label();
             this.cboZoomLevel = new System.Windows.Forms.ComboBox();
             this.tabSearch = new System.Windows.Forms.TabPage();
-            this.animationTimer = new System.Windows.Forms.Timer(this.components);
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).BeginInit();
-            this.splitContainer1.Panel1.SuspendLayout();
-            this.splitContainer1.Panel2.SuspendLayout();
-            this.splitContainer1.SuspendLayout();
+            this.AnimationTimer = new System.Windows.Forms.Timer(this.components);
+            ((System.ComponentModel.ISupportInitialize)(this.Splitter)).BeginInit();
+            this.Splitter.Panel1.SuspendLayout();
+            this.Splitter.Panel2.SuspendLayout();
+            this.Splitter.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.map)).BeginInit();
-            this.tableLayoutPanel1.SuspendLayout();
             this.tabControl1.SuspendLayout();
             this.tabProperties.SuspendLayout();
             this.panelProperties.SuspendLayout();
             this.tabOptions.SuspendLayout();
             this.SuspendLayout();
             // 
-            // splitContainer1
+            // Splitter
             // 
-            this.splitContainer1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.splitContainer1.Location = new System.Drawing.Point(0, 0);
-            this.splitContainer1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.splitContainer1.Name = "splitContainer1";
+            this.Splitter.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.Splitter.Location = new System.Drawing.Point(0, 0);
+            this.Splitter.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.Splitter.Name = "Splitter";
             // 
-            // splitContainer1.Panel1
+            // Splitter.Panel1
             // 
-            this.splitContainer1.Panel1.Controls.Add(this.map);
+            this.Splitter.Panel1.Controls.Add(this.map);
             // 
-            // splitContainer1.Panel2
+            // Splitter.Panel2
             // 
-            this.splitContainer1.Panel2.Controls.Add(this.tableLayoutPanel1);
-            this.splitContainer1.Size = new System.Drawing.Size(1200, 852);
-            this.splitContainer1.SplitterDistance = 822;
-            this.splitContainer1.SplitterWidth = 6;
-            this.splitContainer1.TabIndex = 0;
+            this.Splitter.Panel2.Controls.Add(this.tabControl1);
+            this.Splitter.Size = new System.Drawing.Size(1200, 852);
+            this.Splitter.SplitterDistance = 822;
+            this.Splitter.SplitterWidth = 6;
+            this.Splitter.TabIndex = 0;
             // 
             // map
             // 
             this.map.AllowUserToAddRows = false;
             this.map.AllowUserToDeleteRows = false;
+            this.map.AllowUserToResizeColumns = false;
+            this.map.AllowUserToResizeRows = false;
+            this.map.CellBorderStyle = System.Windows.Forms.DataGridViewCellBorderStyle.None;
             dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleCenter;
             dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.Control;
             dataGridViewCellStyle1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.1F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
@@ -153,39 +154,22 @@
             this.map.EditMode = System.Windows.Forms.DataGridViewEditMode.EditProgrammatically;
             this.map.Location = new System.Drawing.Point(0, 0);
             this.map.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.map.MultiSelect = false;
             this.map.Name = "map";
             this.map.ReadOnly = true;
             this.map.RowHeadersWidth = 50;
             this.map.RowHeadersWidthSizeMode = System.Windows.Forms.DataGridViewRowHeadersWidthSizeMode.DisableResizing;
             this.map.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.CellSelect;
             this.map.ShowEditingIcon = false;
+            this.map.ShowRowErrors = false;
             this.map.Size = new System.Drawing.Size(822, 852);
             this.map.TabIndex = 1;
             this.map.VirtualMode = true;
             this.map.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.dataGridView1_CellPainting);
             this.map.SelectionChanged += new System.EventHandler(this.map_SelectionChanged);
-            // 
-            // tableLayoutPanel1
-            // 
-            this.tableLayoutPanel1.ColumnCount = 1;
-            this.tableLayoutPanel1.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            this.tableLayoutPanel1.Controls.Add(this.tabControl1, 0, 1);
-            this.tableLayoutPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tableLayoutPanel1.Location = new System.Drawing.Point(0, 0);
-            this.tableLayoutPanel1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.tableLayoutPanel1.Name = "tableLayoutPanel1";
-            this.tableLayoutPanel1.RowCount = 3;
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle());
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 50F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 31F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 31F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 31F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 31F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 31F));
-            this.tableLayoutPanel1.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Absolute, 31F));
-            this.tableLayoutPanel1.Size = new System.Drawing.Size(372, 852);
-            this.tableLayoutPanel1.TabIndex = 0;
+            this.map.MouseDown += new System.Windows.Forms.MouseEventHandler(this.map_MouseDown);
+            this.map.MouseMove += new System.Windows.Forms.MouseEventHandler(this.map_MouseMove);
+            this.map.MouseUp += new System.Windows.Forms.MouseEventHandler(this.map_MouseUp);
             // 
             // tabControl1
             // 
@@ -194,21 +178,22 @@
             this.tabControl1.Controls.Add(this.tabSearch);
             this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tabControl1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.tabControl1.Location = new System.Drawing.Point(4, 41);
+            this.tabControl1.Location = new System.Drawing.Point(0, 0);
             this.tabControl1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.tabControl1.Name = "tabControl1";
+            this.tabControl1.Padding = new System.Drawing.Point(6, 30);
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(364, 769);
-            this.tabControl1.TabIndex = 6;
+            this.tabControl1.Size = new System.Drawing.Size(372, 852);
+            this.tabControl1.TabIndex = 7;
             // 
             // tabProperties
             // 
             this.tabProperties.Controls.Add(this.panelProperties);
-            this.tabProperties.Location = new System.Drawing.Point(4, 34);
+            this.tabProperties.Location = new System.Drawing.Point(4, 88);
             this.tabProperties.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.tabProperties.Name = "tabProperties";
             this.tabProperties.Padding = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.tabProperties.Size = new System.Drawing.Size(356, 731);
+            this.tabProperties.Size = new System.Drawing.Size(364, 760);
             this.tabProperties.TabIndex = 1;
             this.tabProperties.Text = "Properties";
             this.tabProperties.UseVisualStyleBackColor = true;
@@ -230,7 +215,7 @@
             this.panelProperties.Location = new System.Drawing.Point(4, 5);
             this.panelProperties.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.panelProperties.Name = "panelProperties";
-            this.panelProperties.Size = new System.Drawing.Size(348, 721);
+            this.panelProperties.Size = new System.Drawing.Size(356, 750);
             this.panelProperties.TabIndex = 2;
             // 
             // txtBackgroundObjectInfo
@@ -242,7 +227,7 @@
             this.txtBackgroundObjectInfo.Multiline = true;
             this.txtBackgroundObjectInfo.Name = "txtBackgroundObjectInfo";
             this.txtBackgroundObjectInfo.ReadOnly = true;
-            this.txtBackgroundObjectInfo.Size = new System.Drawing.Size(348, 28);
+            this.txtBackgroundObjectInfo.Size = new System.Drawing.Size(356, 28);
             this.txtBackgroundObjectInfo.TabIndex = 9;
             this.txtBackgroundObjectInfo.Text = "background object info";
             // 
@@ -252,7 +237,7 @@
             this.panel5.Location = new System.Drawing.Point(0, 228);
             this.panel5.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.panel5.Name = "panel5";
-            this.panel5.Size = new System.Drawing.Size(348, 23);
+            this.panel5.Size = new System.Drawing.Size(356, 23);
             this.panel5.TabIndex = 14;
             // 
             // txtSpriteInfo
@@ -264,7 +249,7 @@
             this.txtSpriteInfo.Multiline = true;
             this.txtSpriteInfo.Name = "txtSpriteInfo";
             this.txtSpriteInfo.ReadOnly = true;
-            this.txtSpriteInfo.Size = new System.Drawing.Size(348, 28);
+            this.txtSpriteInfo.Size = new System.Drawing.Size(356, 28);
             this.txtSpriteInfo.TabIndex = 8;
             this.txtSpriteInfo.Text = "sprite info";
             // 
@@ -274,7 +259,7 @@
             this.panel4.Location = new System.Drawing.Point(0, 177);
             this.panel4.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.panel4.Name = "panel4";
-            this.panel4.Size = new System.Drawing.Size(348, 23);
+            this.panel4.Size = new System.Drawing.Size(356, 23);
             this.panel4.TabIndex = 13;
             // 
             // txtPaletteInfo
@@ -286,7 +271,7 @@
             this.txtPaletteInfo.Multiline = true;
             this.txtPaletteInfo.Name = "txtPaletteInfo";
             this.txtPaletteInfo.ReadOnly = true;
-            this.txtPaletteInfo.Size = new System.Drawing.Size(348, 28);
+            this.txtPaletteInfo.Size = new System.Drawing.Size(356, 28);
             this.txtPaletteInfo.TabIndex = 7;
             this.txtPaletteInfo.Text = "palette info";
             // 
@@ -296,7 +281,7 @@
             this.panel3.Location = new System.Drawing.Point(0, 126);
             this.panel3.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.panel3.Name = "panel3";
-            this.panel3.Size = new System.Drawing.Size(348, 23);
+            this.panel3.Size = new System.Drawing.Size(356, 23);
             this.panel3.TabIndex = 12;
             // 
             // txtListOverrideInfo
@@ -308,7 +293,7 @@
             this.txtListOverrideInfo.Multiline = true;
             this.txtListOverrideInfo.Name = "txtListOverrideInfo";
             this.txtListOverrideInfo.ReadOnly = true;
-            this.txtListOverrideInfo.Size = new System.Drawing.Size(348, 28);
+            this.txtListOverrideInfo.Size = new System.Drawing.Size(356, 28);
             this.txtListOverrideInfo.TabIndex = 6;
             this.txtListOverrideInfo.Text = "list overrides";
             // 
@@ -318,7 +303,7 @@
             this.panel2.Location = new System.Drawing.Point(0, 75);
             this.panel2.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(348, 23);
+            this.panel2.Size = new System.Drawing.Size(356, 23);
             this.panel2.TabIndex = 11;
             // 
             // txtMappedOrGeneratedInfo
@@ -330,7 +315,7 @@
             this.txtMappedOrGeneratedInfo.Multiline = true;
             this.txtMappedOrGeneratedInfo.Name = "txtMappedOrGeneratedInfo";
             this.txtMappedOrGeneratedInfo.ReadOnly = true;
-            this.txtMappedOrGeneratedInfo.Size = new System.Drawing.Size(348, 28);
+            this.txtMappedOrGeneratedInfo.Size = new System.Drawing.Size(356, 28);
             this.txtMappedOrGeneratedInfo.TabIndex = 5;
             this.txtMappedOrGeneratedInfo.Text = "mapped/generated background info";
             // 
@@ -340,7 +325,7 @@
             this.panel1.Location = new System.Drawing.Point(0, 24);
             this.panel1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(348, 23);
+            this.panel1.Size = new System.Drawing.Size(356, 23);
             this.panel1.TabIndex = 10;
             // 
             // txtCoordinates
@@ -352,7 +337,7 @@
             this.txtCoordinates.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.txtCoordinates.Name = "txtCoordinates";
             this.txtCoordinates.ReadOnly = true;
-            this.txtCoordinates.Size = new System.Drawing.Size(348, 24);
+            this.txtCoordinates.Size = new System.Drawing.Size(356, 24);
             this.txtCoordinates.TabIndex = 3;
             this.txtCoordinates.Text = "X:xx Y:yy";
             // 
@@ -366,11 +351,11 @@
             this.tabOptions.Controls.Add(this.chkHighlightMappedData);
             this.tabOptions.Controls.Add(this.label1);
             this.tabOptions.Controls.Add(this.cboZoomLevel);
-            this.tabOptions.Location = new System.Drawing.Point(4, 34);
+            this.tabOptions.Location = new System.Drawing.Point(4, 88);
             this.tabOptions.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.tabOptions.Name = "tabOptions";
             this.tabOptions.Padding = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.tabOptions.Size = new System.Drawing.Size(355, 731);
+            this.tabOptions.Size = new System.Drawing.Size(364, 760);
             this.tabOptions.TabIndex = 0;
             this.tabOptions.Text = "Options";
             this.tabOptions.UseVisualStyleBackColor = true;
@@ -523,38 +508,37 @@
             // 
             // tabSearch
             // 
-            this.tabSearch.Location = new System.Drawing.Point(4, 34);
+            this.tabSearch.Location = new System.Drawing.Point(4, 88);
             this.tabSearch.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.tabSearch.Name = "tabSearch";
             this.tabSearch.Padding = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.tabSearch.Size = new System.Drawing.Size(355, 731);
+            this.tabSearch.Size = new System.Drawing.Size(364, 760);
             this.tabSearch.TabIndex = 2;
             this.tabSearch.Text = "Search";
             this.tabSearch.UseVisualStyleBackColor = true;
             // 
-            // animationTimer
+            // AnimationTimer
             // 
-            this.animationTimer.Enabled = true;
-            this.animationTimer.Tick += new System.EventHandler(this.animationTimer_Tick);
+            this.AnimationTimer.Enabled = true;
+            this.AnimationTimer.Tick += new System.EventHandler(this.AnimationTimer_Tick);
             // 
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(1200, 852);
-            this.Controls.Add(this.splitContainer1);
+            this.Controls.Add(this.Splitter);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.Name = "Form1";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
-            this.Text = "Exile";
+            this.Text = "The Land of the Exile";
             this.Shown += new System.EventHandler(this.Form1_Shown);
-            this.splitContainer1.Panel1.ResumeLayout(false);
-            this.splitContainer1.Panel2.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.splitContainer1)).EndInit();
-            this.splitContainer1.ResumeLayout(false);
+            this.Splitter.Panel1.ResumeLayout(false);
+            this.Splitter.Panel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.Splitter)).EndInit();
+            this.Splitter.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.map)).EndInit();
-            this.tableLayoutPanel1.ResumeLayout(false);
             this.tabControl1.ResumeLayout(false);
             this.tabProperties.ResumeLayout(false);
             this.panelProperties.ResumeLayout(false);
@@ -566,34 +550,33 @@
             }
 
         #endregion
-        private System.Windows.Forms.SplitContainer splitContainer1;
+        private System.Windows.Forms.SplitContainer Splitter;
         private System.Windows.Forms.DataGridView map;
-        private System.Windows.Forms.TableLayoutPanel tableLayoutPanel1;
-        private System.Windows.Forms.Timer animationTimer;
+        private System.Windows.Forms.Timer AnimationTimer;
         private System.Windows.Forms.TabControl tabControl1;
-        private System.Windows.Forms.TabPage tabOptions;
-        private System.Windows.Forms.Label label1;
-        private System.Windows.Forms.ComboBox cboZoomLevel;
         private System.Windows.Forms.TabPage tabProperties;
-        private System.Windows.Forms.CheckBox chkHighlightMappedData;
-        private System.Windows.Forms.TreeView BackgroundObjectTree;
-        private System.Windows.Forms.CheckBox chkHighlightBackgroundObjects;
-        private System.Windows.Forms.TabPage tabSearch;
         private System.Windows.Forms.Panel panelProperties;
         private System.Windows.Forms.TextBox txtBackgroundObjectInfo;
-        private System.Windows.Forms.TextBox txtSpriteInfo;
-        private System.Windows.Forms.TextBox txtPaletteInfo;
-        private System.Windows.Forms.TextBox txtListOverrideInfo;
-        private System.Windows.Forms.TextBox txtMappedOrGeneratedInfo;
-        private System.Windows.Forms.TextBox txtCoordinates;
-        private System.Windows.Forms.Panel panel1;
-        private System.Windows.Forms.Panel panel3;
-        private System.Windows.Forms.Panel panel2;
         private System.Windows.Forms.Panel panel5;
+        private System.Windows.Forms.TextBox txtSpriteInfo;
         private System.Windows.Forms.Panel panel4;
+        private System.Windows.Forms.TextBox txtPaletteInfo;
+        private System.Windows.Forms.Panel panel3;
+        private System.Windows.Forms.TextBox txtListOverrideInfo;
+        private System.Windows.Forms.Panel panel2;
+        private System.Windows.Forms.TextBox txtMappedOrGeneratedInfo;
+        private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.TextBox txtCoordinates;
+        private System.Windows.Forms.TabPage tabOptions;
         private System.Windows.Forms.ComboBox cboHighlightBackground;
         private System.Windows.Forms.Label label2;
         private System.Windows.Forms.CheckBox chkHighlightDisplayElement;
-    }
+        private System.Windows.Forms.CheckBox chkHighlightBackgroundObjects;
+        private System.Windows.Forms.TreeView BackgroundObjectTree;
+        private System.Windows.Forms.CheckBox chkHighlightMappedData;
+        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.ComboBox cboZoomLevel;
+        private System.Windows.Forms.TabPage tabSearch;
+        }
     }
 

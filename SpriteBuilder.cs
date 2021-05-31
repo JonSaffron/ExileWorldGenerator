@@ -16,8 +16,8 @@ namespace ExileMappedBackground
         public static readonly byte[] BackgroundYOffsetLookup = BuildBackgroundYOffsetLookup();
         public static readonly bool[] FlipSpriteHorizontally = BuildFlipSpriteHorizontally();
         public static readonly bool[] FlipSpriteVertically = BuildFlipSpriteVertically();
-        private static readonly byte[] ObjectSpriteLookup = BuildObjectSpriteLookups();
-        private static readonly byte[] ObjectPaletteLookup = BuildObjectPaletteLookups();
+        public static readonly byte[] ObjectSpriteLookup = BuildObjectSpriteLookups();
+        public static readonly byte[] ObjectPaletteLookup = BuildObjectPaletteLookups();
         private static readonly byte[] DoorPalettes = BuildDoorPalettes();
 
         private static readonly Size SquareSize = new Size(16, 32);
@@ -259,9 +259,9 @@ namespace ExileMappedBackground
             var backgroundObjectType = backgroundAndOrientation & 0x3f;
             Debug.Assert(backgroundObjectType == 3 || backgroundObjectType == 4);
 
-            bool flipHorizontallyAndRightAlign = (backgroundAndOrientation & 0x80) != 0;
+            bool rightAlign = (backgroundAndOrientation & 0x80) != 0;
             bool bottomAlign = (backgroundAndOrientation & 0x40) == 0;
-            var doorIsHorizontal = flipHorizontallyAndRightAlign ^ bottomAlign;
+            var doorIsHorizontal = rightAlign ^ bottomAlign;
             byte sprite;
             switch (backgroundObjectType)
                 {
@@ -283,11 +283,11 @@ namespace ExileMappedBackground
             bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
             
             Func<int, int> toX;
-            if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
+            if (!rightAlign && !isSourceFlippedHorizontally)
                 {
                 toX = x => x;
                 }
-            else if (!flipHorizontallyAndRightAlign) // && isSourceFlippedHorizontally
+            else if (!rightAlign) // && isSourceFlippedHorizontally
                 {
                 int right = sourceRectangle.Width - 1;
                 toX = x => right - x;
@@ -317,11 +317,11 @@ namespace ExileMappedBackground
                 {
                 int bottom = sourceRectangle.Height - 1;
                 toY = y => bottom - y;
-                }
-            else
+                }   
+            else         // bottomAlign && isSourceFlippedVertically
                 {
-                var bottom = SquareSize.Height - sourceRectangle.Height;
-                toY = y => bottom + y;
+                var height = SquareSize.Height - 1;
+                toY = y => height - y;
                 }
 
             for (int y = 0; y < sourceRectangle.Height; y++)

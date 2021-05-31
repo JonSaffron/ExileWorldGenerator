@@ -31,6 +31,9 @@ namespace ExileMappedBackground
         private List<byte> _selectedBackgroundObjectTypes = new List<byte>();
         private int _displayElementToHighlight;
 
+        public Point DraggingStartPoint { get; set; }
+        public bool DraggingInGrid { get; set; }
+
         [DllImport("user32.dll", CharSet=CharSet.Auto)]
         private static extern IntPtr SendMessage(HandleRef hWnd, int msg, int wParam, ref TV_ITEM lParam);
 
@@ -173,14 +176,39 @@ namespace ExileMappedBackground
                     Debug.Assert(type.HasValue);
                     return $"Triggered by {(type.Value == 0x80 ? "anything" : ObjectTypeList[type.Value])}";
                 case 1:
-                    return "*** teleport tbd ***";
+                    {
+                    var active = (data.Value & 0x1) != 0;
+                    var destination = (data.Value >> 4 & 0x7);
+                    var key = ((data.Value & 0x7f) + 0x60) >> 5;
+                    Debug.Assert(key <= 6 && key >= 3);
+                    var keyDescription = GetKeyDescription(key);
+                    Debug.WriteLine(keyDescription);
+                    return $"teleport: active = {active}, destination = &{destination:X}, key = {keyDescription}";
+                    }
                 case 2:
                     Debug.Assert(data.HasValue);
                     return ObjectTypeList[data.Value & 0x7f];
                 case 3:
-                    return "*** door tbd ***";
+                    {
+                    var locked = (data.Value & 0x1) != 0;
+                    var open = (data.Value & 0x2) != 0;
+                    var slowMoving = (data.Value & 0x8) != 0;
+                    var key = (data.Value >> 4 & 0x7);
+                    var keyDescription = GetKeyDescription(key);
+                    var latchesOpen = (key & 0x3) != 0;
+                    return $"door: locked = {locked}, open = {open}, slowMoving = {slowMoving}, key = {keyDescription}, latchesOpen = {latchesOpen}";
+                    }
                 case 4:
-                    return "*** stone tbd ***";
+                    {
+                    var locked = (data.Value & 0x1) != 0;
+                    var open = (data.Value & 0x2) != 0;
+                    var slowMoving = (data.Value & 0x8) != 0;
+                    var key = (data.Value >> 4 & 0x7);
+                    Debug.Assert(key == 4 || key == 7);
+                    var keyDescription = GetKeyDescription(key);
+                    var latchesOpen = (key & 0x3) != 0;
+                    return $"stone door: locked = {locked}, open = {open}, slowMoving = {slowMoving}, key = {keyDescription}, latchesOpen = {latchesOpen}";
+                    }
                 case 5:
                 case 6:
                 case 7:
@@ -197,7 +225,7 @@ namespace ExileMappedBackground
 
                     bool spawnedObjectEmergesImmediately = (orientation & 0x80) != 0;
                     bool hasTree = (data.Value & 0x80) != 0;
-                    bool enabled = (data.Value & 0x03) != 0;
+                    bool enabled = (data.Value & 0x03) == 0;
 
                     if (spawnedObjectEmergesImmediately && hasTree)
                         displayType = "emerges immediately from tree";
@@ -233,22 +261,34 @@ namespace ExileMappedBackground
             throw new InvalidOperationException();
             }
 
+        private static string GetKeyDescription(int key)
+            {
+            const int startOfKeyObjects = 0x51;
+
+            if (key < 0 || key > 7)
+                throw new ArgumentOutOfRangeException(nameof(key));
+            var result = key.ToString();
+            int objectType = startOfKeyObjects + key;
+            var objectSprite = SpriteBuilder.ObjectSpriteLookup[objectType];
+            if (objectSprite != 0x4d)
+                {
+                result += " - does not exist";
+                return result;
+                }
+
+            var colourScheme = SquarePalette.FromByte(SpriteBuilder.ObjectPaletteLookup[objectType]);
+            result += $" {colourScheme.Colour1}, {colourScheme.Colour2}, {colourScheme.PrimaryColour}";
+            return result;
+            }
+
         private void dataGridView1_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
             {
- //           if (e.ColumnIndex == -1)
-   //             Debugger.Break();
-
             if (e.RowIndex < 0 || e.ColumnIndex < 0)
                 {
-//if (e.ColumnIndex<0)
-//    Debugger.Break();
-
                 return;
                 }
 
             var timeElapsed = this._stopwatch.Elapsed;
-
-//            e.PaintBackground(e.CellBounds, false);
 
             var squareProperties = this._squareProperties[e.ColumnIndex, e.RowIndex];
 
@@ -279,7 +319,12 @@ namespace ExileMappedBackground
                 case 6:
                     this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundType.Value, squareProperties.BackgroundAfterPalette);
                     break;
-                   
+            
+                case 8:
+                    this._spriteBuilder.BuildObjectFromDataSprite(0x42, squareProperties.BackgroundAfterPalette);
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
+                    break;
+
                 case 9:
                 case 0xa:
                     this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
@@ -618,14 +663,14 @@ namespace ExileMappedBackground
             if (squareValue.BackgroundPalette > 6)
                 {
                 var colours = SquarePalette.FromByte(squareValue.BackgroundPalette);
-                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.Colour3}";
+                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.PrimaryColour}";
                 }
             else
                 {
                 paletteInfo += "\r\n" +
                                $"Derived palette: {squareValue.DisplayedPalette:X2}";
                 var colours = SquarePalette.FromByte(squareValue.DisplayedPalette);
-                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.Colour3}";
+                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.PrimaryColour}";
                 }
 
             if (squareValue.BackgroundAfterHashing != squareValue.BackgroundAfterPalette)
@@ -851,13 +896,13 @@ namespace ExileMappedBackground
                 "remote control device",		
                 "cannon control device",		
                 "inactive grenade",			
-                "cyan/yellow/green key",		
-                "red/yellow/green key",		
-                "green/yellow/red key",		
-                "yellow/white/red key",		
+                "key 0 (cyan/yellow/green)",		
+                "key 1 (red/yellow/green)",		
+                "key 2 (green/yellow/red)",		
+                "key 3 (yellow/white/red)",		
                 "coronium boulder",			
-                "red/magenta/red key",		
-                "blue/cyan/green key",		
+                "key 5 (red/magenta/red)",		
+                "key 6 (blue/cyan/green)",		
                 "coronium crystal",			
                 "jetpack booster",			
                 "pistol",					
@@ -875,7 +920,7 @@ namespace ExileMappedBackground
             return result;
             }
 
-        private void animationTimer_Tick(object sender, EventArgs e)
+        private void AnimationTimer_Tick(object sender, EventArgs e)
             {
             var timeElapsed = this._stopwatch.Elapsed;
 
@@ -893,7 +938,7 @@ namespace ExileMappedBackground
                 });
 
             if (isAnimationBeingDisabled)
-                this.animationTimer.Enabled = false;
+                this.AnimationTimer.Enabled = false;
             }
 
         private void cboZoomLevel_SelectedIndexChanged(object sender, EventArgs e)
@@ -911,14 +956,14 @@ namespace ExileMappedBackground
             {
             this._highlightMappedDataSquares = this.chkHighlightMappedData.Checked;
             if (this._highlightMappedDataSquares)
-                this.animationTimer.Enabled = true;
+                this.AnimationTimer.Enabled = true;
             }
 
         private void chkHighlightBackgroundObjects_CheckedChanged(object sender, EventArgs e)
             {
             this._highlightBackgroundObjects = this.chkHighlightBackgroundObjects.Checked;
             if (this._highlightBackgroundObjects)
-                this.animationTimer.Enabled = true;
+                this.AnimationTimer.Enabled = true;
             }
 
         private void BackgroundObjectTree_AfterCheck(object sender, TreeViewEventArgs e)
@@ -1030,12 +1075,48 @@ namespace ExileMappedBackground
             {
             this._highlightDisplayElement = this.chkHighlightDisplayElement.Checked;
             if (this._highlightDisplayElement)
-                this.animationTimer.Enabled = true;
+                this.AnimationTimer.Enabled = true;
             }
 
         private void cboHighlightBackground_SelectedIndexChanged(object sender, EventArgs e)
             {
             this._displayElementToHighlight = (int) this.cboHighlightBackground.SelectedValue;
+            }
+
+        private void map_MouseDown(object sender, MouseEventArgs e)
+            {
+            if (e.Button == MouseButtons.Left)
+                {
+                this.DraggingInGrid = true;
+                this.DraggingStartPoint = e.Location;
+                }
+            }
+
+        private void map_MouseUp(object sender, MouseEventArgs e)
+            {
+            this.DraggingInGrid = false;
+            map.Capture = false;
+            }
+
+        private void map_MouseMove(object sender, MouseEventArgs e)
+            {
+            if (this.DraggingInGrid)
+                {
+                var diffX = e.X - this.DraggingStartPoint.X;
+                var diffY = e.X - this.DraggingStartPoint.Y;
+                if (!map.Capture && (Math.Abs(diffX) > SystemInformation.DragSize.Width || Math.Abs(diffY) > SystemInformation.DragSize.Height))
+                    {
+                    map.Capture = true;
+                    }
+
+                if (map.Capture)
+                    {
+                    var columnWidth = map.Columns[0].Width;
+                    var rowHeight = map.Rows[0].Height;
+
+
+                    }
+                }
             }
         }
     }

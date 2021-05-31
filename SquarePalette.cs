@@ -9,7 +9,7 @@ namespace ExileMappedBackground
         {
         public GameColour Colour1;
         public GameColour Colour2;
-        public GameColour Colour3;
+        public GameColour PrimaryColour;
 
         private static readonly Dictionary<GameColour, Color> GameColours = BuildGameColours();
         private static readonly (GameColour leftColour, GameColour rightColour)[] ColourPairs = BuildColourPairs();
@@ -21,7 +21,7 @@ namespace ExileMappedBackground
                 {
                 Colour1 = colourPair.rightColour,
                 Colour2 = colourPair.leftColour,
-                Colour3 = (GameColour) (palette >> 4)
+                PrimaryColour = (GameColour) (palette >> 4)
                 };
             return result;
             }
@@ -39,7 +39,7 @@ namespace ExileMappedBackground
                     case 2:
                         return GameColours[Colour2];
                     case 3:
-                        return GameColours[Colour3];
+                        return GameColours[PrimaryColour];
                     default:
                         throw new ArgumentOutOfRangeException(nameof(paletteIndex));
                     }
