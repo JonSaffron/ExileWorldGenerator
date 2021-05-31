@@ -31,8 +31,9 @@ namespace ExileMappedBackground
         private List<byte> _selectedBackgroundObjectTypes = new List<byte>();
         private int _displayElementToHighlight;
 
-        public Point DraggingStartPoint { get; set; }
-        public bool DraggingInGrid { get; set; }
+        private Point DraggingStartPoint;
+        private Point DraggingTopLeftCell;
+        private bool DraggingInGrid;
 
         [DllImport("user32.dll", CharSet=CharSet.Auto)]
         private static extern IntPtr SendMessage(HandleRef hWnd, int msg, int wParam, ref TV_ITEM lParam);
@@ -1087,35 +1088,66 @@ namespace ExileMappedBackground
             {
             if (e.Button == MouseButtons.Left)
                 {
-                this.DraggingInGrid = true;
                 this.DraggingStartPoint = e.Location;
+                this.DraggingTopLeftCell = new Point(this.map.FirstDisplayedCell.ColumnIndex, this.map.FirstDisplayedCell.RowIndex);
                 }
             }
 
         private void map_MouseUp(object sender, MouseEventArgs e)
             {
             this.DraggingInGrid = false;
-            map.Capture = false;
+            map.Cursor = Cursors.Arrow;
             }
 
         private void map_MouseMove(object sender, MouseEventArgs e)
             {
+            if (e.Button != MouseButtons.Left)
+                {
+                if (this.DraggingInGrid)
+                    {
+                    this.DraggingInGrid = false;
+                    map.Cursor = Cursors.Arrow;
+                    }
+                return;
+                }
+
+            var diffX = e.X - this.DraggingStartPoint.X;
+            var diffY = e.Y - this.DraggingStartPoint.Y;
+            if (!this.DraggingInGrid && (Math.Abs(diffX) > SystemInformation.DragSize.Width || Math.Abs(diffY) > SystemInformation.DragSize.Height))
+                {
+                this.DraggingInGrid = true;
+                map.Cursor = Cursors.SizeAll;
+                }
+
             if (this.DraggingInGrid)
                 {
-                var diffX = e.X - this.DraggingStartPoint.X;
-                var diffY = e.X - this.DraggingStartPoint.Y;
-                if (!map.Capture && (Math.Abs(diffX) > SystemInformation.DragSize.Width || Math.Abs(diffY) > SystemInformation.DragSize.Height))
+                var columnWidth = map.Columns[0].Width;
+                var rowHeight = map.Rows[0].Height;
+
+                var columnsDiff = diffX / columnWidth;
+                var rowsDiff = diffY / rowHeight;
+
+                int row = this.DraggingTopLeftCell.Y - rowsDiff;
+                if (row < 0)
                     {
-                    map.Capture = true;
+                    row = 0;
+                    }
+                if (row >= this.map.RowCount)
+                    {
+                    row = this.map.RowCount - 1;
                     }
 
-                if (map.Capture)
+                int column = this.DraggingTopLeftCell.X - columnsDiff;
+                if (column < 0)
                     {
-                    var columnWidth = map.Columns[0].Width;
-                    var rowHeight = map.Rows[0].Height;
-
-
+                    column = 0;
                     }
+                if (column >= this.map.ColumnCount)
+                    {
+                    column = this.map.ColumnCount - 1;
+                    }
+
+                this.map.FirstDisplayedCell = this.map.Rows[row].Cells[column];
                 }
             }
         }
