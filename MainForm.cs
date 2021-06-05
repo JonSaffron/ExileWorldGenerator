@@ -12,16 +12,17 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace ExileMappedBackground
+namespace ExileWorldGenerator
     {
-    public partial class Form1 : Form
+    public partial class MainForm : Form
         {
         private readonly CalculateBackground _mapper = new CalculateBackground();
         private readonly SpriteBuilder _spriteBuilder = new SpriteBuilder();
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
         private static readonly string[] BackgroundHandlerTypeList = BuildBackgroundHandlerTypeList();
         private static readonly string[] ObjectTypeList = BuildObjectTypeList();
-        private static readonly List<WaterLevel> WaterLevelList = BuildWaterLevelsList();
+        private static readonly IReadOnlyList<WaterLevelFromX> WaterLevelList = BuildWaterLevelsList();
+        private static readonly List<Point> TeleportDestinations = BuildTeleportDestinations();
         private decimal _zoom;
         private byte lookFor = 0xff;
         private bool _highlightMappedDataSquares;
@@ -31,14 +32,14 @@ namespace ExileMappedBackground
         private List<byte> _selectedBackgroundObjectTypes = new List<byte>();
         private int _displayElementToHighlight;
 
-        private Point DraggingStartPoint;
-        private Point DraggingTopLeftCell;
-        private bool DraggingInGrid;
+        private Point _draggingStartPoint;
+        private Point _draggingTopLeftCell;
+        private bool _draggingInGrid;
 
         [DllImport("user32.dll", CharSet=CharSet.Auto)]
         private static extern IntPtr SendMessage(HandleRef hWnd, int msg, int wParam, ref TV_ITEM lParam);
 
-        public Form1()
+        public MainForm()
             {
             InitializeComponent();
 
@@ -159,25 +160,35 @@ namespace ExileMappedBackground
                     {
                     data.BackgroundType = backgroundProperties.type;
                     data.BackgroundData = backgroundProperties.data;
-                    data.BackgroundDescription = DescribeBackground(background, backgroundProperties.type, backgroundProperties.data, orientation);
+                    data.BackgroundDescription = DescribeBackground((BackgroundObjectType) background, backgroundProperties.type, backgroundProperties.data, orientation);
                     }
                 }
 
             (data.BackgroundPalette, data.DisplayedPalette) = _mapper.GetPalette(ref background, ref orientation, x, y);
             data.BackgroundAfterPalette = (byte) (background ^ orientation);
 
+            var teleportDestination = TeleportDestinations.FindIndex(item => item == new Point(x, y));
+            if (teleportDestination != -1)
+                {
+                data.BackgroundDescription = $"Teleport destination 0x{teleportDestination:X}\r\n" + (data.BackgroundDescription ?? string.Empty);
+                }
+
             this._squareProperties[x, y] = data;
             }
 
-        private static string DescribeBackground(byte backgroundHandler, byte? type, byte? data, byte orientation)
+        private static string DescribeBackground(BackgroundObjectType backgroundHandler, byte? type, byte? data, byte orientation)
             {
             switch (backgroundHandler)
                 {
-                case 0:
+                case BackgroundObjectType.InvisibleSwitch:
+                    {
                     Debug.Assert(type.HasValue);
                     return $"Triggered by {(type.Value == 0x80 ? "anything" : ObjectTypeList[type.Value])}";
-                case 1:
+                    }
+                
+                case BackgroundObjectType.Teleport:
                     {
+                    Debug.Assert(data.HasValue);
                     var active = (data.Value & 0x1) != 0;
                     var destination = (data.Value >> 4 & 0x7);
                     var key = ((data.Value & 0x7f) + 0x60) >> 5;
@@ -186,11 +197,16 @@ namespace ExileMappedBackground
                     Debug.WriteLine(keyDescription);
                     return $"teleport: active = {active}, destination = &{destination:X}, key = {keyDescription}";
                     }
-                case 2:
+                
+                case BackgroundObjectType.ObjectFromData:
+                    {
                     Debug.Assert(data.HasValue);
                     return ObjectTypeList[data.Value & 0x7f];
-                case 3:
+                    }
+                
+                case BackgroundObjectType.Door:
                     {
+                    Debug.Assert(data.HasValue);
                     var locked = (data.Value & 0x1) != 0;
                     var open = (data.Value & 0x2) != 0;
                     var slowMoving = (data.Value & 0x8) != 0;
@@ -199,8 +215,10 @@ namespace ExileMappedBackground
                     var latchesOpen = (key & 0x3) != 0;
                     return $"door: locked = {locked}, open = {open}, slowMoving = {slowMoving}, key = {keyDescription}, latchesOpen = {latchesOpen}";
                     }
-                case 4:
+                
+                case BackgroundObjectType.StoneDoor:
                     {
+                    Debug.Assert(data.HasValue);
                     var locked = (data.Value & 0x1) != 0;
                     var open = (data.Value & 0x2) != 0;
                     var slowMoving = (data.Value & 0x8) != 0;
@@ -210,15 +228,23 @@ namespace ExileMappedBackground
                     var latchesOpen = (key & 0x3) != 0;
                     return $"stone door: locked = {locked}, open = {open}, slowMoving = {slowMoving}, key = {keyDescription}, latchesOpen = {latchesOpen}";
                     }
-                case 5:
-                case 6:
-                case 7:
+
+                case BackgroundObjectType.ObjectFromTypeWithWall:
+                case BackgroundObjectType.ObjectFromType:
+                case BackgroundObjectType.ObjectFromTypeWithFoliage:
+                    {
                     Debug.Assert(type.HasValue);
                     return ObjectTypeList[type.Value];
-                case 8:
+                    }
+
+                case BackgroundObjectType.Switch:
+                    {
                     return "*** switch tbd ***";
-                case 9:
-                case 0xa:
+                    }
+
+                case BackgroundObjectType.ObjectEmergingFromBush:
+                case BackgroundObjectType.ObjectEmergingFromPipe:
+                    {
                     Debug.Assert(data.HasValue);
                     Debug.Assert(type.HasValue);
                     int countOfObjects = (data.Value & 0x7c) >> 2;
@@ -233,13 +259,15 @@ namespace ExileMappedBackground
                     else if (spawnedObjectEmergesImmediately)
                         displayType = "emerges immediately";
                     else if (hasTree)
-                        displayType = "emerges randomly from tree";
+                        displayType = "emerges sporadically from tree";
                     else
-                        displayType = "emerges randomly";
+                        displayType = "emerges sporadically";
                     var enabledDisplay = enabled ? "enabled" : "disabled";
 
                     return $"{countOfObjects} x {ObjectTypeList[type.Value]} {displayType} {enabledDisplay}";
-                case 0xb:
+                    }
+
+                case BackgroundObjectType.FixedWind:
                     {
                     Debug.Assert(data.HasValue);
                     int yVelocity = data.Value;
@@ -250,13 +278,17 @@ namespace ExileMappedBackground
                         xVelocity -= 256;
                     return $"Fixed wind velocity ({xVelocity}, {yVelocity})";
                     }
-                case 0xc:
+
+                case BackgroundObjectType.EngineThruster:
                     return "*** engine tbd ***";
-                case 0xd:
+
+                case BackgroundObjectType.Water:
                     return null;        // water does not have data
-                case 0xe:
+
+                case BackgroundObjectType.RandomWind:
                     return null;        // random wind does not have data
-                case 0xf:
+
+                case BackgroundObjectType.Mushrooms:
                     return null;        // mushrooms does not have data
                 }
             throw new InvalidOperationException();
@@ -296,56 +328,90 @@ namespace ExileMappedBackground
             var waterLevelType = GetWaterLevelType(squareProperties.X, squareProperties.Y);
             this._spriteBuilder.Clear(waterLevelType);
 
-            switch (squareProperties.BackgroundAfterPalette & 0x3f)
+            switch ((BackgroundObjectType) (squareProperties.BackgroundAfterPalette & 0x3f))
                 {
-                case 0:
-                    this._spriteBuilder.AddBitmap(Resource1.HiddenSwitch);
+                case BackgroundObjectType.InvisibleSwitch:
+                    {
+                    this._spriteBuilder.AddBitmap(Resources.HiddenSwitch);
                     break;
+                    }
 
-                case 2:     
+                case BackgroundObjectType.ObjectFromData:
+                    {
+                    Debug.Assert(squareProperties.BackgroundData.HasValue);
                     this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundData.Value, squareProperties.BackgroundAfterPalette);
                     break;
-
-                case 3:
-                case 4:
+                    }
+                
+                case BackgroundObjectType.Door:
+                case BackgroundObjectType.StoneDoor:
+                    {
+                    Debug.Assert(squareProperties.BackgroundData.HasValue);
                     this._spriteBuilder.BuildDoor(squareProperties.BackgroundAfterPalette, squareProperties.BackgroundData.Value);
                     break;
+                    }
 
-                case 5:
-                case 7:
+                case BackgroundObjectType.ObjectFromTypeWithWall:
+                case BackgroundObjectType.ObjectFromTypeWithFoliage:
+                    {
+                    Debug.Assert(squareProperties.BackgroundType.HasValue);
                     this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundType.Value, squareProperties.BackgroundAfterPalette);
                     this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
                     break;
+                    }
 
-                case 6:
+                case BackgroundObjectType.ObjectFromType:
+                    {
+                    Debug.Assert(squareProperties.BackgroundType.HasValue);
                     this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundType.Value, squareProperties.BackgroundAfterPalette);
                     break;
+                    }
             
-                case 8:
+                case BackgroundObjectType.Switch:
+                    {
                     this._spriteBuilder.BuildObjectFromDataSprite(0x42, squareProperties.BackgroundAfterPalette);
                     this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
                     break;
+                    }
 
-                case 9:
-                case 0xa:
+                case BackgroundObjectType.ObjectEmergingFromBush:
+                case BackgroundObjectType.ObjectEmergingFromPipe:
+                    {
                     this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
-                    if (squareProperties.BackgroundObjectId.HasValue && (squareProperties.BackgroundData.Value & 0x80) != 0)
+                    if (squareProperties.BackgroundObjectId.HasValue)
                         {
-                        this._spriteBuilder.BuildObjectSprite(0x40, squareProperties.BackgroundAfterPalette, (0x40, 0x40));
+                        Debug.Assert(squareProperties.BackgroundData.HasValue);
+                        if ((squareProperties.BackgroundData.Value & 0x80) != 0)
+                            {
+                            this._spriteBuilder.BuildObjectSprite(0x40, squareProperties.BackgroundAfterPalette, (0x40, 0x40));
+                            }
                         }
                     break;
+                    }
 
-                case 0xb:
-                    this._spriteBuilder.AddBitmap(Resource1.FixedWind);
+                case BackgroundObjectType.FixedWind:
+                    {
+                    this._spriteBuilder.AddBitmap(Resources.FixedWind);
                     break;
+                    }
 
-                case 0xe:
-                    this._spriteBuilder.AddBitmap(Resource1.RandomWind);
+                case BackgroundObjectType.RandomWind:
+                    {
+                    this._spriteBuilder.AddBitmap(Resources.RandomWind);
                     break;
+                    }
 
                 default:
+                    {
                     this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
                     break;
+                    }
+                }
+
+            var isTeleportDestination = TeleportDestinations.Contains(new Point(squareProperties.X, squareProperties.Y));
+            if (isTeleportDestination)
+                {
+                this._spriteBuilder.AddBitmap(Resources.TeleportTarget);
                 }
 
             Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, (int) (32 * _zoom), (int) (32 * _zoom));
@@ -420,18 +486,18 @@ namespace ExileMappedBackground
             e.Handled = true;
             }
 
-        private WaterLevelType GetWaterLevelType(byte x, byte y)
+        private static WaterLevelType GetWaterLevelType(byte x, byte y)
             {
             var i = WaterLevelList.Count;
             while (true)
                 {
                 i--;
                 var waterLevel = WaterLevelList[i];
-                if (x >= waterLevel.xSquareFrom)
+                if (x >= waterLevel.FromX)
                     {
-                    if (y > waterLevel.yWaterLevel)
+                    if (y > waterLevel.WaterLevel)
                         return WaterLevelType.BelowWater;
-                    if (y == waterLevel.yWaterLevel)
+                    if (y == waterLevel.WaterLevel)
                         return WaterLevelType.AtWaterLine;
                     return WaterLevelType.AboveWater;
                     }
@@ -556,14 +622,6 @@ namespace ExileMappedBackground
             SetMappedOrGeneratedInfo(squareValue);
 
             SetListOverrideInfo(squareValue);
-            //using (var g = this.txtListOverrideInfo.CreateGraphics())
-            //    {
-            //    g.PageUnit = GraphicsUnit.Pixel;
-            //    Size proposedSize = new Size(this.txtListOverrideInfo.Width, this.txtListOverrideInfo.Height);
-            //    var size = TextRenderer.MeasureText(g, this.txtListOverrideInfo.Text, this.txtListOverrideInfo.Font, proposedSize, TextFormatFlags.TextBoxControl | TextFormatFlags.WordBreak | TextFormatFlags.ExternalLeading);
-            //    //var size = g.MeasureString(this.txtListOverrideInfo.Text, this.txtListOverrideInfo.Font, this.txtListOverrideInfo.Width);
-            //    this.txtListOverrideInfo.Height = size.Height + 10;
-            //    }
 
             SetPaletteInfo(squareValue);
 
@@ -579,12 +637,10 @@ namespace ExileMappedBackground
             if (background >= 0x10)
                 {
                 backgroundObjectInfo = "No background event";
-                }
-            else if (background >= 0xd)
-                {
-                backgroundObjectInfo =
-                    $"Background handler: {squareValue.BackgroundHandlerType}\r\n" +
-                    "Requires no data.";
+                if (squareValue.BackgroundDescription != null)
+                    {
+                    backgroundObjectInfo += "\r\n" + squareValue.BackgroundDescription;
+                    }
                 }
             else 
                 {
@@ -593,8 +649,11 @@ namespace ExileMappedBackground
 
                 if (!squareValue.BackgroundObjectId.HasValue)
                     {
-                    backgroundObjectInfo += "\r\n" +
-                        "Not active event - used only as scenery";
+                    backgroundObjectInfo += "\r\n" + "Scenery only";
+                    if (squareValue.BackgroundDescription != null)
+                        {
+                        backgroundObjectInfo += "\r\n" + squareValue.BackgroundDescription;
+                        }
                     }
                 else 
                     {
@@ -640,7 +699,7 @@ namespace ExileMappedBackground
             var isFlippedHorizontally = isSpriteFlippedHorizontally ^ rightAlign;
             var isFlippedVertically = isSpriteFlippedVertically ^ bottomAlign;
             spriteInfo +=
-                $"Final orientation: ";
+                "Final orientation: ";
             if (isFlippedHorizontally && isFlippedVertically)
                 spriteInfo += "flipped both ways";
             else if (isFlippedHorizontally)
@@ -764,27 +823,27 @@ namespace ExileMappedBackground
             textBox.Height = h;
             }
 
-        private static List<WaterLevel> BuildWaterLevelsList()
+        private static List<WaterLevelFromX> BuildWaterLevelsList()
             {
-            var result = new List<WaterLevel>
+            var result = new List<WaterLevelFromX>
                 {
-                new WaterLevel(0x0, 0xce),
-                new WaterLevel(0x54, 0xdf),
-                new WaterLevel(0x74, 0xc1),
-                new WaterLevel(0xa0, 0xc1)
+                new WaterLevelFromX(0x0, 0xce),
+                new WaterLevelFromX(0x54, 0xdf),
+                new WaterLevelFromX(0x74, 0xc1),
+                new WaterLevelFromX(0xa0, 0xc1)
                 };
             return result;
             }
 
-        private readonly struct WaterLevel
+        private readonly struct WaterLevelFromX
             {
-            public readonly byte xSquareFrom;
-            public readonly byte yWaterLevel;
+            public readonly byte FromX;
+            public readonly byte WaterLevel;
 
-            public WaterLevel(byte xSquareFrom, byte yWaterLevel)
+            public WaterLevelFromX(byte fromX, byte waterLevel)
                 {
-                this.xSquareFrom = xSquareFrom;
-                this.yWaterLevel = yWaterLevel;
+                this.FromX = fromX;
+                this.WaterLevel = waterLevel;
                 }
             }
 
@@ -915,9 +974,24 @@ namespace ExileMappedBackground
                 "mushroom immunity pill",	
                 "whistle 1",				
                 "whistle 2",					
-                "radiation immunity pill",	
-                "?"							
+                "radiation immunity pill"	
                 };
+            return result;
+            }
+
+        private static List<Point> BuildTeleportDestinations()
+            {
+            var x = new[] {0x62, 0xad, 0x2a, 0x0b, 0x9d, 0xaf, 0x9e, 0x45, 0x89, 0x9d, 0xb5, 0xa2, 0x72, 0xa7, 0x9f, 0xb0};
+            var y = new[] {0xc7, 0x62, 0xcd, 0x0b, 0x58, 0x62, 0x69, 0x57, 0x71, 0x3c, 0x66, 0x63, 0x54, 0x80, 0x49, 0x80};
+            Debug.Assert(x.Length == y.Length);
+            var c = x.Length;
+            var result = new List<Point>(c);
+            for (int i = 0; i < c; i++)
+                {
+                var newPoint = new Point(x[i], y[i]);
+                result.Add(newPoint);
+                }
+
             return result;
             }
 
@@ -1023,10 +1097,10 @@ namespace ExileMappedBackground
             {
             var enumerator = nodes.GetEnumerator();
             enumerator.MoveNext();
-            bool result = ((TreeNode) (enumerator.Current)).Checked;
+            bool result = ((TreeNode) enumerator.Current).Checked;
             while (enumerator.MoveNext())
                 {
-                bool isChecked = ((TreeNode) (enumerator.Current)).Checked;
+                bool isChecked = ((TreeNode) enumerator.Current).Checked;
                 if (result != isChecked)
                     return null;
                 }
@@ -1088,14 +1162,14 @@ namespace ExileMappedBackground
             {
             if (e.Button == MouseButtons.Left)
                 {
-                this.DraggingStartPoint = e.Location;
-                this.DraggingTopLeftCell = new Point(this.map.FirstDisplayedCell.ColumnIndex, this.map.FirstDisplayedCell.RowIndex);
+                this._draggingStartPoint = e.Location;
+                this._draggingTopLeftCell = new Point(this.map.FirstDisplayedCell.ColumnIndex, this.map.FirstDisplayedCell.RowIndex);
                 }
             }
 
         private void map_MouseUp(object sender, MouseEventArgs e)
             {
-            this.DraggingInGrid = false;
+            this._draggingInGrid = false;
             map.Cursor = Cursors.Arrow;
             }
 
@@ -1103,23 +1177,23 @@ namespace ExileMappedBackground
             {
             if (e.Button != MouseButtons.Left)
                 {
-                if (this.DraggingInGrid)
+                if (this._draggingInGrid)
                     {
-                    this.DraggingInGrid = false;
+                    this._draggingInGrid = false;
                     map.Cursor = Cursors.Arrow;
                     }
                 return;
                 }
 
-            var diffX = e.X - this.DraggingStartPoint.X;
-            var diffY = e.Y - this.DraggingStartPoint.Y;
-            if (!this.DraggingInGrid && (Math.Abs(diffX) > SystemInformation.DragSize.Width || Math.Abs(diffY) > SystemInformation.DragSize.Height))
+            var diffX = e.X - this._draggingStartPoint.X;
+            var diffY = e.Y - this._draggingStartPoint.Y;
+            if (!this._draggingInGrid && (Math.Abs(diffX) > SystemInformation.DragSize.Width || Math.Abs(diffY) > SystemInformation.DragSize.Height))
                 {
-                this.DraggingInGrid = true;
+                this._draggingInGrid = true;
                 map.Cursor = Cursors.SizeAll;
                 }
 
-            if (this.DraggingInGrid)
+            if (this._draggingInGrid)
                 {
                 var columnWidth = map.Columns[0].Width;
                 var rowHeight = map.Rows[0].Height;
@@ -1127,7 +1201,7 @@ namespace ExileMappedBackground
                 var columnsDiff = diffX / columnWidth;
                 var rowsDiff = diffY / rowHeight;
 
-                int row = this.DraggingTopLeftCell.Y - rowsDiff;
+                int row = this._draggingTopLeftCell.Y - rowsDiff;
                 if (row < 0)
                     {
                     row = 0;
@@ -1137,7 +1211,7 @@ namespace ExileMappedBackground
                     row = this.map.RowCount - 1;
                     }
 
-                int column = this.DraggingTopLeftCell.X - columnsDiff;
+                int column = this._draggingTopLeftCell.X - columnsDiff;
                 if (column < 0)
                     {
                     column = 0;

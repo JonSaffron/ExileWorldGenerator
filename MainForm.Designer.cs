@@ -1,6 +1,6 @@
-﻿namespace ExileMappedBackground
+﻿namespace ExileWorldGenerator
     {
-    partial class Form1
+    partial class MainForm
         {
         /// <summary>
         /// Required designer variable.
@@ -68,7 +68,7 @@
             treeNode16,
             treeNode17,
             treeNode18});
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             this.Splitter = new System.Windows.Forms.SplitContainer();
             this.map = new System.Windows.Forms.DataGridView();
             this.tabControl1 = new System.Windows.Forms.TabControl();

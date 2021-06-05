@@ -11400,8 +11400,8 @@ door	palette												speed	min_energy
 
 ; animate_beam
 &4dad: a5 6f            LDA &6f ; this_object_flags
-&4daf: 29 04            AND #&04                                                # is the beam active?
-&4db1: d0 15            BNE &4dc8 ; no_beam_motion                              # if not, don't move it
+&4daf: 29 04            AND #&04                                                # check if the flag that we don't have an explanation for is set 
+&4db1: d0 15            BNE &4dc8 ; no_beam_motion                              # if set, don't animate the beam, just set position to 4
 
 &4db3: a5 11            LDA &11 ; this_object_extra                             # this_object_extra = beam position
 &4db5: 69 20            ADC #&20												# position moves 1 pixel at a time

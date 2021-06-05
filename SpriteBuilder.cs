@@ -5,7 +5,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 
-namespace ExileMappedBackground
+namespace ExileWorldGenerator
     {
     class SpriteBuilder
         {

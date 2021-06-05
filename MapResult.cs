@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace ExileMappedBackground
+namespace ExileWorldGenerator
     {
     class MapResult
         {
