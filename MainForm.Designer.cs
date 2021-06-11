@@ -87,12 +87,12 @@
             this.txtCoordinates = new System.Windows.Forms.TextBox();
             this.tabOptions = new System.Windows.Forms.TabPage();
             this.cboHighlightBackground = new System.Windows.Forms.ComboBox();
-            this.label2 = new System.Windows.Forms.Label();
+            this.BackgroundLabel = new System.Windows.Forms.Label();
             this.chkHighlightDisplayElement = new System.Windows.Forms.CheckBox();
             this.chkHighlightBackgroundObjects = new System.Windows.Forms.CheckBox();
             this.BackgroundObjectTree = new System.Windows.Forms.TreeView();
             this.chkHighlightMappedData = new System.Windows.Forms.CheckBox();
-            this.label1 = new System.Windows.Forms.Label();
+            this.ZoomLevelLabel = new System.Windows.Forms.Label();
             this.cboZoomLevel = new System.Windows.Forms.ComboBox();
             this.tabSearch = new System.Windows.Forms.TabPage();
             this.AnimationTimer = new System.Windows.Forms.Timer(this.components);
@@ -344,12 +344,12 @@
             // tabOptions
             // 
             this.tabOptions.Controls.Add(this.cboHighlightBackground);
-            this.tabOptions.Controls.Add(this.label2);
+            this.tabOptions.Controls.Add(this.BackgroundLabel);
             this.tabOptions.Controls.Add(this.chkHighlightDisplayElement);
             this.tabOptions.Controls.Add(this.chkHighlightBackgroundObjects);
             this.tabOptions.Controls.Add(this.BackgroundObjectTree);
             this.tabOptions.Controls.Add(this.chkHighlightMappedData);
-            this.tabOptions.Controls.Add(this.label1);
+            this.tabOptions.Controls.Add(this.ZoomLevelLabel);
             this.tabOptions.Controls.Add(this.cboZoomLevel);
             this.tabOptions.Location = new System.Drawing.Point(4, 88);
             this.tabOptions.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
@@ -371,15 +371,15 @@
             this.cboHighlightBackground.TabIndex = 7;
             this.cboHighlightBackground.SelectedIndexChanged += new System.EventHandler(this.cboHighlightBackground_SelectedIndexChanged);
             // 
-            // label2
+            // BackgroundLabel
             // 
-            this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(45, 663);
-            this.label2.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(123, 25);
-            this.label2.TabIndex = 6;
-            this.label2.Text = "Background:";
+            this.BackgroundLabel.AutoSize = true;
+            this.BackgroundLabel.Location = new System.Drawing.Point(45, 663);
+            this.BackgroundLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.BackgroundLabel.Name = "BackgroundLabel";
+            this.BackgroundLabel.Size = new System.Drawing.Size(123, 25);
+            this.BackgroundLabel.TabIndex = 6;
+            this.BackgroundLabel.Text = "Background:";
             // 
             // chkHighlightDisplayElement
             // 
@@ -485,15 +485,15 @@
             this.chkHighlightMappedData.UseVisualStyleBackColor = true;
             this.chkHighlightMappedData.CheckedChanged += new System.EventHandler(this.chkHighlightMappedData_CheckedChanged);
             // 
-            // label1
+            // ZoomLevelLabel
             // 
-            this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(10, 11);
-            this.label1.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(113, 25);
-            this.label1.TabIndex = 0;
-            this.label1.Text = "Zoom level:";
+            this.ZoomLevelLabel.AutoSize = true;
+            this.ZoomLevelLabel.Location = new System.Drawing.Point(10, 11);
+            this.ZoomLevelLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
+            this.ZoomLevelLabel.Name = "ZoomLevelLabel";
+            this.ZoomLevelLabel.Size = new System.Drawing.Size(113, 25);
+            this.ZoomLevelLabel.TabIndex = 0;
+            this.ZoomLevelLabel.Text = "Zoom level:";
             // 
             // cboZoomLevel
             // 
@@ -522,7 +522,7 @@
             this.AnimationTimer.Enabled = true;
             this.AnimationTimer.Tick += new System.EventHandler(this.AnimationTimer_Tick);
             // 
-            // Form1
+            // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
@@ -530,7 +530,7 @@
             this.Controls.Add(this.Splitter);
             this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.Name = "Form1";
+            this.Name = "MainForm";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
             this.Text = "The Land of the Exile";
             this.Shown += new System.EventHandler(this.Form1_Shown);
@@ -569,12 +569,12 @@
         private System.Windows.Forms.TextBox txtCoordinates;
         private System.Windows.Forms.TabPage tabOptions;
         private System.Windows.Forms.ComboBox cboHighlightBackground;
-        private System.Windows.Forms.Label label2;
+        private System.Windows.Forms.Label BackgroundLabel;
         private System.Windows.Forms.CheckBox chkHighlightDisplayElement;
         private System.Windows.Forms.CheckBox chkHighlightBackgroundObjects;
         private System.Windows.Forms.TreeView BackgroundObjectTree;
         private System.Windows.Forms.CheckBox chkHighlightMappedData;
-        private System.Windows.Forms.Label label1;
+        private System.Windows.Forms.Label ZoomLevelLabel;
         private System.Windows.Forms.ComboBox cboZoomLevel;
         private System.Windows.Forms.TabPage tabSearch;
         }

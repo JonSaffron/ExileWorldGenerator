@@ -5,25 +5,28 @@ using System.Linq;
 
 namespace ExileWorldGenerator
     {
-    class SquarePalette
+    internal class SquarePalette
         {
-        public GameColour Colour1;
-        public GameColour Colour2;
-        public GameColour PrimaryColour;
+        public readonly byte Palette;
+        public readonly GameColour Colour1;
+        public readonly GameColour Colour2;
+        public readonly GameColour PrimaryColour;
 
         private static readonly Dictionary<GameColour, Color> GameColours = BuildGameColours();
         private static readonly (GameColour leftColour, GameColour rightColour)[] ColourPairs = BuildColourPairs();
 
+        private SquarePalette(byte palette)
+            {
+            this.Palette = palette;
+            var colourPair = ColourPairs[palette & 0xf];
+            this.Colour1 = colourPair.rightColour;
+            this.Colour2 = colourPair.leftColour;
+            this.PrimaryColour = (GameColour) (palette >> 4);
+            }
+
         public static SquarePalette FromByte(byte palette)
             {
-            var colourPair = ColourPairs[palette & 0xf];
-            var result = new SquarePalette
-                {
-                Colour1 = colourPair.rightColour,
-                Colour2 = colourPair.leftColour,
-                PrimaryColour = (GameColour) (palette >> 4)
-                };
-            return result;
+            return new SquarePalette(palette);
             }
         
         public Color this[int paletteIndex]
@@ -107,6 +110,11 @@ namespace ExileWorldGenerator
         private static byte[] BuildPaletteValueToPixelLookup()
             {
             return new byte[] {0xca, 0xc9, 0xe3, 0xe9, 0xeb, 0xce, 0xf8, 0xe6, 0xcc, 0xee, 0x30, 0xde, 0xef, 0xcb, 0xfb, 0xfe};
+            }
+
+        public override string ToString()
+            {
+            return $"{this.Palette:X2} ({this.Colour1} {this.Colour2} {this.PrimaryColour})";
             }
         }
     }

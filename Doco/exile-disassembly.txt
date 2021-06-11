@@ -1103,8 +1103,8 @@ These are a list of square_x values in sections delimited by background_objects_
 #								  new_object_type_pointer = new_object_data_pointer + background_objects_type_offset[r]
 # range 0
 # no	id	x            square s&o   data         type            x, y    handler: object
-# &00	 1	&05ef = &ff  &06ee = &89  &0987 = &7c  &0a72 = &0f  (&ff, &??) &09 object_emerging_from_sucker/bush : worm (x 31) (used for random emergents in process_events)
-# &01	 2	&05f0 = &ff  &06ef = &89  &0988 = &60  &0a73 = &27  (&ff, &??) &09 object_emerging_from_sucker/bush : maggot (x 24) (used for random emergents in process_events)
+# &00	 1	&05ef = &ff  &06ee = &89  &0987 = &7c  &0a72 = &0f  (&ff,    ) &09 object_emerging_from_sucker/bush : worm (x 31) (used for random emergents in process_events)
+# &01	 2	&05f0 = &ff  &06ef = &89  &0988 = &60  &0a73 = &27  (&ff,    ) &09 object_emerging_from_sucker/bush : maggot (x 24) (used for random emergents in process_events)
 # &02	 3	&05f1 = &b0  &06f0 = &89  &0989 = &04  &0a74 = &2e  (&b0, &4e) &09 object_emerging_from_sucker/bush : green/yellow bird - the first npc we meet
 # &03	 4	&05f2 = &ec  &06f1 = &89  &098a = &88  &0a75 = &07  (&ec, &c0) &09 object_emerging_from_sucker/bush : green frogman (x 2)
 # &04	 5	&05f3 = &77  &06f2 = &89  &098b = &88  &0a76 = &2f  (&77, &54) &09 object_emerging_from_sucker/bush : white/yellow bird (x 2)

@@ -7,7 +7,7 @@ using System.Linq;
 
 namespace ExileWorldGenerator
     {
-    class SpriteBuilder
+    internal class SpriteBuilder
         {
         private static readonly byte[] SpriteData = BuildSpriteSheet();
         private static readonly byte[] SpriteHeightLookup = BuildSpriteHeightLookup();
@@ -37,12 +37,12 @@ namespace ExileWorldGenerator
                     {
                     using (SolidBrush b = new SolidBrush(Color.FromArgb(0x80, Color.Blue)))
                         {
-                        var top = (waterLevelType == WaterLevelType.AtWaterLine) ? 3 : 0;
+                        var top = (waterLevelType == WaterLevelType.OnWaterLine) ? 3 : 0;
                         g.FillRectangle(b, 0, top, SquareSize.Width, SquareSize.Height);
                         }
                     }
 
-                if (waterLevelType == WaterLevelType.AtWaterLine)
+                if (waterLevelType == WaterLevelType.OnWaterLine)
                     {
                     using (SolidBrush b = new SolidBrush(Color.FromArgb(0x80, Color.Cyan)))
                         {
@@ -52,16 +52,14 @@ namespace ExileWorldGenerator
                 }
             }
 
-        public void BuildBackgroundSprite(byte backgroundAndOrientation, byte displayPalette)
+        public void BuildBackgroundSprite(byte backgroundAndOrientation, SquarePalette palette)
             {
             byte background = (byte) (backgroundAndOrientation & 0x3f);
             bool flipHorizontallyAndRightAlign = (backgroundAndOrientation & 0x80) != 0;
             bool flipVerticallyAndBottomAlign = (backgroundAndOrientation & 0x40) != 0;
 
-            byte sprite = (byte) (BackgroundSpriteLookup[background]);
+            byte sprite = BackgroundSpriteLookup[background];
             byte offsetAlongY = (byte) (BackgroundYOffsetLookup[background] & 0xf0);
-                
-            SquarePalette palette = SquarePalette.FromByte(displayPalette);
 
             var sourceRectangle = SpritePositions[sprite];
             bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
@@ -115,7 +113,7 @@ namespace ExileWorldGenerator
                     Color pixelColour = palette[paletteIndex];
                     if (paletteIndex == 0)
                         {
-                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        Debug.Assert(pixelColour == Color.Black);
                         continue;
                         }
                     int x2 = toX(x);
@@ -188,7 +186,7 @@ namespace ExileWorldGenerator
                     Color pixelColour = palette[paletteIndex];
                     if (paletteIndex == 0)
                         {
-                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        Debug.Assert(pixelColour == Color.Black);
                         continue;
                         }
                     int x2 = toX(x);
@@ -244,7 +242,7 @@ namespace ExileWorldGenerator
                     Color pixelColour = palette[paletteIndex];
                     if (paletteIndex == 0)
                         {
-                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        Debug.Assert(pixelColour == Color.Black);
                         continue;
                         }
                     int x2 = toX(x) + offset.x;
@@ -332,7 +330,7 @@ namespace ExileWorldGenerator
                     Color pixelColour = palette[paletteIndex];
                     if (paletteIndex == 0)
                         {
-                        System.Diagnostics.Debug.Assert(pixelColour == Color.Black);
+                        Debug.Assert(pixelColour == Color.Black);
                         continue;
                         }
                     int x2 = toX(x);

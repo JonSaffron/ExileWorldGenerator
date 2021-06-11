@@ -16,7 +16,6 @@ namespace ExileWorldGenerator
     {
     public partial class MainForm : Form
         {
-        private readonly CalculateBackground _mapper = new CalculateBackground();
         private readonly SpriteBuilder _spriteBuilder = new SpriteBuilder();
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
         private static readonly string[] BackgroundHandlerTypeList = BuildBackgroundHandlerTypeList();
@@ -77,6 +76,7 @@ namespace ExileWorldGenerator
             cboHighlightBackground.DataSource = new BindingSource(backgroundItems, null);
             cboHighlightBackground.SelectedIndex = 1;
 
+            // turn on double-buffering for the data grid view to reduce flickering
             var type = map.GetType();
             var prop = type.GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
             if (prop != null)
@@ -84,27 +84,27 @@ namespace ExileWorldGenerator
 
             this._stopwatch.Start();
 
-            var hashOfPositions = new ConcurrentBag<int>();
-            Parallel.For(0, 0x10000, i => { NewMethod(i, hashOfPositions); });
-            if (hashOfPositions.Count != 1024)
-                throw new InvalidOperationException("1024 positions are expected to be explicitly mapped, rather than " + hashOfPositions.Count);
-            if (hashOfPositions.Distinct().Count() != 1024)
+            var checkOnMappedSquares = new ConcurrentBag<int>();
+            Parallel.For(0, 0x10000, i => { CalculateSquareContents(i, checkOnMappedSquares); });
+            if (checkOnMappedSquares.Count != 1024)
+                throw new InvalidOperationException("1024 positions are expected to be explicitly mapped, rather than " + checkOnMappedSquares.Count);
+            if (checkOnMappedSquares.Distinct().Count() != 1024)
                 throw new InvalidOperationException("All 1024 explicit map positions should be unique.");
 
-            string findResults = string.Empty;
-            for (int y = 0; y < 256; y++)
-                {
-                for (int x = 0; x < 256; x++)
-                    {
-                    var squareProperties = this._squareProperties[x, y];
-                    if ((squareProperties.BackgroundAfterPalette & 0x3f) == lookFor)
-                        {
-                        findResults += $"({x:x2},{y:x2})\r\n";
-                        }
-                    }
-                }
+            //string findResults = string.Empty;
+            //for (int y = 0; y < 256; y++)
+            //    {
+            //    for (int x = 0; x < 256; x++)
+            //        {
+            //        var squareProperties = this._squareProperties[x, y];
+            //        if ((squareProperties.BackgroundAfterPalette & 0x3f) == lookFor)
+            //            {
+            //            findResults += $"({x:x2},{y:x2})\r\n";
+            //            }
+            //        }
+            //    }
 
-            Trace.WriteLine(findResults);
+            //Trace.WriteLine(findResults);
             }
 
         private void Form1_Shown(object sender, EventArgs e)
@@ -131,41 +131,34 @@ namespace ExileWorldGenerator
             this.map.ResumeLayout();
             }
 
-        private void NewMethod(int i, ConcurrentBag<int> hashOfPositions)
+        private void CalculateSquareContents(int squareCoordinates, ConcurrentBag<int> hashOfPositions)
             {
-            byte y = (byte) (i >> 8);
-            byte x = (byte) (i & 0xFF);
+            byte y = (byte) (squareCoordinates >> 8);
+            byte x = (byte) (squareCoordinates & 0xFF);
 
-            var mapResult = _mapper.GetBackground(x, y);
-            if (mapResult.IsMappedData)
+            var generatedBackground = CalculateBackground.GetBackground(x, y);
+            var data = new SquareProperties {X = x, Y = y, GeneratedBackground = generatedBackground};
+            if (generatedBackground.IsMappedData)
                 {
-                hashOfPositions.Add(mapResult.PositionInMappedData);
+                hashOfPositions.Add(generatedBackground.PositionInMappedData);
                 }
 
-            var data = new SquareProperties {X = x, Y = y, CalculatedBackground = mapResult.Result};
-            if (mapResult.IsMappedData)
-                data.MappedDataPosition = mapResult.PositionInMappedData;
+            var backgroundProperties = CalculateBackgroundObjectData.GetBackgroundObjectData(generatedBackground.Result, x);
+            data.BackgroundObjectData = backgroundProperties;
 
-            var backgroundProperties = _mapper.GetMapData(mapResult.Result, x);
-            data.BackgroundAfterHashing = backgroundProperties.background;
-            data.BackgroundObjectId = backgroundProperties.backgroundObjectId;
-            data.IsHashDefault = backgroundProperties.isHashDefault;
-
-            byte background = (byte) (data.BackgroundAfterHashing & 0x3f);
-            byte orientation = (byte) (data.BackgroundAfterHashing & 0xc0);
-            if (data.IsBackgroundEvent)
+            byte background = (byte) (data.BackgroundObjectData.Result & 0x3f);
+            byte orientation = (byte) (data.BackgroundObjectData.Result & 0xc0);
+            if (data.BackgroundObjectData.IsBackgroundEvent)
                 {
                 data.BackgroundHandlerType = BackgroundHandlerTypeList[background];
-                if (backgroundProperties.backgroundObjectId.HasValue)
+                if (backgroundProperties.Number.HasValue)
                     {
-                    data.BackgroundType = backgroundProperties.type;
-                    data.BackgroundData = backgroundProperties.data;
-                    data.BackgroundDescription = DescribeBackground((BackgroundObjectType) background, backgroundProperties.type, backgroundProperties.data, orientation);
+                    data.BackgroundDescription = DescribeBackground((BackgroundObjectType) background, backgroundProperties.Type, backgroundProperties.Data, orientation);
                     }
                 }
 
-            (data.BackgroundPalette, data.DisplayedPalette) = _mapper.GetPalette(ref background, ref orientation, x, y);
-            data.BackgroundAfterPalette = (byte) (background ^ orientation);
+            data.PaletteData = CalculatePalette.GetPalette(ref background, ref orientation, x, y);
+            data.Background = (byte) (background ^ orientation);
 
             var teleportDestination = TeleportDestinations.FindIndex(item => item == new Point(x, y));
             if (teleportDestination != -1)
@@ -273,7 +266,7 @@ namespace ExileWorldGenerator
                     int yVelocity = data.Value;
                     if (yVelocity >= 128)
                         yVelocity -= 256;
-                    int xVelocity = ((data.Value << 4) & 0xff);
+                    int xVelocity = (data.Value << 4) & 0xff;
                     if (xVelocity >= 128)
                         xVelocity -= 256;
                     return $"Fixed wind velocity ({xVelocity}, {yVelocity})";
@@ -289,7 +282,7 @@ namespace ExileWorldGenerator
                     return null;        // random wind does not have data
 
                 case BackgroundObjectType.Mushrooms:
-                    return null;        // mushrooms does not have data
+                    return null;        // mushrooms do not have data
                 }
             throw new InvalidOperationException();
             }
@@ -310,13 +303,13 @@ namespace ExileWorldGenerator
                 }
 
             var colourScheme = SquarePalette.FromByte(SpriteBuilder.ObjectPaletteLookup[objectType]);
-            result += $" {colourScheme.Colour1}, {colourScheme.Colour2}, {colourScheme.PrimaryColour}";
+            result += $" {colourScheme}";
             return result;
             }
 
         private void dataGridView1_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
             {
-            if (e.RowIndex < 0 || e.ColumnIndex < 0)
+            if (e.RowIndex < 0 || e.ColumnIndex < 0 || (e.PaintParts & DataGridViewPaintParts.ContentForeground) == 0)
                 {
                 return;
                 }
@@ -328,7 +321,7 @@ namespace ExileWorldGenerator
             var waterLevelType = GetWaterLevelType(squareProperties.X, squareProperties.Y);
             this._spriteBuilder.Clear(waterLevelType);
 
-            switch ((BackgroundObjectType) (squareProperties.BackgroundAfterPalette & 0x3f))
+            switch ((BackgroundObjectType) (squareProperties.Background & 0x3f))
                 {
                 case BackgroundObjectType.InvisibleSwitch:
                     {
@@ -338,52 +331,53 @@ namespace ExileWorldGenerator
 
                 case BackgroundObjectType.ObjectFromData:
                     {
-                    Debug.Assert(squareProperties.BackgroundData.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundData.Value, squareProperties.BackgroundAfterPalette);
+                    Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Data.Value, squareProperties.Background);
                     break;
                     }
                 
                 case BackgroundObjectType.Door:
                 case BackgroundObjectType.StoneDoor:
                     {
-                    Debug.Assert(squareProperties.BackgroundData.HasValue);
-                    this._spriteBuilder.BuildDoor(squareProperties.BackgroundAfterPalette, squareProperties.BackgroundData.Value);
+                    Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
+                    this._spriteBuilder.BuildDoor(squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
                     break;
                     }
 
                 case BackgroundObjectType.ObjectFromTypeWithWall:
                 case BackgroundObjectType.ObjectFromTypeWithFoliage:
                     {
-                    Debug.Assert(squareProperties.BackgroundType.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundType.Value, squareProperties.BackgroundAfterPalette);
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
+                    Debug.Assert(squareProperties.BackgroundObjectData.Type.HasValue);
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background);
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     break;
                     }
 
                 case BackgroundObjectType.ObjectFromType:
                     {
-                    Debug.Assert(squareProperties.BackgroundType.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundType.Value, squareProperties.BackgroundAfterPalette);
+                    Debug.Assert(squareProperties.BackgroundObjectData.Type.HasValue);
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background);
                     break;
                     }
             
                 case BackgroundObjectType.Switch:
                     {
-                    this._spriteBuilder.BuildObjectFromDataSprite(0x42, squareProperties.BackgroundAfterPalette);
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
+                    this._spriteBuilder.BuildObjectFromDataSprite(0x42, squareProperties.Background);
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     break;
                     }
 
                 case BackgroundObjectType.ObjectEmergingFromBush:
                 case BackgroundObjectType.ObjectEmergingFromPipe:
                     {
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
-                    if (squareProperties.BackgroundObjectId.HasValue)
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
+                    if (squareProperties.BackgroundObjectData.Number.HasValue)
                         {
-                        Debug.Assert(squareProperties.BackgroundData.HasValue);
-                        if ((squareProperties.BackgroundData.Value & 0x80) != 0)
+                        Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
+                        bool hasTree = (squareProperties.BackgroundObjectData.Data.Value & 0x80) != 0;
+                        if (hasTree)
                             {
-                            this._spriteBuilder.BuildObjectSprite(0x40, squareProperties.BackgroundAfterPalette, (0x40, 0x40));
+                            this._spriteBuilder.BuildObjectSprite(0x40, squareProperties.Background, (0x40, 0x40));
                             }
                         }
                     break;
@@ -403,7 +397,7 @@ namespace ExileWorldGenerator
 
                 default:
                     {
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.BackgroundAfterPalette, squareProperties.DisplayedPalette);
+                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     break;
                     }
                 }
@@ -423,7 +417,7 @@ namespace ExileWorldGenerator
                 {
                 AdvanceAnimation(squareProperties, timeElapsed);
 
-                if (this._highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
+                if (this._highlightMappedDataSquares && squareProperties.GeneratedBackground.IsMappedData)
                     {
                     using (Brush brush = new SolidBrush(Color.FromArgb(128, Color.Orange)))
                         {
@@ -449,9 +443,9 @@ namespace ExileWorldGenerator
                         }
                     }
 
-                if (this._highlightDisplayElement && (squareProperties.BackgroundAfterPalette & 0x3f) == this._displayElementToHighlight)
+                if (this._highlightDisplayElement && (squareProperties.Background & 0x3f) == this._displayElementToHighlight)
                     {
-                    using (Brush brush = new SolidBrush(Color.FromArgb(0x40, Color.Silver)))
+                    using (Brush brush = new SolidBrush(Color.FromArgb(0x80, Color.White)))
                         {
                         using (Pen pen = new Pen(brush, squareProperties.AnimationFrame))
                             {
@@ -479,7 +473,7 @@ namespace ExileWorldGenerator
                     }
                 }
 
-            if ((squareProperties.BackgroundAfterPalette & 0x3f) == lookFor)
+            if ((squareProperties.Background & 0x3f) == lookFor)
                 {
                 }
 
@@ -496,9 +490,9 @@ namespace ExileWorldGenerator
                 if (x >= waterLevel.FromX)
                     {
                     if (y > waterLevel.WaterLevel)
-                        return WaterLevelType.BelowWater;
+                        return WaterLevelType.UnderWater;
                     if (y == waterLevel.WaterLevel)
-                        return WaterLevelType.AtWaterLine;
+                        return WaterLevelType.OnWaterLine;
                     return WaterLevelType.AboveWater;
                     }
                 }
@@ -534,24 +528,24 @@ namespace ExileWorldGenerator
             {
             if (squareProperties.NextAnimationFrame.HasValue)
                 return true;
-            if (this._highlightMappedDataSquares && squareProperties.MappedDataPosition.HasValue)
+            if (this._highlightMappedDataSquares && squareProperties.GeneratedBackground.IsMappedData)
                 return true;
             if (this._highlightBackgroundObjects && DoesSquareMatchBackgroundObjectCriteria(squareProperties))
                 return true;
-            if (this._highlightDisplayElement && (squareProperties.BackgroundAfterPalette & 0x3f) == this._displayElementToHighlight)
+            if (this._highlightDisplayElement && (squareProperties.Background & 0x3f) == this._displayElementToHighlight)
                 return true;
             return false;
             }
 
         private bool DoesSquareMatchBackgroundObjectCriteria(SquareProperties squareProperties)
             {
-            var type = (byte) (squareProperties.BackgroundAfterPalette & 0x3f);
+            var type = (byte) (squareProperties.Background & 0x3f);
             if (type > 0xf || !this._selectedBackgroundObjectTypes.Contains(type))
                 {
                 return false;
                 }
 
-            var result = type > 0xc || squareProperties.BackgroundObjectId.HasValue;
+            var result = type > 0xc || squareProperties.BackgroundObjectData.Number.HasValue;
             return result;
             }
 
@@ -578,40 +572,6 @@ namespace ExileWorldGenerator
                 }
             }
 
-        private class SquareProperties
-            {
-            public byte X;
-            public byte Y;
-            public byte CalculatedBackground;
-            public byte BackgroundAfterHashing;
-            public byte BackgroundAfterPalette;
-
-            public int? MappedDataPosition;
-            public bool IsHashDefault;
-            public int? BackgroundObjectId;
-            public string BackgroundHandlerType;
-            public byte BackgroundPalette;
-            public byte DisplayedPalette;
-
-            public byte? BackgroundType;
-            public byte? BackgroundData;
-            public string BackgroundDescription;
-
-            public TimeSpan? NextAnimationFrame;
-            public int AnimationFrame;
-
-            public bool IsBackgroundEvent
-                {
-                get 
-                    {
-                    var background = this.BackgroundAfterHashing & 0x3f;
-                    if (this.BackgroundObjectId.HasValue & background <= 0xc)
-                        return true;
-                    return background <= 0xf;
-                    }
-                }
-            }
-
         private void map_SelectionChanged(object sender, EventArgs e)
             {
             var squareValue = this._squareProperties[this.map.CurrentCell.ColumnIndex, this.map.CurrentCell.RowIndex];
@@ -633,40 +593,39 @@ namespace ExileWorldGenerator
         private void SetBackgroundObjectInfo(SquareProperties squareValue)
             {
             string backgroundObjectInfo;
-            byte background = (byte) (squareValue.BackgroundAfterPalette & 0x3f); 
-            if (background >= 0x10)
+            byte background = (byte) (squareValue.Background & 0x3f);
+            if (!squareValue.BackgroundObjectData.Id.HasValue)
                 {
-                backgroundObjectInfo = "No background event";
+                if (background < 0x10)
+                    {
+                    backgroundObjectInfo = $"Background event used as scenery: {squareValue.BackgroundHandlerType}";
+                    }
+                else
+                    {
+                    backgroundObjectInfo = $"Scenery only";
+                    }
                 if (squareValue.BackgroundDescription != null)
                     {
                     backgroundObjectInfo += "\r\n" + squareValue.BackgroundDescription;
                     }
-                }
-            else 
-                {
-                backgroundObjectInfo =
-                    $"Background handler: {squareValue.BackgroundHandlerType}";
 
-                if (!squareValue.BackgroundObjectId.HasValue)
+                }
+            else
+                {
+                backgroundObjectInfo = $"Background object id: {squareValue.BackgroundObjectData.Id:X2}";
+                backgroundObjectInfo += $"\r\nBackground handler: {squareValue.BackgroundHandlerType}";
+                backgroundObjectInfo += "\r\n" +
+                    $"Description: {squareValue.BackgroundDescription}";
+                if (squareValue.BackgroundObjectData.Type.HasValue)
                     {
-                    backgroundObjectInfo += "\r\n" + "Scenery only";
-                    if (squareValue.BackgroundDescription != null)
-                        {
-                        backgroundObjectInfo += "\r\n" + squareValue.BackgroundDescription;
-                        }
+                    backgroundObjectInfo += "\r\n" +
+                        $"Object type: {squareValue.BackgroundObjectData.Type.Value:X2}";
                     }
-                else 
+
+                if (squareValue.BackgroundObjectData.Data.HasValue)
                     {
-                    if (squareValue.BackgroundType.HasValue)
-                        {
-                        backgroundObjectInfo += "\r\n" +
-                            $"Object type: {squareValue.BackgroundType.Value:X2}";
-                        }
-                    Debug.Assert(squareValue.BackgroundData.HasValue);
                     backgroundObjectInfo += "\r\n" +
-                        $"Data: {squareValue.BackgroundData.Value:X2}";
-                    backgroundObjectInfo += "\r\n" +
-                        $"Description: {squareValue.BackgroundDescription}";
+                                            $"Data: {squareValue.BackgroundObjectData.Data.Value:X2}";
                     }
                 }
 
@@ -676,7 +635,7 @@ namespace ExileWorldGenerator
 
         private void SetSpriteInfo(SquareProperties squareValue)
             {
-            byte sprite = (byte) (SpriteBuilder.BackgroundSpriteLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0x7f);
+            byte sprite = (byte) (SpriteBuilder.BackgroundSpriteLookup[squareValue.Background & 0x3f] & 0x7f);
             string spriteInfo =
                 $"Sprite number: {sprite:X2}\r\n" +
                 "Orientation on sprite sheet: ";
@@ -690,12 +649,12 @@ namespace ExileWorldGenerator
                 spriteInfo += "flipped vertically";
             else
                 spriteInfo += "not flipped";
-            byte offsetAlongY = (byte) (SpriteBuilder.BackgroundYOffsetLookup[squareValue.BackgroundAfterPalette & 0x3f] & 0xf0);
+            byte offsetAlongY = (byte) (SpriteBuilder.BackgroundYOffsetLookup[squareValue.Background & 0x3f] & 0xf0);
             spriteInfo += "\r\n" +
                           $"Y offset: {offsetAlongY:X2}\r\n";
 
-            bool rightAlign = (squareValue.BackgroundAfterPalette & 0x80) != 0;
-            bool bottomAlign = (squareValue.BackgroundAfterPalette & 0x40) != 0;
+            bool rightAlign = (squareValue.Background & 0x80) != 0;
+            bool bottomAlign = (squareValue.Background & 0x40) != 0;
             var isFlippedHorizontally = isSpriteFlippedHorizontally ^ rightAlign;
             var isFlippedVertically = isSpriteFlippedVertically ^ bottomAlign;
             spriteInfo +=
@@ -718,28 +677,27 @@ namespace ExileWorldGenerator
 
         private void SetPaletteInfo(SquareProperties squareValue)
             {
-            string paletteInfo =
-                $"Palette for background: {squareValue.BackgroundPalette:X2}";
-            if (squareValue.BackgroundPalette > 6)
+            string paletteInfo;
+            if (squareValue.PaletteData.BackgroundPalette > 6)
                 {
-                var colours = SquarePalette.FromByte(squareValue.BackgroundPalette);
-                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.PrimaryColour}";
+                Debug.Assert(squareValue.PaletteData.BackgroundPalette == squareValue.PaletteData.Palette.Palette);
+                paletteInfo =
+                    $"Invariable palette for background: {squareValue.PaletteData.Palette}";
                 }
             else
                 {
-                paletteInfo += "\r\n" +
-                               $"Derived palette: {squareValue.DisplayedPalette:X2}";
-                var colours = SquarePalette.FromByte(squareValue.DisplayedPalette);
-                paletteInfo += $" {colours.Colour1}, {colours.Colour2}, {colours.PrimaryColour}";
+                paletteInfo = 
+                    $"Palette algorithm for background: {squareValue.PaletteData.BackgroundPalette:X2} \r\n" +
+                    $"Derived palette: {squareValue.PaletteData.Palette}";
                 }
 
-            if (squareValue.BackgroundAfterHashing != squareValue.BackgroundAfterPalette)
+            if (squareValue.BackgroundObjectData.Result != squareValue.Background)
                 {
                 paletteInfo +=
-                    $"\r\nRevised background: {squareValue.BackgroundAfterPalette:x2}\r\n" +
-                    $"Appearance: {squareValue.BackgroundAfterPalette & 0x3f:X2}, " +
-                    $"Orientation: {squareValue.BackgroundAfterPalette & 0xc0:X2} " +
-                    $"({DescribeOrientation(squareValue.BackgroundAfterPalette)})";
+                    $"\r\nRevised background: {squareValue.Background:x2}\r\n" +
+                    $"Appearance: {squareValue.Background & 0x3f:X2}, " +
+                    $"Orientation: {squareValue.Background & 0xc0:X2} " +
+                    $"({DescribeOrientation(squareValue.Background)})";
                 }
 
             this.txtPaletteInfo.Text = paletteInfo;
@@ -748,7 +706,8 @@ namespace ExileWorldGenerator
 
         private void SetListOverrideInfo(SquareProperties squareValue)
             {
-            if ((squareValue.CalculatedBackground & 0x3f) >= 0x9)
+            var backgroundOverrideList = squareValue.GeneratedBackground.Result & 0x3f;
+            if (backgroundOverrideList >= 0x9)
                 {
                 // ReSharper disable once LocalizableElement
                 this.txtListOverrideInfo.Text = "No override";
@@ -756,24 +715,25 @@ namespace ExileWorldGenerator
             else
                 {
                 var listOverride =
-                    $"Override list: {squareValue.CalculatedBackground & 0x3f}\r\n";
-                if (squareValue.IsHashDefault)
+                    $"Override list: {backgroundOverrideList}\r\n";
+                if (squareValue.BackgroundObjectData.IsHashDefault)
                     {
                     listOverride +=
-                        $"Default for list: {squareValue.BackgroundAfterHashing:X2}\r\n";
+                        $"Default for list: {squareValue.BackgroundObjectData.Result:X2}\r\n";
                     }
                 else
                     {
-                    Debug.Assert(squareValue.BackgroundObjectId.HasValue);
+                    Debug.Assert(squareValue.BackgroundObjectData.Number.HasValue);
                     listOverride +=
-                        $"Background object index = {squareValue.BackgroundObjectId.Value:X2}\r\n" +
-                        $"Value from list: {squareValue.BackgroundAfterHashing:x2}\r\n";
+                        $"Background object number: {squareValue.BackgroundObjectData.Number.Value:X2}\r\n" +
+                        $"Value from list: {squareValue.BackgroundObjectData.Result:x2}\r\n";
                     }
 
+                byte contents = (byte) (squareValue.BackgroundObjectData.Result & 0x3f);
+                byte orientation = (byte) (squareValue.BackgroundObjectData.Result & 0xc0);
                 listOverride +=
-                    $"{((squareValue.BackgroundAfterHashing & 0x3f) <= 0xf ? "Handler" : "Appearance")}: {squareValue.BackgroundAfterHashing & 0x3f:X2}, " +
-                    $"Orientation: {squareValue.BackgroundAfterHashing & 0xc0:X2} " +
-                    $"({DescribeOrientation(squareValue.BackgroundAfterHashing)})";
+                    $"{(contents <= 0xf ? "Handler" : "Appearance")}: {contents:X2}, \r\n" +
+                    $"Orientation: {orientation:X2} ({DescribeOrientation(orientation)})";
                 this.txtListOverrideInfo.Text = listOverride;
                 }
             SetTextBoxHeight(this.txtListOverrideInfo);
@@ -782,15 +742,16 @@ namespace ExileWorldGenerator
         private void SetMappedOrGeneratedInfo(SquareProperties squareValue)
             {
             var mappedGeneratedInfo =
-                squareValue.MappedDataPosition.HasValue
-                    ? $"Mapped location index: {squareValue.MappedDataPosition.Value}\r\n"
+                squareValue.GeneratedBackground.IsMappedData
+                    ? $"Mapped location index: {squareValue.GeneratedBackground.PositionInMappedData}\r\n"
                     : string.Empty;
+            byte calculatedBackground = squareValue.GeneratedBackground.Result;
             mappedGeneratedInfo +=
-                $"{(squareValue.MappedDataPosition.HasValue ? "Explicit" : "Generated")} background {squareValue.CalculatedBackground:X2}\r\n";
+                $"{(squareValue.GeneratedBackground.IsMappedData ? "Explicit" : "Generated")} background {calculatedBackground:X2}\r\n";
             mappedGeneratedInfo +=
-                $"Appearance: {squareValue.CalculatedBackground & 0x3f:X2}, " +
-                $"Orientation: {squareValue.CalculatedBackground & 0xc0:X2} " +
-                $"({DescribeOrientation(squareValue.CalculatedBackground)})";
+                $"Appearance: {calculatedBackground & 0x3f:X2}, " +
+                $"Orientation: {calculatedBackground & 0xc0:X2} " +
+                $"({DescribeOrientation(calculatedBackground)})";
             this.txtMappedOrGeneratedInfo.Text = mappedGeneratedInfo;
             SetTextBoxHeight(this.txtMappedOrGeneratedInfo);
             }

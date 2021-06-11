@@ -23,6 +23,7 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <Prefer32Bit>false</Prefer32Bit>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -46,6 +47,10 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BackgroundObjectData.cs" />
+    <Compile Include="CalculateBackgroundObjectData.cs" />
+    <Compile Include="CalculatePalette.cs" />
+    <Compile Include="InstructionsFor6502.cs" />
     <Compile Include="BackgroundObjectType.cs" />
     <Compile Include="CalculateBackground.cs" />
     <Compile Include="MainForm.cs">
@@ -55,16 +60,18 @@
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>
     <Compile Include="GameColour.cs" />
+    <Compile Include="PaletteData.cs" />
     <Compile Include="Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
     <Compile Include="SquarePalette.cs" />
-    <Compile Include="MapResult.cs" />
+    <Compile Include="GeneratedBackground.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SpriteBuilder.cs" />
+    <Compile Include="SquareProperties.cs" />
     <Compile Include="WaterLevelType.cs" />
     <EmbeddedResource Include="MainForm.resx">
       <DependentUpon>MainForm.cs</DependentUpon>
