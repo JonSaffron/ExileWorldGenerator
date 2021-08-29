@@ -504,8 +504,19 @@ Disassembly
 #027f: 00 00 00 00 00 00 00 00 4c df 14 ; + &79 # (unused)
 
 handle_background_invisible_switch:
-type indicates the type of object that triggers the switch. bit 7 is set if anything can trigger the switch.
-data format is tbd
+An invisible switch sets or clears specific bits on its targets.
+data type indicates the type of object that triggers the switch. bit 7 is set if anything can trigger the switch.
+object data format is iiiiiees, where
+- iiiii is the index into the switch_effects_table which indicate the objects the switch effects
+- ee indicate which bits to change on the target object(s) (if 0 then the switch would have no effect)
+- s indicates whether to set or clear the bits indicated by e
+
+handle_background_switch
+A visible switch toggles specific bits on its targets.
+object data format is 0iiiiees, where
+- iiii is the index into the switch_effects_table which indicate the objects the switch effects
+- ee indicate which bits to toggle on the target object(s) (if 0 then the switch would have no effect)
+- s indicates whether the switch is currently in the in or out position
 
 handle_background_object_emerging: 
 data byte format: xnnnnnee
@@ -523,7 +534,7 @@ where l is set if locked
 
 handle_background_teleport:
 data byte format: xkkdddda
-where a is set if active
+where a is clear if active
 	  dddd is the destination index into teleport_destinations_x and teleport_destinations_y
 	  kk + 3 is the key required to activate/deactivate the transporter
 
@@ -1232,7 +1243,7 @@ These are a list of square_x values in sections delimited by background_objects_
 # &71	6b	&0660 = &e7  &075f = &04  &09f1 = &c1      n/a      (&e7, &bc) &04: stone door
 # &72	6c	&0661 = &94  &0760 = &01  &09f2 = &8c      n/a      (&94, &5c) &01: teleport beam
 # &73	6d	&0662 = &7c  &0761 = &08  &09f3 = &a4      n/a      (&7c, &c0) &08: switch
-# &74	6e	&0663 = &e3  &0762 = &08  &09f4 = &e4      n/a      (&e3, &9c) &08: switch
+# &74	6e	&0663 = &e3  &0762 = &08  &09f4 = &e4      n/a      (&e3, &9c) and (&e3, &bc) &08: switch
 # &75	6f	&0664 = &45  &0763 = &02  &09f5 = &d7      n/a      (&45, &c0) &02 object_from_data : blue/cyan/green key
 # &76	70	&0665 = &9b  &0764 = &02  &09f6 = &9d      n/a      (&9b, &66) &02 object_from_data : red robot
 # &77	71	&0666 = &9f  &0765 = &82  &09f7 = &e1      n/a      (&9f, &73) &02 object_from_data : whistle 1
@@ -1256,7 +1267,7 @@ These are a list of square_x values in sections delimited by background_objects_
 # &86	7e	&0675 = &83  &0774 = &8a  &0a04 = &04  &0abd = &37  (&83, &78) &0a object_emerging_from_pipe_end : fireball
 # &87	7f	&0676 = &84  &0775 = &8a  &0a05 = &04  &0abe = &37  (&84, &6c) &0a object_emerging_from_pipe_end : fireball
 # &88	80	&0677 = &80  &0776 = &0a  &0a06 = &08  &0abf = &2a  (&80, &75) &0a object_emerging_from_pipe_end : red/yellow imp (x 2)
-# &89	81	&0678 = &87  &0777 = &00  &0a07 = &bd  &0ac0 = &80  (&87, &77) &00: invisible switch (triggered by player)
+# &89	81	&0678 = &87  &0777 = &00  &0a07 = &bd  &0ac0 = &80  (&87, &77) &00: invisible switch (triggered by anything)
 # &8a	82	&0679 = &9b  &0778 = &00  &0a08 = &8a  &0ac1 = &4a  (&9b, &3b) &00: invisible switch (triggered by destinator)
 # &8b	83	&067a = &50  &0779 = &c4  &0a09 = &f1      n/a      (&50, &60) &04: stone door
 # &8c	84	&067b = &ae  &077a = &43  &0a0a = &d1      n/a      (&ae, &62) &03: door
@@ -4354,11 +4365,13 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; get_object_gravity_flags
 ; on entry, Y is the object index on the primary stack
 ; on exit, A has the object weight in bits 0 to 2
+;          X is the type of object
 &1e20: a9 07            LDA #&07
 ; get_object_gravity_flags_arbitrary_and
 ; on entry, Y is the object index on the primary stack
 ;           A is the mask to apply to the gravity flags
 ; on exit, A has the flags requested
+;          X is the type of object
 &1e22: be 60 08         LDX &0860,Y ; object_stack_type				# get object type for object Y
 &1e25: 3d 54 03         AND &0354,X ; object_gravity_flags			# and A with gravity flags
 &1e28: 60               RTS
@@ -9069,17 +9082,18 @@ maggot x = &06 a = &08
 &3f02: 90 ed            BCC &3ef1					        # if not, leave
 
 &3f04: a4 bd            LDY &bd ; new_object_data_pointer
-&3f06: b9 86 09         LDA &0986,Y ; background_objects_data
-&3f09: 48               PHA
+&3f06: b9 86 09         LDA &0986,Y ; background_objects_data	# get switch's object_data iiiiiees
+&3f09: 48               PHA									# store temporarily
 
-&3f0a: 4a               LSR									# c = old bit 0
+; create mask for switch_effects
+&3f0a: 4a               LSR									# left shift to get ee, move s to carry
 &3f0b: 09 fc            ORA #&fc							# set bits 111111--
-&3f0d: 49 03            EOR #&03							# change bits ------xx
-&3f0f: aa               TAX
+&3f0d: 49 03            EOR #&03							# flip lowest 2 bits ------xx
+&3f0f: aa               TAX									# this will be the mask for switch_effects
 
-&3f10: 68               PLA									# get background_objects_data
-&3f11: b0 02            BCS &3f15
-&3f13: 29 f8            AND #&f8							# clear bits -----000
+&3f10: 68               PLA									# retrieve switch's object_data
+&3f11: b0 02            BCS &3f15							# jump over if we're setting bits
+&3f13: 29 f8            AND #&f8							# clear lowest 3 bits -----000
 &3f15: 4c db 49         JMP &49db ; switch_effects
 
 ; handle_background_object_random_wind
@@ -10709,40 +10723,64 @@ bit 1 set indicates door is open
 bit 7 of data switch when set means that switch is not on screen
 
 
-index		data_ptrs		background_objs		used_by		switch_data
+index		data_ptrs		description
+00			b0 bb 84		turns on engines in lab, opens door to the right
+01			0f 29			unlocks/locks doors in top spaceship
+02			c5				opens (briefly) weird door under alarm bell and teleport
+03			e7 8f			stone door leading to imprisoned crew, one of the stone doors leading to the maggot machine
+04			8a				vertical stone door in piranha puzzle area to the left of the bottom of the windy passage past the moving fireball
+05			13				stone door below windy area below the stone door sealing off triax's area
+06			8e 32			changes destination of twin teleporters
+07			c2				the stone door that opens to let out water underneath the maggot machine
+08			11 aa bd		door to small area with hovering robot and pistol, teleport on/off in same area, and teleport near white birds just under surface
+09			58 cc 55 bc		turns on/off turret above first whistle, and the turret above that past the yellow/blue robot, causes energy capsules to be dispensed from pipe to the right of the 2nd turret, and turns on/off the teleporter to the right of that
+0a			55				controls whether energy capsules emerge from pipe
+0b			46 a9			stone door above boulder and key, stone door above wasp's nest
+0c			6a 8b			vertical stone door by sucker close to coronium boulder and slimes, vertical stone door above that by gargoyle
+0d			e6 85 d8		horizontal stone door just above maggot machine, horizontal stone door at entrance to maggot machine area, imps emerging from just above 2nd door
+0e			c7 88			horizontal stone door between invisible switch and deadly sucker near piranhas, vertical stone door just to the right of the deadly sucker
+0f			68				vertical stone door just to the right of where the moving fireball emerges
+10			14				cyan/yellow/green vertical metal door just to the right of the windy passage and the hover balls
+11			28 4c			engines on the pericles
+12			65				cyan/yellow/green vertical metal door to where the energy capsules emerge
+13			89				weird stone door which you can't get to, to the right of the maggot tree - no idea what this is all about
+14			8d				teleport component of maggot machine
+15			64 2a			door off windy passage leading to imps, door in imp's area where 2nd whistle is
+16			6b				stone door on floor of area close to coronium boulder and slimes
+17			a7 b9 10		stone door where flask is, wasp's nest in same place, stone door where RCD is
 
-manual switches
-00			b0 bb 84		bb c6 8c			ed			84				1 0000 100	turns on engines in lab, opens door
-01			0f 29			0e 2b				14			8a				1 0001 010	unlocks/locks doors in top spaceship
-02			c5				d0					b6			94				1 0010 100	opens (briefly) weird door under teleport
-03			e7 8f			f4 97				cb			9e				1 0011 110
-04			8a 
-05			13
-06			8e 32 
-07			c2 
-08			11 aa bd 
-09			58 cc 55 bc		5e d9 5b c7			b8			ca				1 1001 010
-0a			55
-0b			46 a9 
-0c			6a 8b 
-0d			e6 85 d8 
-0e			c7 88			d2 90				cc			f4				1 1110 100
-0f			68				6e					b9			fa				1 1111 010
-
-invisible switches
-10			14				13					64			85				1 0000 101
-11			28 4c			2a 51				8a			8a				1 0001 010
-12			65				6b					65			95				1 0010 101
-13			89				91
-14			8d				95
-15			64 2a			6a 2c				
-16			6b				71
-17			a7 b9 10		b2 c4 0f			ae ea		bc bc			1 0111 100
-
-
-
-
-
+effect	used by				switch	bits
+index	object				effect	changed
+0		Switch E0			toggle	10		located by engines in lab - turns engines on/off, and open/closes lab door to the right
+1		Switch 15			toggle	01		located in pericles - locks/unlocks airlock doors
+2		Switch AB			toggle	10		located above weird door, to the right of alarm bell and teleport - opens/closes the weird door
+3		Switch C0			toggle	11		located above the imprisoned crew, above the water level - opens/closes and unlocks/locks the door
+4		Switch 6D			toggle	10		located in the pirahna puzzle area - opens/closes vertical door in same area
+5		Switch 16			toggle	10		located beneath door sealing off triax's area - opens/closes vertical stone door below and slightly right, on the other side of windy area
+6		Switch 4B			toggle	10		located by the two transporters past the piano - changes destination of the transporters 
+7		Switch 4A			toggle	10		located by the maggot machine - opens/closes the door that controls the water level
+8		Switch 90			toggle	01		located by the teleport and white birds just under the surface by the first key - turns that teleport on/off, and back in the area with the hovering robot it locks/unlocks the door, and turns the nearby teleport on/off
+8		Switch AC			toggle	01		located in the area with the hovering robot and teleport - locks/unlocks the door, turns the teleport on/off, and in the area with the white birds just under the surface it turns that teleport on/off
+9		Switch AD			toggle	01		located past the yellow/blue robot and turrets to the right of main cavern - turns on/off turret above first whistle, and the turret above that past the yellow/blue robot, causes energy capsules to be dispensed from pipe to the right of the 2nd turret, and turns on/off the teleporter to the right of that
+a		InvisibleSwitch	DE	set		01		triggered by energy capsule as it falls - stops more energy capsules emerging 
+b		Switch	BF			toggle	10		located to the left of the flames guarding key and boulder - opens/closes stone door above boulder and key, and open/closes stone door above wasp's nest
+b		Switch	E1			toggle	01		located by the key and boulder - locks/unlocks stone door above boulder and key, and locks/unlocks stone door above wasp's nest
+c		Switch	6E			toggle	10		switch appears twice, first located amongst orange bricks past the squeeze over the deadly sucker and down - 
+c		Switch	6E			toggle	10		switch appears twice, second located next to puzzle with sucker and coronium - opens/closes vertical stone door by sucker close to coronium boulder and slimes, opens/closes vertical stone door above that by gargoyle
+d		Switch	BE			toggle	10		located in area above maggot machine, beneath turret - opens/closes horizontal stone door just above maggot machine, opens/closes horizontal stone door at entrance to maggot machine area, starts/stops imps emerging from just above 2nd door
+e		InvisibleSwitch	A2	set		10		triggered by player, located at entrance to puzzle area beneath windy passage just below water line - opens horizontal stone door between invisible switch and deadly sucker near piranhas, opens vertical stone door just to the right of the deadly sucker
+e		Switch	C1			toggle	10		located in the right side of the puzzle area beneath windy passage just below water line - opens/closes horizontal stone door between invisible switch and deadly sucker near piranhas, opens/closes vertical stone door just to the right of the deadly sucker
+f		Switch	AE			toggle	01		located by nest just to the right and underwater of the windy passage - locks/unlocks vertical stone door just to the right of where the moving fireball emerges
+10		InvisibleSwitch	5E	set		10		triggered by anything, located just to the right of the top of the windy passage - opens cyan/yellow/green vertical metal door just to the right of the windy passage and the hover balls
+11		InvisibleSwitch	82	clear	01		triggered by destinator, located in pericles - causes engines to start
+12		InvisibleSwitch	5F	set		10		triggered by player, located to the right of the windy passage - opens cyan/yellow/green vertical metal door to where the energy capsules emerge
+13		InvisibleSwitch	DF	set		10		triggered by anything, located within the puzzle area past the moving fireball near the deadly sucker and piranhas - opens weird horizontal stone door
+14		InvisibleSwitch	60	set		01		triggered by anything, located just to the right of the maggot machine - turns off teleport component of maggot machine
+15		InvisibleSwitch	0E	set		10		triggered by cyan/yellow imp, located near to cyan/yellow imps nest - opens door off windy passage leading to imps, opens door in imp's area where 2nd whistle is
+16		InvisibleSwitch	61	set		10		triggered by anything, located just to the left of the coronium boulder and slimes nest - moves the stone horizontal door to the right
+17		InvisibleSwitch	81	set		10		triggered by anything, located to the left of the red/magenta imps - opens the doors, stops wasps emerging
+17		InvisibleSwitch	DD	clear	10		triggered by anything, above door leading to RCD - closes doors, starts wasps emerging
+17		InvisibleSwitch	A3	clear	10		triggered by empty flask, closes doors, starts wasps emerging
 
 ; handle_switch
 # called with:
@@ -10750,21 +10788,22 @@ invisible switches
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
 &499d: 18               CLC
-&499e: 30 03            BMI &49a3				                # is it touching something?
-&49a0: 20 c5 49         JSR &49c5 ; can_object_trigger_switch                   # is that something sufficiently heavy?
-&49a3: 66 14            ROR &14 ; this_object_tx                                # if so, mark the switch as touched
-&49a5: 10 16            BPL &49bd ; switch_not_pressed
-&49a7: a5 14            LDA &14 ; this_object_tx                        
-&49a9: 0a               ASL                                                     # has the switch been recently touched?
-&49aa: d0 11            BNE &49bd ; switch_not_pressed                          # if so, don't trigger it again
+&499e: 30 03            BMI &49a3												# is it touching something?
+&49a0: 20 c5 49         JSR &49c5 ; can_object_trigger_switch                   # is that something sufficiently heavy? C set if it is, and X set to the object type
+&49a3: 66 14            ROR &14 ; this_object_tx                                # move C into bit 7, lower bits contain history of whether it has been pressed or not
+&49a5: 10 16            BPL &49bd ; switch_not_pressed							# branch over if not currently pressed
+&49a7: a5 14            LDA &14 ; this_object_tx								# retrive the history of the switch being pressed or not
+&49a9: 0a               ASL                                                     # shift left to move the current pressed state back to carry 
+&49aa: d0 11            BNE &49bd ; switch_not_pressed                          # if any remaining bit is set then the switch has been pressed recently, so branch over
 
-&49ac: 2a               ROL
-&49ad: 45 bc            EOR &bc ; this_object_data
-&49af: 85 bc            STA &bc ; this_object_data                              # toggle switch state
-&49b1: a2 ff            LDX #&ff
+&49ac: 2a               ROL														# set bit 0 
+&49ad: 45 bc            EOR &bc ; this_object_data								# toggle bit 0 of the switch, its in/out state
+&49af: 85 bc            STA &bc ; this_object_data                              # store new switch state
+&49b1: a2 ff            LDX #&ff												# set mask to all bits in switch_effects for toggling
 &49b3: 20 db 49         JSR &49db ; switch_effects                              # and do whatever the switch does!
 &49b6: 20 fa 13         JSR &13fa ; play_sound
 #49b9: 3d 04 11 d4 ; sound data
+
 ; switch_not_pressed
 &49bd: a5 bc            LDA &bc ; this_object_data
 &49bf: 4a               LSR
@@ -10773,16 +10812,18 @@ invisible switches
 
 ; can_object_trigger_switch
 ; on entry, Y is the object index on the primary stack
-; returns carry set if object can trigger switches, carry clear if not
+; on exit, carry will be set if object can trigger switches, and carry will be clear if not
+;          X is the type of the object indicated by Y
+;
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 ;   00 ok ok ok no -- -- ok ok ok -- ok ok -- -- ok ok
 ;   10 ok ok ok ok ok ok ok ok no ok ok ok ok ok ok --
 ;   20 ok ok ok no no no no no -- ok ok ok ok ok ok ok
 ;   30 ok ok ok no no no ok ok ok ok ok -- -- -- -- --
-;   40 ok -- -- ok  n ok ok ok -- ok ok no no ok no no
+;   40 ok -- -- ok no ok ok ok -- ok ok no no ok no no
 ;   50 ok ok ok ok ok ok ok ok no ok ok ok ok ok ok ok
 ;   60 ok no no ok --
-&49c5: 20 20 1e         JSR &1e20 ; get_object_weight		# how heavy is what is touching the switch?
+&49c5: 20 20 1e         JSR &1e20 ; get_object_weight		# on exit, A = how heavy is the object that is touching the switch, and X is the object type
 &49c8: c9 02            CMP #&02					        # if it has weight less than 3
 &49ca: 90 0e            BCC &49da					        # then it doesn't trigger the switch
 &49cc: e0 35            CPX #&35					        # X = object type
@@ -10796,41 +10837,50 @@ invisible switches
 &49da: 60               RTS
 
 ; switch_effects
-; X = &ff if real switch, 111111xx if invisible where 
-; A = switch subtype = &80
-; A = this_object_data
-&49db: 86 9c            STX &9c				# store mask
+; on entry, X is the mask to apply to the target (the target object_data will be ANDed with this value)
+;			A is the switch's object_data in the form iiiiieex 
+;				where iiiii is the index into the switch_effects_table,
+;				and ee is the bits to toggle (the target object_data's lowest 2 bits will be EORed with this value)
+;				and x isn't used
+; where triggered by a manual switch:
+; - the mask X is always &ff ensuring a toggle effect
+; - the top bit of iiiii will always be 0 (so the index is always in the range 0 to 15)
+; where triggered by an invisible switch:
+; - the mask X will be 111111??
+; - the top bit of iiiii is used as part of the index (so the value is in the range 0 to 23)
+&49db: 86 9c            STX &9c										# store mask
+&49dd: 4a               LSR											# lose bottom bit which isn't used	
+&49de: 48               PHA											# store the switch effects index temporarily
+&49df: 29 03            AND #&03									# mask to get what was bits 1 and 2
+&49e1: 85 9d            STA &9d ; switch_type_and_03				# store bits to change
+&49e3: 68               PLA											# retrieve the switch effects index
+&49e4: 4a               LSR											# lose bottom bit
+&49e5: 4a               LSR											# lose bottom bit - now A has the switch effects index into switch_effects_table
+&49e6: aa               TAX											# init loop counter for the switch effect index - it will be decremented and when it reaches 0 we have found the start of the effects list
+&49e7: a0 ff            LDY #&ff									# init loop counter for memory starting at switch_effects_table
 
-&49dd: 4a               LSR
-&49de: 48               PHA
-&49df: 29 03            AND #&03
-&49e1: 85 9d            STA &9d ; switch_type_and_03		# store bits to change
-&49e3: 68               PLA
-&49e4: 4a               LSR
-&49e5: 4a               LSR
-&49e6: aa               TAX														# x is the slot in the switch_effects_table to look for
-&49e7: a0 ff            LDY #&ff												# init loop counter
+; finds the next zero byte in switch_effects_table
+&49e9: c8               INY											# increment loop counter into switch_effects_table
+&49ea: b9 58 49         LDA &4958,Y ; switch_effects_table          # get entry in switch_effects_table
+&49ed: d0 fa            BNE &49e9									# loop round if it wasn't a zero byte
 
-&49e9: c8               INY
-&49ea: b9 58 49         LDA &4958,Y ; switch_effects_table                      # find a zero slot in switch_effects_table
-&49ed: d0 fa            BNE &49e9
+; counts down until the correct list has been located
+&49ef: ca               DEX											# decrement loop counter for switch effects index
+&49f0: 10 f7            BPL &49e9                                   # loop around if we need to search further
 
-&49ef: ca               DEX
-&49f0: 10 f7            BPL &49e9                                               # find the Xth zero slot in switch_effects_table
+&49f2: aa               TAX											# X will be a pointer to the target object data, but it starts with x = 0
 
-&49f2: aa               TAX														# set x = 0
+&49f3: bd 86 09         LDA &0986,X ; background_objects_data		# get object data
+&49f6: 85 9a            STA &9a										# store current value for later comparison
+&49f8: 25 9c            AND &9c										# mask bits with the value provided at entry 
+&49fa: 45 9d            EOR &9d										# change bits 0 and 1 possibly
+&49fc: 9d 86 09         STA &0986,X ; background_objects_data		# store revised object data
 
-&49f3: bd 86 09         LDA &0986,X ; background_objects_data					# get object data
-&49f6: 85 9a            STA &9a													# store current value for later comparison
-&49f8: 25 9c            AND &9c													# clear bits 
-&49fa: 45 9d            EOR &9d													# change bits 0 and 1 possibly
-&49fc: 9d 86 09         STA &0986,X ; background_objects_data					# store revised object data
-
-&49ff: c8               INY														# increment index into switch_effects_table 
-&4a00: be 58 49         LDX &4958,Y ; switch_effects_table						# get next data pointer
+&49ff: c8               INY											# increment index into switch_effects_table 
+&4a00: be 58 49         LDX &4958,Y ; switch_effects_table			# get next data pointer
 &4a03: d0 ee            BNE &49f3
 
-&4a05: c5 9a            CMP &9a							# if last data value changed then play sound
+&4a05: c5 9a            CMP &9a										# if last data value changed then play sound
 &4a07: f0 07            BEQ &4a10
 &4a09: 20 fa 13         JSR &13fa ; play_sound
 #4a0c: c7 c3 c1 03 ; sound data
@@ -11381,7 +11431,7 @@ door	palette												speed	min_energy
 &4d87: 29 0f            AND #&0f                                                # teleport destination is bits 1 to 4
 &4d89: aa               TAX                                                     # set X = teleport number
 &4d8a: a9 b0            LDA #&b0										# &b0 = position where beam sitting in teleporter base
-&4d8c: b0 2f            BCS &4dbd ; set_beam_position
+&4d8c: b0 2f            BCS &4dbd ; set_beam_position					# branch if carry set and teleport is inactive
 
 &4d8e: 98               TYA												# set a to index of object touching beam (if any)
 &4d8f: 30 1c            BMI &4dad ; animate_beam						# branch over if the beam isn't touching something

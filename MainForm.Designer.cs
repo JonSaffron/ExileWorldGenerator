@@ -165,7 +165,7 @@
             this.map.Size = new System.Drawing.Size(822, 852);
             this.map.TabIndex = 1;
             this.map.VirtualMode = true;
-            this.map.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.dataGridView1_CellPainting);
+            this.map.CellPainting += new System.Windows.Forms.DataGridViewCellPaintingEventHandler(this.map_CellPainting);
             this.map.SelectionChanged += new System.EventHandler(this.map_SelectionChanged);
             this.map.MouseDown += new System.Windows.Forms.MouseEventHandler(this.map_MouseDown);
             this.map.MouseMove += new System.Windows.Forms.MouseEventHandler(this.map_MouseMove);

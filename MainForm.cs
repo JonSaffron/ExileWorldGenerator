@@ -153,7 +153,23 @@ namespace ExileWorldGenerator
                 data.BackgroundHandlerType = BackgroundHandlerTypeList[background];
                 if (backgroundProperties.Number.HasValue)
                     {
-                    data.BackgroundDescription = DescribeBackground((BackgroundObjectType) background, backgroundProperties.Type, backgroundProperties.Data, orientation);
+                    var backgroundObjectType = (BackgroundObjectType) background;
+                    data.BackgroundDescription = DescribeBackground(backgroundObjectType, backgroundProperties.Type, backgroundProperties.Data, orientation);
+                    //if (backgroundObjectType == BackgroundObjectType.InvisibleSwitch || backgroundObjectType == BackgroundObjectType.Switch)
+                    //    {
+                    //    var objectData = data.BackgroundObjectData.Data.Value;
+                    //    string action;
+                    //    if (backgroundObjectType == BackgroundObjectType.InvisibleSwitch)
+                    //        {
+                    //        action = (objectData & 1) == 0 ? "clear" : "set";
+                    //        }
+                    //    else
+                    //        {
+                    //        objectData = (byte) (objectData & 0x7f);
+                    //        action = "toggle";
+                    //        }
+                    //    Debug.WriteLine($"{backgroundObjectType}\t{data.X:X},{data.Y:X}\t{data.BackgroundObjectData.Id:X}\t{objectData >> 3:X}\t{Convert.ToString(objectData >> 1 & 3, 2)}\t{action}");
+                    //    }
                     }
                 }
 
@@ -176,19 +192,52 @@ namespace ExileWorldGenerator
                 case BackgroundObjectType.InvisibleSwitch:
                     {
                     Debug.Assert(type.HasValue);
-                    return $"Triggered by {(type.Value == 0x80 ? "anything" : ObjectTypeList[type.Value])}";
+                    Debug.Assert(data.HasValue);
+                    var triggeredBy = type.Value == 0x80 ? "anything" : ObjectTypeList[type.Value];
+                    var switchEffectsIndex = data.Value >> 3;
+                    var bitsToEffect = data.Value >> 1 & 3;
+                    Debug.Assert(bitsToEffect == 1 || bitsToEffect == 2);
+                    string effect;
+                    if ((data.Value & 1) == 0)
+                        {
+                        // switch clears bits
+                        effect = "clear bit ";
+                        switch (bitsToEffect)
+                            {
+                            case 1:
+                                effect += "0 (e.g. unlock doors)";
+                                break;
+                            case 2:
+                                effect += "1 (e.g. close doors)";
+                                break;
+                            }
+                        }
+                    else
+                        {
+                        // switch sets bits
+                        effect = "set bit ";
+                        switch (bitsToEffect)
+                            {
+                            case 1:
+                                effect += "0 (e.g. lock doors)";
+                                break;
+                            case 2:
+                                effect += "1 (e.g. open doors)";
+                                break;
+                            }
+                        }
+                    return $"Triggered by {triggeredBy}, switch effects index 0x{switchEffectsIndex}, effect is to {effect}";
                     }
                 
                 case BackgroundObjectType.Teleport:
                     {
                     Debug.Assert(data.HasValue);
-                    var active = (data.Value & 0x1) != 0;
+                    var active = (data.Value & 0x1) == 0 ? "active" : "inactive";
                     var destination = (data.Value >> 4 & 0x7);
                     var key = ((data.Value & 0x7f) + 0x60) >> 5;
                     Debug.Assert(key <= 6 && key >= 3);
                     var keyDescription = GetKeyDescription(key);
-                    Debug.WriteLine(keyDescription);
-                    return $"teleport: active = {active}, destination = &{destination:X}, key = {keyDescription}";
+                    return $"teleport: {active}, destination = 0x{destination:X}, key = {keyDescription}";
                     }
                 
                 case BackgroundObjectType.ObjectFromData:
@@ -232,7 +281,24 @@ namespace ExileWorldGenerator
 
                 case BackgroundObjectType.Switch:
                     {
-                    return "*** switch tbd ***";
+                    Debug.Assert(data.HasValue);
+                    var switchEffectsIndex = data.Value >> 3 & 0xf;
+                    var bitsToEffect = data.Value >> 1 & 3;
+                    Debug.Assert(bitsToEffect > 0 && bitsToEffect <= 3);
+                    string effect = null;
+                    switch (bitsToEffect)
+                        {
+                        case 1:
+                            effect = "toggle bit 0 (e.g. lock/unlock doors)";
+                            break;
+                        case 2:
+                            effect = "toggle bit 1 (e.g. open/close doors)";
+                            break;
+                        case 3:
+                            effect = "toggle bits 0 and 1 (e.g. lock/unlock and open/close doors)";
+                            break;
+                        }
+                    return $"Switch effects index 0x{switchEffectsIndex}, effect is to {effect}";
                     }
 
                 case BackgroundObjectType.ObjectEmergingFromBush:
@@ -307,7 +373,7 @@ namespace ExileWorldGenerator
             return result;
             }
 
-        private void dataGridView1_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
+        private void map_CellPainting(object sender, DataGridViewCellPaintingEventArgs e)
             {
             if (e.RowIndex < 0 || e.ColumnIndex < 0 || (e.PaintParts & DataGridViewPaintParts.ContentForeground) == 0)
                 {
