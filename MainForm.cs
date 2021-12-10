@@ -22,6 +22,8 @@ namespace ExileWorldGenerator
         private static readonly string[] ObjectTypeList = BuildObjectTypeList();
         private static readonly IReadOnlyList<WaterLevelFromX> WaterLevelList = BuildWaterLevelsList();
         private static readonly List<Point> TeleportDestinations = BuildTeleportDestinations();
+        private static readonly string[] SuckerTriggers = BuildSuckerTriggers();
+        private static readonly string[] SuckerActions = BuildSuckerActions();
         private decimal _zoom;
         private byte lookFor = 0xff;
         private bool _highlightMappedDataSquares;
@@ -243,7 +245,10 @@ namespace ExileWorldGenerator
                 case BackgroundObjectType.ObjectFromData:
                     {
                     Debug.Assert(data.HasValue);
-                    return ObjectTypeList[data.Value & 0x7f];
+                    byte dataType = (byte) (data.Value & 0x7f);
+                    if (dataType == 0xc)
+                        Debugger.Break();
+                    return ObjectTypeList[dataType];
                     }
                 
                 case BackgroundObjectType.Door:
@@ -276,7 +281,14 @@ namespace ExileWorldGenerator
                 case BackgroundObjectType.ObjectFromTypeWithFoliage:
                     {
                     Debug.Assert(type.HasValue);
-                    return ObjectTypeList[type.Value];
+                    var result = ObjectTypeList[type.Value];
+                    if (type.Value == 0xd)
+                        {
+                        Debug.Assert(data.HasValue);
+                        result += $" to {SuckerActions[data.Value & 0x7f]}, {SuckerTriggers[data.Value & 0x7f]}";
+                        }
+
+                    return result;
                     }
 
                 case BackgroundObjectType.Switch:
@@ -368,7 +380,7 @@ namespace ExileWorldGenerator
                 return result;
                 }
 
-            var colourScheme = SquarePalette.FromByte(SpriteBuilder.ObjectPaletteLookup[objectType]);
+            var colourScheme = Palette.FromByte(SpriteBuilder.ObjectPaletteLookup[objectType]);
             result += $" {colourScheme}";
             return result;
             }
@@ -414,7 +426,8 @@ namespace ExileWorldGenerator
                 case BackgroundObjectType.ObjectFromTypeWithFoliage:
                     {
                     Debug.Assert(squareProperties.BackgroundObjectData.Type.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background);
+                    Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
                     this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     break;
                     }
@@ -422,7 +435,8 @@ namespace ExileWorldGenerator
                 case BackgroundObjectType.ObjectFromType:
                     {
                     Debug.Assert(squareProperties.BackgroundObjectData.Type.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background);
+                    Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
+                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
                     break;
                     }
             
@@ -662,31 +676,26 @@ namespace ExileWorldGenerator
             byte background = (byte) (squareValue.Background & 0x3f);
             if (!squareValue.BackgroundObjectData.Id.HasValue)
                 {
-                if (background < 0x10)
-                    {
-                    backgroundObjectInfo = $"Background event used as scenery: {squareValue.BackgroundHandlerType}";
-                    }
-                else
-                    {
-                    backgroundObjectInfo = $"Scenery only";
-                    }
+                backgroundObjectInfo = background < 0x10 
+                    ? $"Background event used as scenery: {squareValue.BackgroundHandlerType}" 
+                    : "Scenery only";
+
                 if (squareValue.BackgroundDescription != null)
                     {
                     backgroundObjectInfo += "\r\n" + squareValue.BackgroundDescription;
                     }
-
                 }
             else
                 {
                 backgroundObjectInfo = $"Background object id: {squareValue.BackgroundObjectData.Id:X2}";
                 backgroundObjectInfo += $"\r\nBackground handler: {squareValue.BackgroundHandlerType}";
-                backgroundObjectInfo += "\r\n" +
-                    $"Description: {squareValue.BackgroundDescription}";
                 if (squareValue.BackgroundObjectData.Type.HasValue)
                     {
                     backgroundObjectInfo += "\r\n" +
                         $"Object type: {squareValue.BackgroundObjectData.Type.Value:X2}";
                     }
+                backgroundObjectInfo += "\r\n" +
+                    $"Description: {squareValue.BackgroundDescription}";
 
                 if (squareValue.BackgroundObjectData.Data.HasValue)
                     {
@@ -746,7 +755,7 @@ namespace ExileWorldGenerator
             string paletteInfo;
             if (squareValue.PaletteData.BackgroundPalette > 6)
                 {
-                Debug.Assert(squareValue.PaletteData.BackgroundPalette == squareValue.PaletteData.Palette.Palette);
+                Debug.Assert(squareValue.PaletteData.BackgroundPalette == squareValue.PaletteData.Palette.PaletteByte);
                 paletteInfo =
                     $"Invariable palette for background: {squareValue.PaletteData.Palette}";
                 }
@@ -914,8 +923,8 @@ namespace ExileWorldGenerator
                 "red slime",
                 "green slime",
                 "yellow ball",
-                "sucker",
-                "deadly sucker",
+                "tough bush",
+                "sucker/blower",
                 "big fish",
                 "worm",
                 "piranha",
@@ -1100,12 +1109,15 @@ namespace ExileWorldGenerator
             {
             var lParam = new TV_ITEM 
                 {
+                // ReSharper disable CommentTypo
                 mask = 0x18,            // TVIF_HANDLE | TVIF_STATE
                 hItem = node.Handle,
                 stateMask = 0xf000,     // TVIS_STATEIMAGEMASK
+                // ReSharper restore CommentTypo
                 state = 0x3000
                 };
             // ReSharper disable once InconsistentNaming
+            // ReSharper disable once IdentifierTypo
             const int TVM_SETITEM = 0x110d;
             SendMessage(new HandleRef(this.BackgroundObjectTree, this.BackgroundObjectTree.Handle), TVM_SETITEM, 0, ref lParam);
             }
@@ -1250,6 +1262,28 @@ namespace ExileWorldGenerator
 
                 this.map.FirstDisplayedCell = this.map.Rows[row].Cells[column];
                 }
+            }
+
+        private static string[] BuildSuckerTriggers()
+            {
+            return new []
+                {
+                "always active", 
+                "triggered by horizontal stone door", 
+                "triggered by wasp", 
+                "triggered by coronium boulder & yellow ball", 
+                "triggered by piranha", 
+                "always active", 
+                "triggered by coronium boulder & yellow ball", 
+                "triggered by piranha", 
+                "triggered by worm"
+                };
+            }
+
+        private static string[] BuildSuckerActions()
+            {
+            var palettesAndActions = SpriteBuilder.BuildSuckerPalettesAndAction();
+            return palettesAndActions.Select(p => (p & 1) == 1 ? "suck" : "blow").ToArray();
             }
         }
     }

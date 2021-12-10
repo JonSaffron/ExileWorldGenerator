@@ -606,7 +606,7 @@ the data byte is simply passed to the new object so is specific to the type
 #   &09  &ae &09  &47c9 handle_red_slime              red slime					7f		0		1c		14		f7
 #   &0a  &0f &04  &422a handle_green_slime            green slime				7f		0		1c		29		6e
 #   &0b  &4b &04  &4266 handle_yellow_ball            yellow ball				7f		0		20		bc		25
-#   &0c  &6e &09  &4789 handle_sucker                 sucker					7f		0		70		65		f7
+#   &0c  &6e &09  &4789 handle_tough_bush             tough bush				7f		0		70		65		f7
 #   &0d  &d2 &0f  &4ded handle_sucker_deadly          deadly sucker				7f		0		70		65		f7
 #   &0e  &46 &89  &4761 handle_big_fish               big fish					7f		80		61		f7		25
 #
@@ -1056,16 +1056,20 @@ These are a list of square_x values in sections delimited by background_objects_
 
 #0870: 04 04 02 22 24 22 22 24 23 23 23 23 25 23 23 02 ; object_stack_sprite
 
+# holds the lower 8 bits of the X co-ordinate of the object's top left corner
 #0880: c0 64 23 23 23 26 25 22 22 22 25 e7 d7 c8 a4 7d ; object_stack_x_low
 #0890: 7a ; seventeenth slot = target
 
+# holds the higher 8 bits of the X co-ordinate of the object's top left corner
 #0891: 9b 99 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ; object_stack_x
 #08a1: bc 65 ; eighteenth slot = waterfall (&65, &dc), for sound
 
+# holds the lower 8 bits of the Y co-ordinate of the object's top left corner
 #08a3: 20 20 94 48 5c 5a ae 0f 4b 6e d2 46 ef 06 06 dc ; object_stack_y_low
 #08b3: a4
 
-; the slot is considered empty if object_stack_y[index] == 0
+# holds the higher 8 bits of the Y co-ordinate of the object's top left corner
+# the slot is considered empty if the value here is 0
 #08b4: 3b 3b 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ; object_stack_y
 #08c4: 04 dc
 
@@ -1548,8 +1552,8 @@ Range 8:                          -- -- -- -- -- -- -- --
 ; these 16 values define the logical colour of two pixels and are stored in mode 2 screen format 
 ; so the pixels are interlaced like this: lrlrlrlr
 ; the colours are in reference to palette_register_data 
-;;  foreground colours:  0:black 1:red 2:green 3:yellow 4:blue 5:magenta 6:cyan 7:white
-;;  background colours:  8:black 9:red 10:green 11:yellow 12:blue 13:magenta 14:cyan 15:white
+;  foreground colours:  0:black 1:red 2:green 3:yellow 4:blue 5:magenta 6:cyan 7:white
+;  background colours:  8:black 9:red 10:green 11:yellow 12:blue 13:magenta 14:cyan 15:white
 
 0 $CA                        ; yellow bg, black bg		1011 / 1000		11 / 8
 1 $C9                        ; green bg, red bg			1010 / 1001		10 / 9
@@ -1616,6 +1620,8 @@ f $FE                        ; white bg, cyan bg
 #0ba8: 00
 
 ; set_object_velocities
+; on enter Y is the index on the primary stack of the object who's velocity is to be changed
+; to match the velocity of the current object
 &0ba9: a5 43            LDA &43 ; this_object_vel_x
 &0bab: 99 e6 08         STA &08e6,Y ; object_stack_vel_x
 &0bae: a5 45            LDA &45 ; this_object_vel_y
@@ -1670,7 +1676,7 @@ f $FE                        ; white bg, cyan bg
 &0bf8: b0 54            BCS &0c4e ; push_near_objects_from_secondary_to_primary_stack
 &0bfa: ce 73 0b         DEC &0b73 ; secondary_stack_object_number
 &0bfd: 10 0d            BPL &0c0c
-&0bff: 20 87 25         JSR &2587 ; increment_timers
+&0bff: 20 87 25         JSR &2587 ; gen_random_num
 &0c02: 29 1f            AND #&1f
 &0c04: 8d 74 0b         STA &0b74 ; secondary_stack_random_1f
 &0c07: a9 1f            LDA #&1f
@@ -2992,7 +2998,7 @@ f $FE                        ; white bg, cyan bg
 #14d0: 00 ; water_level_low
 #14d1: 00 ; water_level
 
-#14d2: 00 54 74 a0 ; x_ranges
+#14d2: 00 54 74 a0 ; x_ranges		# gives the start of the 4 ranges of water level
 
 ; f9_pressed
 &14d6: 2c 91 12		BIT &1291 ; shift_held_duration                         # if shift held?
@@ -4216,7 +4222,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1cf1: 69 10            ADC #&10											# add &10 to bring to range &10 to &13, the 4 explosion types
 &1cf3: 20 f1 19         JSR &19f1 ; handle_current_object                   # call explosion handler to destroy the object
 ; not_exploding
-&1cf6: 20 87 25         JSR &2587 ; increment_timers
+&1cf6: 20 87 25         JSR &2587 ; gen_random_num
 &1cf9: 4a               LSR
 &1cfa: 4a               LSR
 &1cfb: 09 01            ORA #&01
@@ -4612,7 +4618,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1f99: f0 f6            BEQ &1f91						# if not, leave
 &1f9b: c6 2a            DEC &2a ; screen_background_flash_counter
 &1f9d: f0 07            BEQ &1fa6						# if the counter has run out, use &07
-&1f9f: 20 87 25         JSR &2587 ; increment_timers
+&1f9f: 20 87 25         JSR &2587 ; gen_random_num
 &1fa2: 29 20            AND #&20
 &1fa4: f0 02            BEQ &1fa8						# otherwise use either &07 or &00 at random
 &1fa6: a9 07            LDA #&07                                                # &07 = colour 0 black; &00 = colour 0 white
@@ -4772,7 +4778,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &20ba: cd d0 14         CMP &14d0 ; water_level_low
 &20bd: 90 0b            BCC &20ca
 &20bf: a0 fd            LDY #&fd
-&20c1: 20 87 25         JSR &2587 ; increment_timers
+&20c1: 20 87 25         JSR &2587 ; gen_random_num
 &20c4: 29 07            AND #&07
 &20c6: 09 06            ORA #&06
 &20c8: 85 99            STA &99
@@ -4917,11 +4923,11 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &21d1: a4 a1            LDY &a1 ; particle_type
 &21d3: 49 80            EOR #&80
 &21d5: 85 b5            STA &b5 ; angle
-&21d7: 20 87 25         JSR &2587 ; increment_timers
+&21d7: 20 87 25         JSR &2587 ; gen_random_num
 &21da: 39 08 02         AND &0208,Y ; particle_velocity_randomness_table
 &21dd: 18               CLC
 &21de: 79 09 02         ADC &0209,Y ; particle_velocity_table
-&21e1: 20 57 23         JSR &2357 ; determine_velocities_from_angle
+&21e1: 20 57 23         JSR &2357 ; build_vector_from_angle
 &21e4: 06 a0            ASL &a0 ; particle_flags # 80
 &21e6: 06 a0            ASL &a0 ; particle_flags # 40
 &21e8: 06 a0            ASL &a0 ; particle_flags # 20
@@ -4953,14 +4959,14 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &221a: 85 a3            STA &a3
 &221c: 29 07            AND #&07
 &221e: 85 99            STA &99
-&2220: 20 87 25         JSR &2587 ; increment_timers
+&2220: 20 87 25         JSR &2587 ; gen_random_num
 &2223: 39 06 02         AND &0206,Y ; particle_life_randomness_table
 &2226: 79 07 02         ADC &0207,Y ; particle_life_table
 &2229: 9d dc 28         STA &28dc,X ; particle_stack_ttl
 &222c: 86 9c            STX &9c
 &222e: a2 fe            LDX #&fe        # first X = &fe, Y = 0 (x direction), then X = &0, Y = 1 (y direction)
 &2230: 86 a2            STX &a2
-&2232: 20 87 25         JSR &2587 ; increment_timers
+&2232: 20 87 25         JSR &2587 ; gen_random_num
 &2235: 4a               LSR
 &2236: 39 0f 02         AND &020f,Y ; particle_x_velocity_randomness_table    # Y = 0, &020f ; Y = 1, &0210
 &2239: 90 02            BCC &223d
@@ -5028,12 +5034,20 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &229f: 60               RTS
 
 ; get_angle_between_objects
-# compare two object centres
-# returns angle in &b5
-# this_object specifies the first object
-# X specifies the second object
+# compares the current object's centre agains another specified object
+# on entry, X specifies the second object
+# on exit,  &87 this_object_x_center_low
+#			&8b this_object_x_center
+#			&89 this_object_y_center_low 
+#			&8d this_object_y_center
+#			&88 stack_object_x_centre_low
+#			&8c stack_object_x_centre
+#			&8a stack_object_y_centre_low
+#			&8e stack_object_y_centre
+#			&b5 angle (0 being straight to the right and increasing in a clockwise direction)
+#			&b7 the greater of distance_x and distance_y
 &22a0: 20 88 22         JSR &2288 # get_object_centre for this_object 
-                                  # sets 87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d this_object_y_center
+                                  # sets 87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d (this_object_y_center)
 
 &22a3: bc 70 08         LDY &0870,X ; object_stack_sprite       # get sprite indicated in object_stack_sprite,X
 
@@ -5054,9 +5068,11 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &22c4: 85 8e            STA &8e ; stack_object_y_centre         # store result
 
 &22c6: 20 fe 22         JSR &22fe ; calculate_object_centre_deltas
-				# returns with A = distance x, &b7 = distance y, &b8 = delta_magnitude which should be 1 to 7
+				# returns with A = distance x, &b7 = distance y, &b8 = delta_magnitude which should be 1 to 8
+				#	&99 velocity bits
 
 &22c9: 4c d7 22         JMP &22d7 ; calculate_angle
+				# returns &b5 the angle calculated, and &b7 the greater of distance_x and distance_y
 
 ; calculate_angle_from_this_object_velocities
 &22cc: a5 43            LDA &43 ; this_object_vel_x
@@ -5070,9 +5086,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 ; calculate_angle
 # takes A = distance_x, &b7 = distance_y, &99 velocity_signs (bottom two bits only, bit 1 for y, bit 0 for x)
-# returns &b5 angle
-&22d7: c5 b7            CMP &b7 ; opposite_velocity_y	# set C if A >= &b7
-&22d9: 90 05            BCC &22e0 ; no_xy_swap          # branch if x < y 
+# returns &b5 angle (0 being straight to the right and increasing in a clockwise direction)
+# and &b7, the higher of distance_x and distance_y
+&22d7: c5 b7            CMP &b7 ; opposite_velocity_y	# set C if A (distance_x) >= &b7 (distance_y)
+&22d9: 90 05            BCC &22e0 ; no_xy_swap          # therefore branch if x < y
 &22db: a8               TAY                             
 &22dc: a5 b7            LDA &b7 ; opposite_velocity_y # if not, swap A and &b7
 &22de: 84 b7            STY &b7 ; opposite_velocity_y # ie, force A < &b7
@@ -5082,9 +5099,9 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &22e4: 84 b5            STY &b5 ; angle
 ; calc_angle_loop
 &22e6: 0a               ASL					# double value, 0 is shifted into bit 0 and the original bit 7 is shifted into the Carry
-&22e7: c5 b7            CMP &b7 ; oppositite_velocity_y
+&22e7: c5 b7            CMP &b7 ; highest_distance
 &22e9: 90 02            BCC &22ed
-&22eb: e5 b7            SBC &b7 ; oppositite_velocity_y
+&22eb: e5 b7            SBC &b7 ; highest_distance
 &22ed: 26 b5            ROL &b5 ; angle                         # increment loop counter and save result from C
 &22ef: 90 f5            BCC &22e6 ; calc_angle_loop		# loop around 5 times
 
@@ -5101,16 +5118,21 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 # on entry, data should be supplied in:
 #   87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d (this_object_y_center)
 #   88 (stack_object_x_centre_low), 8a (stack_object_y_centre_low), 8c (stack_object_x_centre), 8e (stack_object_y_centre)
-# leaves with A = abs(support_delta_x_low), &b7 = abs(support_delta_y_low), &b8 = delta_magnitude which should be 1 to 7
+# on exit:
+#	A = abs(support_delta_x_low), 
+#	&b7 = abs(support_delta_y_low), 
+#	&b8 = delta_magnitude which should be 1 to 8
+#	&99 has bit 0 set if the X delta is +ve, bit 1 set if the Y delta is +ve.
 &22fe: a0 04            LDY #&04        # first y direction (Y = 4), then x direction (Y = 2)
 
+; calculate_centre_diffs_loop
+# this does the following calculations:
 # &7d support_delta_y_low = &8a stack_object_y_centre_low - &89 this_object_y_centre_low
 # &7e support_delta_y = &8e stack_object_y_centre - &8d this_object_y_centre
 # &7b support_delta_x_low = &88 stack_object_x_centre_low - &87 this_object_x_centre_low
 # &7c support_delta_x = &8c stack_object_x_centre - &8b this_object_x_centre
-# &99 has bit 0 set if the X delta is +ve, bit 1 set if the Y delta is +ve.
-
-&2300: 85 b7            STA &b7 ; tmp   # on 2nd time around loop stores support_delta_y
+# also &99 has bit 0 set if the X delta is +ve, bit 1 set if the Y delta is +ve.
+&2300: 85 b7            STA &b7 ; tmp   # on 2nd time around loop stores abs(support_delta_y)
 
 &2302: b9 86 00         LDA &0086,Y     # Y = 4, &8a stack_object_y_centre_low; Y = 2, &88 stack_object_x_centre_low
 &2305: f9 85 00         SBC &0085,Y     # Y = 4, &89 this_object_y_centre_low; Y = 2, &87 this_object_x_centre_low
@@ -5121,26 +5143,39 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2311: 99 7a 00         STA &007a,Y     # Y = 4, &7e support_delta_y; Y = 2, &7c support_delta_x
 
 &2314: 38               SEC
-&2315: 10 03            BPL &231a
+&2315: 10 03            BPL &231a		; branch if stack object > this object
 &2317: 20 56 32         JSR &3256 ; make_positive (as part of operation bit 7 will be set to 0, and C will be cleared)
+
 &231a: 26 99            ROL &99 ; velocity-signs	# shift left and set bit 0 to value of carry flag: set if that_x > this_x, or that_y > this_y, cleared otherwise 
 &231c: 88               DEY
 &231d: 88               DEY
-&231e: d0 e0            BNE &2300       # now do it again for the x direction
+&231e: d0 e0            BNE &2300 ; calculate_centre_diffs_loop      # now do it again for the x direction
 
 &2320: 05 b7            ORA &b7 ; tmp                   # A = abs(support_delta_y) | abs(support_delta_x), so that we get 0xxxxxxx
                                                         # the number of bits set will be counted by Y and determine the delta_magnitude
-&2322: 0a               ASL A				# double (bit 7 goes to C but it should always be 0 anyway, bit 0 set to 0)
+&2322: 0a               ASL A				# double (to get xxxxxxx0)
 
+# y is now 0
+# if A is 0, Y will be 1
+# A cannot be 1
+# If A is 2 or 3, Y will be 2
+# if A is 4 to 7, Y will be 3
+# if A is 8 to 15, Y will be 4
+# if A is 16 to 31, Y will be 5
+# if A is 32 to 63, Y will be 6
+# if A is 64 to 127, Y will be 7
+# if A is 128 to 255, Y will be 8
+
+; count_magnitude_loop
 &2323: 46 7c            LSR &7c	; support_delta_x	# halve (sets bit 7 to 0, bit 0 goes to C)
 &2325: 66 7b            ROR &7b ; support_delta_x_low   # halve support_delta_x (sets bit 7 to C)
 &2327: 46 7e            LSR &7e	; support_delta_y	# halve (sets bit 7 to 0, bit 0 goes to C)
 &2329: 66 7d            ROR &7d ; support_delta_y_low   # halve support_delta_y (sets bit 7 to C)
 &232b: c8               INY                             # for each halving, increment Y
 &232c: 4a               LSR A
-&232d: d0 f4            BNE &2323                       # keep halving A until zero
+&232d: d0 f4            BNE &2323 ; count_magnitude_loop # keep halving A until zero
 
-&232f: 84 b8            STY &b8 ; delta_magnitude	# should be 1 to 7
+&232f: 84 b8            STY &b8 ; delta_magnitude	# should be 1 to 8
 &2331: a5 7d            LDA &7d                         # support_delta_y_low
 &2333: 20 56 32         JSR &3256 ; make_positive
 &2336: 85 b7            STA &b7 ; some_kind_of_velocity
@@ -5163,21 +5198,30 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2354: 26 99            ROL &99 ; velocity_signs                                # note this in velocity_signs
 &2356: 60               RTS
 
-; determine_velocities_from_angle
-# A = magnitude, &b5 = angle
-&2357: 85 b4            STA &b4 ; velocity_x
+; build_vector_from_angle
+# Builds a vector based on the specified angle
+# With a magnitude of 0x20 this produces a vector that moves around the perimeter of a 32x32 box
+# on entry, A = magnitude
+#			&b5 = angle
+# on exit, the vector is returned in &b4 velocity_x and &b6 velocity_y
+&2357: 85 b4            STA &b4 ; velocity_x		# store the magnitude
 &2359: a5 b5            LDA &b5 ; angle
 &235b: 85 9d            STA &9d ; temp
-&235d: a0 05            LDY #&05
-&235f: a9 00            LDA #&00
-&2361: 46 9d            LSR &9d ; temp
-&2363: 90 03            BCC &2368
-&2365: 18               CLC
-&2366: 65 b4            ADC &b4 ; velocity_x
-&2368: 6a               ROR
-&2369: 88               DEY
-&236a: d0 f5            BNE &2361
-&236c: 46 9d            LSR &9d ; temp
+
+# count the number of bits set in the lowest 5 bits of the angle and multiple by the magnitude passed in
+&235d: a0 05            LDY #&05					# init loop counter
+&235f: a9 00            LDA #&00					# init result for Y component
+; count_set_bits_loop
+&2361: 46 9d            LSR &9d ; temp				# shift bits from original angle, lowest to carry
+&2363: 90 03            BCC &2368 ; bit_not_set		# if bit wasn't set, then branch
+&2365: 18               CLC							
+&2366: 65 b4            ADC &b4 ; velocity_x		# add magnitude to result
+; bit_not_set
+&2368: 6a               ROR							# halve result, but bring in carry???
+&2369: 88               DEY							# decrement loop counter
+&236a: d0 f5            BNE &2361 ; count_set_bits_loop
+
+&236c: 46 9d            LSR &9d ; temp				# shift bits again to put original bit 5 into carry
 &236e: 90 0a            BCC &237a
 &2370: a4 b4            LDY &b4 ; velocity_x
 &2372: 85 b4            STA &b4 ; velocity_x
@@ -5185,14 +5229,16 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2375: e5 b4            SBC &b4 ; velocity_x
 &2377: 85 b4            STA &b4 ; velocity_x
 &2379: 98               TYA
-&237a: 46 9d            LSR &9d ; temp
+
+&237a: 46 9d            LSR &9d ; temp				# shift bits again to put original bit 6 into carry
 &237c: 90 08            BCC &2386
 &237e: 49 ff            EOR #&ff
 &2380: a8               TAY
 &2381: c8               INY
 &2382: a5 b4            LDA &b4 ; velocity_x
 &2384: 84 b4            STY &b4 ; velocity_x
-&2386: 46 9d            LSR &9d ; temp
+
+&2386: 46 9d            LSR &9d ; temp				# shift bits again to put original bit 7 into carry
 &2388: 90 0b            BCC &2395
 &238a: 49 ff            EOR #&ff
 &238c: a8               TAY
@@ -5201,6 +5247,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2390: e5 b4            SBC &b4 ; velocity_x
 &2392: 85 b4            STA &b4 ; velocity_x
 &2394: 98               TYA
+
 &2395: 85 b6            STA &b6 ; velocity_y
 &2397: 60               RTS
 
@@ -5329,14 +5376,14 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; get_wall_start_80_83
 ; A determines X on leaving
 &2450: a9 04            LDA #&04
-&2452: 2c a9 00         BIT &00a9
+&2452: 2c				(BIT	)				# interlaced code
 ; get_wall_start_7c_7f
-#2453:    a9 00         LDA #&00
+#2453: a9 00              LDA #&00
 &2455: 48               PHA
 &2456: 8e 90 24         STX &2490                                               # self modifying code - preserve X
 &2459: 20 15 17         JSR &1715 ; determine_background                        # find out background in this square
-&245c: a8               TAY                                                     # Y = background
-&245d: 68               PLA
+&245c: a8               TAY                                                     # set Y = background
+&245d: 68               PLA														# retrieve offset for storing results (0 or 4)
 &245e: aa               TAX                                                     # X is set based on how we were called
 &245f: b9 6b 05         LDA &056b,Y ; background_wall_y_start_base_lookup
 &2462: 24 09            BIT &09 ; square_orientation
@@ -5367,7 +5414,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2489: 95 7c            STA &7c,X       # X = 0, &7c wall_y_start_lookup_pointer; X = 4, &80 wall_y_start_lookup_pointer_4
 &248b: a9 01            LDA #&01
 &248d: 95 7d            STA &7d,X       # X = 0, &7d wall_y_start_lookup_pointer_h; X = 4, &81 wall_y_start_lookup_pointer_h_4
-&248f: a2 00            LDX #&00        # modified by &2456; actually LDX #X
+&248f: a2 00            LDX #(value)        # modified by &2456; actually LDX #X
 &2491: 60               RTS
 
 ; scream_if_damaged
@@ -5545,7 +5592,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2584: a5 37            LDA &37 ; this_object_angle
 &2586: 60               RTS
 
-; increment_timers
+; gen_random_num
 &2587: 65 dc            ADC &dc ; timer_4                                       # quick and easy pseudo-random numbers
 &2589: 65 d9            ADC &d9 ; timer_1
 &258b: 85 d9            STA &d9 ; timer_1
@@ -5606,7 +5653,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &25f7: ee 1f 08         INC &081f ; earthquake_triggered
 &25fa: 4a               LSR
 &25fb: d0 15            BNE &2612
-&25fd: 20 87 25         JSR &2587 ; increment_timers                            # shudder screen
+&25fd: 20 87 25         JSR &2587 ; gen_random_num                            # shudder screen
 &2600: 29 01            AND #&01
 &2602: 09 5a            ORA #&5a
 &2604: a0 02            LDY #&02
@@ -5675,7 +5722,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2684: 29 70            AND #&70
 &2686: d0 40            BNE &26c8 ; no_emerging_objects                         # if not, objects less likely to emerge
 &2688: a0 01            LDY #&01                                # indicates background object id 1 (a worm) 
-&268a: 20 87 25         JSR &2587 ; increment_timers
+&268a: 20 87 25         JSR &2587 ; gen_random_num
 &268d: c9 08            CMP #&08                                # set if >&8
 &268f: 6a               ROR
 &2690: 2c 1e 08         BIT &081e ; endgame_value               # or endgame
@@ -5725,7 +5772,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &26ed: 2d 1e 08         AND &081e ; endgame_value
 &26f0: 05 c2            ORA &c2 ; loop_counter_every_20                         # in the endgame / earthquake,
 &26f2: 10 20            BPL &2714 ; no_triax2                                   # triax is much more likely to appear
-&26f4: 20 87 25         JSR &2587 ; increment_timers
+&26f4: 20 87 25         JSR &2587 ; gen_random_num
 &26f7: d0 1b            BNE &2714 ; no_triax2                                   # random probability for triax to appear
 &26f9: ad b4 08         LDA &08b4 ; object_stack_y 		
 &26fc: e9 14            SBC #&14                                                # triax doesn't appear above y = &94
@@ -5742,7 +5789,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; no_triax2
 &2714: 24 c4            BIT &c4 ; loop_counter_every_08                         # every 8 cycles,
 &2716: 10 2a            BPL &2742				
-&2718: 20 87 25         JSR &2587 ; increment_timers		
+&2718: 20 87 25         JSR &2587 ; gen_random_num		
 &271b: 29 03            AND #&03				                # pick a random clawed robot
 &271d: aa               TAX
 &271e: bd 3f 08         LDA &083f,X ; clawed_robot_availability                 
@@ -5770,7 +5817,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2743: 85 9d            STA &9d ; diameter
 &2745: 4a               LSR
 &2746: 85 9c            STA &9c ; radius
-&2748: 20 87 25         JSR &2587 ; increment_timers                            # get a random number
+&2748: 20 87 25         JSR &2587 ; gen_random_num                            # get a random number
 &274b: 25 9d            AND &9d ; diameter                                      # modulus the diameter
 &274d: 6d 91 08         ADC &0891 ; object_stack_x                              # add the player's x position
 &2750: e5 9c            SBC &9c ; radius                                        # subtract the radius
@@ -5814,7 +5861,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; enemy_fire
 # Y = bullet type
 # X = target 
-&278a: 20 87 25         JSR &2587 ; increment_timers
+&278a: 20 87 25         JSR &2587 ; gen_random_num
 &278d: 29 3f            AND #&3f
 &278f: 69 b4            ADC #&b4
 ; in_enemy_fire
@@ -5839,7 +5886,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &27b4: 68               PLA
 &27b5: b0 0e            BCS &27c5
 &27b7: 9d 06 09         STA &0906,X ; object_stack_target                       # set target for bullet
-&27ba: 20 87 25         JSR &2587 ; increment_timers
+&27ba: 20 87 25         JSR &2587 ; gen_random_num
 &27bd: 29 07            AND #&07
 &27bf: 5d e6 08         EOR &08e6,X ; object_stack_vel_x                        # randomise bullet's x velocity slightly
 &27c2: 9d e6 08         STA &08e6,X ; object_stack_vel_x
@@ -5870,14 +5917,14 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &27ef: a5 21            LDA &21 ; npc_fed
 &27f1: f0 08            BEQ &27fb                               
 &27f3: 20 11 3c         JSR &3c11 ; flag_target_as_avoid
-&27f6: 20 87 25         JSR &2587 ; increment_timers
+&27f6: 20 87 25         JSR &2587 ; gen_random_num
 &27f9: 30 09            BMI &2804 ; no_second_find
 &27fb: bd 89 31         LDA &3189,X ; npc_find_ay
 &27fe: a8               TAY
 &27ff: 20 fe 3b         JSR &3bfe ; find_target
 &2802: a6 22            LDX &22 ; npc_type
 ; no_second_find
-&2804: 20 87 25         JSR &2587 ; increment_timers
+&2804: 20 87 25         JSR &2587 ; gen_random_num
 &2807: 30 07            BMI &2810 ; no_absorb_find
 &2809: bd 7f 31         LDA &317f,X ; npc_absorb_lookup
 &280c: a8               TAY
@@ -6063,7 +6110,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; move_npc
 &2a02: a5 17		LDA &17 ; object_onscreen?				# is it offscreen?
 &2a04: 10 0b            BPL &2a11
-&2a06: 20 87 25         JSR &2587 ; increment_timers
+&2a06: 20 87 25         JSR &2587 ; gen_random_num
 &2a09: d0 13            BNE &2a1e
 ; force_object_offscreen
 &2a0b: 06 bf            ASL &bf ; this_object_offscreen
@@ -6214,11 +6261,11 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2b0c: c5 dd            CMP &dd ; object_held				        # the object they're holding?
 &2b0e: f0 1f            BEQ &2b2f					        # if so, ignore this and continue loop
 &2b10: aa               TAX
-&2b11: 20 87 25         JSR &2587 ; increment_timers
+&2b11: 20 87 25         JSR &2587 ; gen_random_num
 &2b14: 05 3b            ORA &3b ; this_object_supporting		        # only note the support half the time
 &2b16: 10 02            BPL &2b1a
 &2b18: 86 3b            STX &3b ; this_object_supporting		        # note the supported object
-&2b1a: 20 87 25         JSR &2587 ; increment_timers
+&2b1a: 20 87 25         JSR &2587 ; gen_random_num
 &2b1d: 19 56 08		ORA &0856,Y	# actually &0946 (object_stack_supporting)
 &2b20: 10 05            BPL &2b27					        # only note the support in the stack half the time
 &2b22: a5 aa            LDA &aa ; current_object
@@ -6457,6 +6504,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 ; get_water_level_for_x
 ; on entry, A specifies the screen_start_square_x
+; on exit, water level is stored in &14d0 and &14d1
 &2cbc: a2 04            LDX #&04												# init loop counter (range is 3 to 0)
 
 &2cbe: ca               DEX														# decrement loop counter
@@ -6963,7 +7011,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &30eb: b0 02            BCS &30ef
 &30ed: a9 00            LDA #&00
 &30ef: 20 35 32         JSR &3235 ; seven_eights
-&30f2: 20 57 23         JSR &2357 ; determine_velocities_from_angle	        # A = velocity_y
+&30f2: 20 57 23         JSR &2357 ; build_vector_from_angle	        # A = velocity_y
 &30f5: 85 45            STA &45 ; this_object_vel_y
 &30f7: a5 b4            LDA &b4 ; velocity_x
 &30f9: 85 43            STA &43 ; this_object_vel_x
@@ -7112,7 +7160,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &31e0: 48               PHA
 &31e1: 20 8e 28         JSR &288e ; store_object_tx_ty_to_seventeenth_stack_slot
 &31e4: 68               PLA                                                     # target is in slot seventeen for comparison
-&31e5: 20 47 33         JSR &3347 ; get_object_centre_and_determine_velocities_from_angle
+&31e5: 20 47 33         JSR &3347 ; get_object_centres_and_build_vector_from_angle
 &31e8: a2 02            LDX #&02
 &31ea: a0 00            LDY #&00
 &31ec: b5 b4            LDA &b4,X	# X = 2, &b6 velocity_y ; X = 0, &b4 velocity_x
@@ -7290,10 +7338,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &32e3: a8               TAY					                # Y = object weight
 &32e4: a6 dd            LDX &dd ; object_held
 &32e6: 20 c8 32         JSR &32c8 ; drop_object
-&32e9: 20 87 25         JSR &2587 ; increment_timers
+&32e9: 20 87 25         JSR &2587 ; gen_random_num
 &32ec: 29 07            AND #&07
 &32ee: 79 d2 32         ADC &32d2,Y ; throw_velocities		                # get a velocity based on the weight, plus a random extra
-&32f1: 20 57 23         JSR &2357 ; determine_velocities_from_angle
+&32f1: 20 57 23         JSR &2357 ; build_vector_from_angle
 &32f4: 24 19            BIT &19 ; any_collision_top_bottom                      # have we collided with something?
 &32f6: 30 08            BMI &3300
 &32f8: a5 b6            LDA &b6 ; velocity_y			                # if not,
@@ -7312,10 +7360,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &330f: a5 34            LDA &34  ; firing_angle                                 # set angle to firing angle
 ; setup_bullet_velocities_from_A                                                # or use A as angle
 &3311: 85 b5            STA &b5 ; angle
-&3313: 20 87 25         JSR &2587 ; increment_timers
+&3313: 20 87 25         JSR &2587 ; gen_random_num
 &3316: 29 03            AND #&03
 &3318: 69 40            ADC #&40                                                # magnitude is between &40 and &43
-&331a: 20 57 23         JSR &2357 ; determine_velocities_from_angle             # calculate velocities
+&331a: 20 57 23         JSR &2357 ; build_vector_from_angle             # calculate velocities
 ; setup_bullet_velocities_with_velocities
 &331d: a5 43            LDA &43 ; this_object_vel_x
 &331f: 65 b4            ADC &b4 ; velocity_x                                    # the new x velocity is relative
@@ -7336,22 +7384,27 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &3340: 85 b4            STA &b4 ; velocity_x                                    # (curiously, the y velocity isn't relative)
 &3342: 60               RTS
 
-; get_object_centre_and_determine_velocities_from_angle_quarter
+; get_object_centres_and_build_vector_from_angle_quarter
 &3343: 85 a3            STA &a3
 &3345: 4a               LSR
 &3346: 4a               LSR
-; get_object_centre_and_determine_velocities_from_angle
-# a = magnitude
-# a=&20 from unknown door func
+
+; get_object_centres_and_build_vector_from_angle
+# on entry, A = magnitude to use when constructing vector
+#			X = index of the 2nd object
+# on exit, returns various things including
+#			&b8 delta_magnitude 
+#			&84 the greater of distance_x and distance_y (as calculated in calculate_object_centre_deltas)
 &3347: 85 a2            STA &a2 ; magnitude
-&3349: 20 a0 22         JSR &22a0 ; get_angle_between_objects
-&334c: a5 b7            LDA &b7 ; some_kind_of_velocity
-&334e: 85 84            STA &84 ; some_kind_of_velocity_copy
+&3349: 20 a0 22         JSR &22a0 ; get_angle_between_objects		# angle returned in &b5, the highest_distance in &b7
+&334c: a5 b7            LDA &b7 ; highest_distance					# the greater of distance_x and distance_y, which are adjusted by delta_magnitude
+&334e: 85 84            STA &84 ; highest_distance_copy
 &3350: a5 a2            LDA &a2 ; magnitude
-&3352: 4c 57 23         JMP &2357 ; determine_velocities_from_angle
+&3352: 4c 57 23         JMP &2357 ; build_vector_from_angle			# takes &a2 magnitude and &b5 angle,
+																	# returns &b4 velocity_x and &b5 velocity_y
 
 ; enemy_fire_velocity_calculation
-&3355: 20 43 33         JSR &3343 ; get_object_centre_and_determine_velocities_from_angle_quarter
+&3355: 20 43 33         JSR &3343 ; get_object_centres_and_build_vector_from_angle_quarter
 &3358: a5 b8            LDA &b8 ; delta_magnitude
 &335a: c9 06            CMP #&06
 &335c: b0 46            BCS &33a4
@@ -7534,7 +7587,7 @@ e336d: 90 02            BCC &3371
 &348a: 24 24            BIT &24 ; object_static
 &348c: 30 16            BMI &34a4 ; suck_loop_next                              # don't suck it if it's fixed
 &348e: 4a               LSR                                                     # magnitude
-&348f: 20 57 23         JSR &2357 ; determine_velocities_from_angle	        # A = velocity_y
+&348f: 20 57 23         JSR &2357 ; build_vector_from_angle	        # A = velocity_y
 &3492: 7d f6 08         ADC &08f6,X ; object_stack_vel_y                        # add velocities to object
 &3495: 70 03            BVS &349a                                               # avoiding overflows
 &3497: 9d f6 08         STA &08f6,X ; object_stack_vel_y
@@ -7698,79 +7751,96 @@ e336d: 90 02            BCC &3371
 ; is_object_close_enough
 # A = range
 # X = object
-&359c: 8d cd 35         STA &35cd                                               # self modifying code
-&359f: bd b4 08         LDA &08b4,X ; object_stack_y
+# on exit, on success carry is clear and &83 contains the distance to object X
+&359c: 8d cd 35         STA &35cd                                               # store range in self modifying code
+&359f: bd b4 08         LDA &08b4,X ; object_stack_y							# get whether there's an object at index X
 &35a2: 38               SEC
-&35a3: f0 29            BEQ &35ce                                               # is it an object? branch if not
+&35a3: f0 29            BEQ &35ce  ; no_object_exists                           # branch if there is no object at index X
 &35a5: bd 60 08         LDA &0860,X ; object_stack_type
 &35a8: e9 3c            SBC #&3c                                                # &3c - &3f various doors
 &35aa: c9 04            CMP #&04
-&35ac: b0 06            BCS &35b4 ; not_door                                    # if so, is it a door?
-&35ae: bd 66 09         LDA &0966,X ; object_stack_data_pointer         
-&35b1: 8d 99 35         STA &3599 ; door_data_pointer_store                     # if so, store data pointer for door
+&35ac: b0 06            BCS &35b4 ; not_door                                    # branch if not a door
+&35ae: bd 66 09         LDA &0966,X ; object_stack_data_pointer					# get data pointer for door
+&35b1: 8d 99 35         STA &3599 ; door_data_pointer_store                     # store data pointer for door
 ; not_door
-&35b4: a9 20            LDA #&20                                                # magnitude
-&35b6: 20 47 33         JSR &3347 ; get_object_centre_and_determine_velocities_from_angle
-&35b9: a4 b8            LDY &b8 ; delta_magnitude
+&35b4: a9 20            LDA #&20                                                # magnitude to obtain a vector around the perimeter of a 32x32 square
+&35b6: 20 47 33         JSR &3347 ; get_object_centres_and_build_vector_from_angle
+
+&35b9: a4 b8            LDY &b8 ; delta_magnitude								# value should be between 1 and 8
 &35bb: c8               INY
 &35bc: c8               INY
-&35bd: c8               INY
+&35bd: c8               INY														# so now we should have a value between 4 and 11
 &35be: a9 00            LDA #&00
 ; closeness_loop                                                
-&35c0: 06 84            ASL &84 ; some_kind_of_velocity_copy                    # push bits from some_kind_of_velocity_copy
-&35c2: 2a               ROL                                                     # depending on delta_magnitude
-&35c3: 90 02            BCC &35c7
-&35c5: a9 fd            LDA #&fd                                                # or set to &fd if overflowed
-&35c7: 88               DEY
-&35c8: d0 f6            BNE &35c0 ; closeness_loop
-&35ca: 69 01            ADC #&01
-&35cc: c9 40            CMP #&40                                                # modifed by &359c (CMP #range)
-&35ce: 90 05            BCC &35d5 ; line_of_sight_without_obstructions          # if not an object, branch 
+&35c0: 06 84            ASL &84 ; highest_distance_copy							# push lowest bit into carry
+&35c2: 2a               ROL                                                     # move the bit into A
+&35c3: 90 02            BCC &35c7												# branch over if no set bit fell out of A into carry
+&35c5: a9 fd            LDA #&fd                                                # reset A to &fd if it did
+
+&35c7: 88               DEY														# decrement loop counter
+&35c8: d0 f6            BNE &35c0 ; closeness_loop								# loop around
+
+&35ca: 69 01            ADC #&01												# add 1 to make comparison work with range being 
+&35cc: c9 40            CMP #(range)                                            # operand modifed by &359c
+; no_object_exists
+&35ce: 90 05            BCC &35d5 ; line_of_sight_without_obstructions          # if range > A, branch to check that the object can be seen
 &35d0: 85 83            STA &83 ; distance
 &35d2: 4c 7a 36         JMP &367a ; leave_with_carry_set
 
 ; line_of_sight_without_obstructions
 # distance to consider
 &35d5: 85 84            STA &84 ; distance_left
-&35d7: 86 9d            STX &9d ; tmp_x                                         # preserve X
-&35d9: a2 02            LDX #&02        # first y direction (X = 2), then x direction (X = 0)
-; los_dir
-&35db: 8d 34 36         STA &3634       # A = &b0 (BCS) or &90 (BCC)            # self modifying code
+&35d7: 86 9d            STX &9d ; tmp_x                                         # preserve X, presumably still the object index that was passed in
+&35d9: a2 02            LDX #&02        # init loop counter: first y direction (X = 2), then x direction (X = 0)
+; los_dir_loop
+	# modify code according to the value of velocity_y
+	# if velocity_y is between -1 and -64, or between 64 and 127 then the result is BCS and DEC, otherwise it's BCC and INC
+&35db: 8d 34 36         STA &3634       # A = &b0 (BCS) or &90 (BCC)            # self modifying code - not relevant first time through loop
 &35de: 49 76            EOR #&76
-&35e0: 8d 36 36         STA &3636       # A = &c6 (DEC) or &e6 (INC)            # self modifying code
-&35e3: 86 83            STX &83 ; distance
-&35e5: b5 3a            LDA &3a,X       # X = 2, &3c this_object_height; X = 0, &3a this_object_width
-&35e7: 4a               LSR                                                     
-&35e8: 75 4f            ADC (&4f,X)     # X = 2, &51 this_object_y_low; X = 0, &4f this_object_x_low
-&35ea: 95 80            STA &80,X       # X = 2, &82 square_y_low; X = 0, &80 square_x_low
-&35ec: b5 53            LDA &53,X       # X = 2, &55 this_object_y
-&35ee: 69 00            ADC #&00
-&35f0: 95 95            STA &95,X       # X = 2, &97 square_y                   # get centre of object into square, square_low
-&35f2: b5 b4            LDA &b4,X       # X = 2, &b6 velocity_y
-&35f4: 4a               LSR
-&35f5: 29 20            AND #&20
+&35e0: 8d 36 36         STA &3636       # A = &c6 (DEC) or &e6 (INC)            # self modifying code - not relevant first time through loop
+&35e3: 86 83            STX &83 ; distance										# store loop counter value, 2 or 0
+	# get centre of object into square_y_low, square_y, square_x_low, square_x
+&35e5: b5 3a            LDA &3a,X       # get this_object_height or &3a this_object_width
+&35e7: 4a               LSR             # halve the value to get the centre point
+&35e8: 75 4f            ADC (&4f,X)     # add this_object_y_low or this_object_x_low
+&35ea: 95 80            STA &80,X       # store in square_y_low or square_x_low
+&35ec: b5 53            LDA &53,X       # get this_object_y or this_object_x
+&35ee: 69 00            ADC #&00		# add any carry from the addition
+&35f0: 95 95            STA &95,X       # store in square_y or square_x
+	# generate BCS or BCC instruction according to value of velocity_y or velocity_x (though this result isn't used)
+&35f2: b5 b4            LDA &b4,X       # get velocity_y or velocity_x (a signed value, we're only interested in bit 6 though)
+&35f4: 4a               LSR				# move bit 6 to bit 5
+&35f5: 29 20            AND #&20		# mask to get only bit 5
 &35f7: 49 90            EOR #&90        # A = &B0 (BCS) or &90 (BCC)            # is the velocity positive or negative?
+	# adjust loop counter X and loop
 &35f9: ca               DEX
 &35fa: ca               DEX
-&35fb: f0 de            BEQ &35db ; los_dir      # do it again for x direction
+&35fb: f0 de            BEQ &35db ; los_dir_loop      # loop around with X=0 for x direction
+
+	# modify code according to the value of velocity_x
+	# if velocity_x is between -1 and -64, or between 64 and 127 then the result is BCS and DEC, otherwise it's BCC and INC
 &35fd: 8d 42 36         STA &3642       # A = &b0 (BCS) or &90 (BCC)            # self modifying code
 &3600: 49 76            EOR #&76
 &3602: 8d 44 36         STA &3644       # A = &c6 (DEC) or &e6 (INC)            # self modifying code
+
 &3605: a9 40            LDA #&40
-&3607: 85 2d            STA &2d ; background_processing_flag                    # doors
+&3607: 85 2d            STA &2d ; background_processing_flag                    # in sight? doors
+
+	# compare centre point of object to water level
 &3609: a5 95            LDA &95 ; square_x
-&360b: 20 bc 2c         JSR &2cbc ; get_water_level_for_x
+&360b: 20 bc 2c         JSR &2cbc ; get_water_level_for_x						# result placed in &14d0 and &14d1
 &360e: a5 82            LDA &82 ; square_y_low
 &3610: cd d0 14         CMP &14d0 ; water_level_low
 &3613: a5 97            LDA &97 ; square_y
 &3615: ed d1 14         SBC &14d1 ; water_level
-&3618: 6a               ROR
+&3618: 6a               ROR														# move -ve bit down
 &3619: 6a               ROR
 &361a: 6a               ROR
-&361b: 29 20            AND #&20                                                # are we underwater or not?
-&361d: 49 b0            EOR #&b0        
+&361b: 29 20            AND #&20                                                # mask out what was the -ve bit
+&361d: 49 b0            EOR #&b0												# if -ve then we end up with BCS, otherwise BCC
 &361f: 8d 70 36         STA &3670       # A = &b0 (BCS) or &90 (BCC)            # self modifying code
-&3622: a6 9d            LDX &9d ; tmp_x
+
+&3622: a6 9d            LDX &9d ; tmp_x											# restore the saved value of X
 &3624: 20 53 24         JSR &2453 ; get_wall_start_7c_7f
 ; los_loop
 &3627: a5 82            LDA &82 ; square_y_low                                  # consider the next point on our route
@@ -7780,16 +7850,18 @@ e336d: 90 02            BCC &3371
 &362e: 29 f8            AND #&f8
 &3630: 09 04            ORA #&04
 &3632: 85 81            STA &81 ; square_y_low_max
-&3634: b0 05            BCS &363b                       # modified by &35db; either BCS &363b or BCC &363b, depending on sign of velocity_x
-&3636: e6 97            INC &97 ; square_y              # modified by &35e0; either DEC &97 or &INC &97, depending on sign of velocity_x
+&3634: b0 05            BCS / BCC &363b                 # modified by &35db; either BCS &363b or BCC &363b, depending on sign of velocity_x
+&3636: e6 97            INC / DEC &97 ; square_y        # modified by &35e0; either DEC &97 or &INC &97, depending on sign of velocity_x
 &3638: 20 53 24         JSR &2453 ; get_wall_start_7c_7f                        # redundant?
+
 &363b: a5 80            LDA &80 ; square_x_low
 &363d: 18               CLC
 &363e: 65 b4            ADC &b4 ; velocity_x
 &3640: 85 80            STA &80 ; square_x_low
-&3642: b0 05            BCS &3649                       # modified by &35fd; either BCS &3649 or BCC &3649, depending on sign of velocity_y
-&3644: e6 95            INC &95 ; square_x              # modified by &3602; either DEC &95 or &INC &95, depending on sign of velocity_y
+&3642: b0 05            BCS / BCC &3649                 # modified by &35fd; either BCS &3649 or BCC &3649, depending on sign of velocity_y
+&3644: e6 95            INC / DEC &95 ; square_x        # modified by &3602; either DEC &95 or &INC &95, depending on sign of velocity_y
 &3646: 20 53 24         JSR &2453 ; get_wall_start_7c_7f
+
 &3649: a5 80            LDA &80 ; square_x_low                                  # check whether there's a wall there
 &364b: 29 e0            AND #&e0                                                
 &364d: 0a               ASL     
@@ -7801,28 +7873,32 @@ e336d: 90 02            BCC &3371
 &3654: 65 7e            ADC &7e ; wall_y_start_base
 &3656: 90 02            BCC &365a
 &3658: a9 ff            LDA #&ff        
+
 &365a: c5 81            CMP &81 ; square_y_low_max      
 &365c: 6a               ROR                             
 &365d: 45 7f            EOR &7f ; wall_sprite
 &365f: 10 19            BPL &367a ; leave_with_carry_set                        # if so, there's an obstruction
+
 &3661: 2c 98 35         BIT &3598 ; los_consider_water
-&3664: 10 0c            BPL &3672                                               # is water considered a barrier?
+&3664: 10 0c            BPL &3672 ; los_ignore_water                            # branch over if water is not considered a barrier
 &3666: a5 82            LDA &82 ; square_y_low
 &3668: cd d0 14         CMP &14d0 ; water_level_low                             # if so, have we passed through the water?
 &366b: a5 97            LDA &97 ; square_y
 &366d: ed d1 14         SBC &14d1 ; water_level                                 # if so, there's an obstruction
-&3670: 90 08            BCC &367a       # modified by &371f; either BCS &367a or BCC &367a, depending on initial water level
+&3670: 90 08            BCC / BCS &367a	; leave_with_carry_set					# (modified by &371f)
+
 ; los_ignore_water
 &3672: e6 83            INC &83 ; distance
 &3674: c6 84            DEC &84 ; distance_left
 &3676: d0 af            BNE &3627 ; los_loop
 &3678: 18               CLC                                                     # no obstructions found; return carry clear
-&3679: 24 38            BIT &38  
+&3679: 24				(BIT   )				# interlaced code
+
 ; leave_with_carry_set
-#367a:    38            SEC                                                     # obstructions found; return carry set
+#367a: 38                 SEC                                                   # obstructions found; return carry set
 &367b: a9 ff            LDA #&ff
-&367d: 8d 99 35         STA &3599 ; door_data_pointer_store
-&3680: 8d 98 35         STA &3598 ; los_consider_water                          # consider water unless otherwise ignored
+&367d: 8d 99 35         STA &3599 ; door_data_pointer_store						# reset door_data_pointer_store
+&3680: 8d 98 35         STA &3598 ; los_consider_water                          # default to consider water
 &3683: 60               RTS
 
 ; redraw_screen
@@ -8323,7 +8399,7 @@ e336d: 90 02            BCC &3371
 &3a2e: f0 11            BEQ &3a41 ; no_wall_underneath
 &3a30: c5 8a            CMP &8a ; half_minus_height
 &3a32: b0 1f            BCS &3a53
-&3a34: 20 87 25         JSR &2587 ; increment_timers
+&3a34: 20 87 25         JSR &2587 ; gen_random_num
 &3a37: 09 c0            ORA #&c0
 &3a39: 65 83            ADC &83 ; bob_y_low
 &3a3b: b0 02            BCS &3a3f
@@ -8427,7 +8503,7 @@ maggot x = &06 a = &08
 &3ae1: 20 08 3b         JSR &3b08 ; some_other_npc_stuff
 &3ae4: 20 46 3a         JSR &3a46
 &3ae7: 90 13            BCC &3afc
-&3ae9: 20 87 25         JSR &2587 ; increment_timers
+&3ae9: 20 87 25         JSR &2587 ; gen_random_num
 &3aec: dd 77 39         CMP &3977,X ; unknown_lookup_3977
 &3aef: 90 13            BCC &3b04
 &3af1: a9 01            LDA #&01
@@ -8435,7 +8511,7 @@ maggot x = &06 a = &08
 &3af5: 20 4c 32         JSR &324c ; make_negative
 &3af8: 65 53            ADC &53 ; this_object_x
 &3afa: 85 14            STA &14 ; this_object_tx
-&3afc: 20 87 25         JSR &2587 ; increment_timers
+&3afc: 20 87 25         JSR &2587 ; gen_random_num
 &3aff: dd 7e 39         CMP &397e,X ; unknown_lookup_397e
 &3b02: b0 03            BCS &3b07
 &3b04: 4c 54 3a         JMP &3a54
@@ -8474,7 +8550,7 @@ maggot x = &06 a = &08
 &3b46: 85 b5            STA &b5 ; angle
 &3b48: 98               TYA
 &3b49: 20 56 32         JSR &3256 ; make_positive
-&3b4c: 20 57 23         JSR &2357 ; determine_velocities_from_angle	        # A = velocity_y
+&3b4c: 20 57 23         JSR &2357 ; build_vector_from_angle	        # A = velocity_y
 &3b4f: 85 42            STA &42 ; acceleration_y
 &3b51: a5 b4            LDA &b4 ; velocity_x
 &3b53: 85 40            STA &40 ; acceleration_x
@@ -8612,24 +8688,36 @@ maggot x = &06 a = &08
 #3c21: 80 ff 20 80 ; find_object_probabilities
 
 #3c25: 00 ; nearest_object
-#3c26: 00 ; find_first_7f
-#3c27: 00 ; find_second
+#3c26: 00 ; find_first_7f				# first object type to find and &7f
+#3c27: 00 ; find_second					# second object type to find
 #3c28: 00 ; nearest_distance
-#3c29: 00 ; find_first
+#3c29: 00 ; find_first					# first object type to find
 
 ; find_nearest_object
-# A & &80 : note player too
-# A & &7f = object type to look for
-# Y & &80 : consider objects in range too
-# Y & &7f = object range to look for
-# else Y &7f = second object type to look for
-# if carry set, simply count the number of matching objects in primary stack, return in &9f
-# if carry clear, find the nearest matching object and return number in X
+# on entry, A is specified in the form pttttttt
+#	where ttttttt is the object type to look for
+#	and p when set additionally considers the player
+# and also, Y is specified in the form rttttttt
+#   where, if r is set, then ttttttt specifies the object type range to look for
+#   and, if r is clear, then ttttttt specifies the specific object type to look for
+# on exit, X is the index of the matching object on the primary stack or &ff if not found
+#	also &3c25 nearest_object will have the same value as X
+#	and &3c28 nearest_distance will be set
 &3c2a: 18               CLC
-&3c2b: 24 38            BIT &38 ; this_object_weight
-&3c2d: 66 9b            ROR &9b ; weight_bit									# set bit 7 to 0
+&3c2b: 24				(BIT &38)					# interlaced code
+
+; find_nearest_object_for_fluffy
+&3c2c: 38				SEC
+
+&3c2d: 66 9b            ROR &9b ; weight_bit									# set bit 7 from C
 &3c2f: 18               CLC
+
 ; in_find_nearest_object
+# 
+# and also, if C is set:
+#   the routine counts the number of matching objects in the primary stack, returning the result in &9f
+# or, if C is clear:
+#   the nearest matching object is found in the primary stack and its index is returned in X
 &3c30: 66 a1            ROR &a1 ; find_carry                                    # note whether we're finding or counting
 &3c32: 8d 29 3c         STA &3c29 ; find_first
 &3c35: 29 7f            AND #&7f
@@ -8641,7 +8729,7 @@ maggot x = &06 a = &08
 &3c45: e8               INX
 &3c46: 86 a0            STX &a0 ; result                                        # initially &00
 &3c48: 86 9f            STX &9f ; count                                         # initially &00
-&3c4a: 20 87 25         JSR &2587 ; increment_timers
+&3c4a: 20 87 25         JSR &2587 ; gen_random_num
 &3c4d: 29 0f            AND #&0f
 &3c4f: 85 a3            STA &a3 ; rnd_0f                                        # get a random number &00 - &0f
 &3c51: a0 0f            LDY #&0f
@@ -8682,21 +8770,22 @@ maggot x = &06 a = &08
 &3c90: e6 9f            INC &9f ; count                                         # count contains total number of matches
 &3c92: 24 a1            BIT &a1 ; find_carry                                    # was the carry set when function called?
 &3c94: 30 33            BMI &3cc9 ; find_object_next_object                     # if so, move on to the next object
-&3c96: 20 87 25         JSR &2587 ; increment_timers
+&3c96: 20 87 25         JSR &2587 ; gen_random_num
 &3c99: dd 21 3c         CMP &3c21,X ; find_object_probabilities                 # X = result
 &3c9c: b0 2b            BCS &3cc9 ; find_object_next_object                     # a random chance based on result to skip
 &3c9e: 98               TYA
 &3c9f: aa               TAX                                                     # X = object being considered
-&3ca0: 24 9b            BIT &9b ; weight_bit
-&3ca2: 10 0e            BPL &3cb2 ; find_object_unset_weight_bit
-&3ca4: a9 00            LDA #&00
+&3ca0: 24 9b            BIT &9b ; weight_bit									# retrieve whether search is being done for fluffy (bit 7 set) 
+&3ca2: 10 0e            BPL &3cb2 ; find_object_unset_weight_bit				# branch if not searching for fluffy
+&3ca4: a9 00            LDA #&00												# 
 &3ca6: 20 9c 35         JSR &359c ; is_object_close_enough                      # get distance to object
 &3ca9: a5 83            LDA &83 ; distance
 &3cab: cd 28 3c         CMP &3c28 ; nearest_distance                            # is it nearer than earlier finds?
 &3cae: 90 11            BCC &3cc1 ; find_object_store_distance                  # if nearer, store it
 &3cb0: b0 17            BCS &3cc9 ; find_object_next_object                     # if further away, ignore it
 
-&3cb2: 20 87 25         JSR &2587 ; increment_timers
+; find_object_unset_weight_bit
+&3cb2: 20 87 25         JSR &2587 ; gen_random_num
 &3cb5: 29 4f            AND #&4f
 &3cb7: 4d 28 3c         EOR &3c28 ; nearest_distance
 &3cba: 20 9c 35         JSR &359c ; is_object_close_enough                      # otherwise, pick one at random
@@ -8787,7 +8876,7 @@ maggot x = &06 a = &08
 &3d3f: 60               RTS
 
 ; target &c0 = &40
-&3d40: 20 87 25         JSR &2587 ; increment_timers
+&3d40: 20 87 25         JSR &2587 ; gen_random_num
 &3d43: 29 03            AND #&03
 &3d45: f0 21            BEQ &3d68 ; no_target                                   # one in four chance to drop a notch
 &3d47: 4a               LSR
@@ -8797,7 +8886,7 @@ maggot x = &06 a = &08
 &3d4f: d0 53            BNE &3da4
 &3d51: a6 0e            LDX &0e ; this_object_target_object
 &3d53: a9 20            LDA #&20                                                # magnitude
-&3d55: 20 47 33         JSR &3347 ; get_object_centre_and_determine_velocities_from_angle
+&3d55: 20 47 33         JSR &3347 ; get_object_centres_and_build_vector_from_angle
 &3d58: a5 3e            LDA &3e ; this_object_target
 &3d5a: 29 20            AND #&20
 &3d5c: f0 06            BEQ &3d64
@@ -8809,7 +8898,7 @@ maggot x = &06 a = &08
 ; target &c0 = &00
 &3d68: 20 94 3d         JSR &3d94 ; possibly_get_speed_to_y_based_on_same_square_with_bit_1b
 &3d6b: d0 37            BNE &3da4       # rotator
-&3d6d: 20 87 25         JSR &2587 ; increment_timers
+&3d6d: 20 87 25         JSR &2587 ; gen_random_num
 &3d70: 29 07            AND #&07
 &3d72: e9 03            SBC #&03
 &3d74: 65 43            ADC &43 ; this_object_vel_x
@@ -8855,14 +8944,14 @@ maggot x = &06 a = &08
 &3db6: 8d e5 3c         STA &3ce5 ; route_chooser_loop
 &3db9: 8d e3 3c         STA &3ce3 ; best_distance 
 ; choose_route_loop
-&3dbc: 20 87 25         JSR &2587 ; increment_timers                            # consider four random angles
+&3dbc: 20 87 25         JSR &2587 ; gen_random_num                            # consider four random angles
 &3dbf: 2d e1 3c         AND &3ce1 ; angle_randomness
 &3dc2: 6d e2 3c         ADC &3ce2 ; angle_minus_half_angle_randomness
 &3dc5: 85 b5            STA &b5 ; angle                                         # angle +/- rnd(angle_randomness / 2)
 &3dc7: 48               PHA
 &3dc8: a9 20            LDA #&20                                                # magnitude
-&3dca: 20 57 23         JSR &2357 ; determine_velocities_from_angle
-&3dcd: 20 87 25         JSR &2587 ; increment_timers
+&3dca: 20 57 23         JSR &2357 ; build_vector_from_angle
+&3dcd: 20 87 25         JSR &2587 ; gen_random_num
 &3dd0: 29 1f            AND #&1f                                                # consider a random distance &10 - &3f
 &3dd2: 69 10            ADC #&10
 &3dd4: 4e 98 35         LSR &3598 ; los_consider_water                          # ignore water
@@ -8879,7 +8968,7 @@ maggot x = &06 a = &08
 &3def: ad e4 3c         LDA &3ce4 ; best_angle                                  # pick the one with the maximum distance
 &3df2: 85 b5            STA &b5 ; angle
 &3df4: a9 20            LDA #&20
-&3df6: 20 57 23         JSR &2357 ; determine_velocities_from_angle
+&3df6: 20 57 23         JSR &2357 ; build_vector_from_angle
 &3df9: ad e3 3c         LDA &3ce3 ; best_distance
 &3dfc: c9 0a            CMP #&0a
 &3dfe: 90 0d            BCC &3e0d                                               # leave if it's a really short distance
@@ -8936,7 +9025,7 @@ maggot x = &06 a = &08
 &3e46: 30 05            BMI &3e4d ; should_emit_object	# N will always be set, so this is a JMP
 
 ; randomly_emit_object 
-&3e48: 20 87 25         JSR &2587 ; increment_timers	# get a random value
+&3e48: 20 87 25         JSR &2587 ; gen_random_num	# get a random value
 &3e4b: c9 f7            CMP #&f7						# set a high threshold - carry will be cleared about 97% of the time
 
 ; should_emit_object
@@ -9119,7 +9208,7 @@ maggot x = &06 a = &08
 &3f35: 10 04            BPL &3f3b
 &3f37: 29 3f            AND #&3f
 &3f39: 69 28            ADC #&28
-&3f3b: 20 57 23         JSR &2357 ; determine_velocities_from_angle
+&3f3b: 20 57 23         JSR &2357 ; build_vector_from_angle
 &3f3e: 4c 4f 3f         JMP &3f4f # becomes reserve_object_for_background
 
 ; handle_background_object_fixed_wind
@@ -9373,7 +9462,7 @@ maggot x = &06 a = &08
 &4096: a6 aa            LDX &aa ; current_object                                # is it the player?
 &4098: d0 fb            BNE &4095                                               # if not, it's an indestructible object - leave
 &409a: e6 15            INC &15 ; this_object_energy
-&409c: 20 87 25         JSR &2587 ; increment_timers                            # a 50% chance to either:
+&409c: 20 87 25         JSR &2587 ; gen_random_num                            # a 50% chance to either:
 &409f: 10 0b            BPL &40ac drop_object_from_pocket                       
 &40a1: 20 c8 32         JSR &32c8 ; drop_object                                 # drop held object and teleport
 &40a4: a2 04            LDX #&04
@@ -9589,7 +9678,7 @@ maggot x = &06 a = &08
 &41fe: a0 00            LDY #&00
 &4200: 20 a6 24         JSR &24a6 ; take_damage			                # coronium contact damage = &08
 ; no_damage_from_coronium
-&4203: 20 87 25         JSR &2587 ; increment_timers
+&4203: 20 87 25         JSR &2587 ; gen_random_num
 &4206: 4a               LSR
 &4207: 85 73            STA &73 ; this_object_palette		                # change to a random colour
 &4209: 60               RTS
@@ -9696,9 +9785,9 @@ maggot x = &06 a = &08
 &42a8: a5 06            LDA &06 ; current_object_rotator
 &42aa: 29 0b            AND #&0b
 &42ac: d0 2d            BNE &42db
-&42ae: a9 2a            LDA #&2a
-&42b0: a0 86            LDY #&86
-&42b2: 20 2c 3c         JSR &3c2c
+&42ae: a9 2a            LDA #&2a							# look for red/yellow imps
+&42b0: a0 86            LDY #&86							# also look for range 6, flying things & imps
+&42b2: 20 2c 3c         JSR &3c2c ; find_nearest_object_for_fluffy 		# find objects
 &42b5: 30 12            BMI &42c9
 &42b7: ad 28 3c         LDA &3c28 ; nearest_distance
 &42ba: c5 da            CMP &da ; timer_2
@@ -10158,7 +10247,7 @@ maggot x = &06 a = &08
 &45b1: d0 35            BNE &45e8
 &45b3: 24 1f            BIT &1f ; underwater
 &45b5: 30 f8            BMI &45af
-&45b7: 20 87 25         JSR &2587 ; increment_timers
+&45b7: 20 87 25         JSR &2587 ; gen_random_num
 &45ba: 29 1f            AND #&1f
 &45bc: d0 03            BNE &45c1
 &45be: 20 59 3a         JSR &3a59
@@ -10191,7 +10280,7 @@ maggot x = &06 a = &08
 &45f5: b0 12            BCS &4609
 &45f7: a5 07            LDA &07 ; current_object_rotator_low
 &45f9: d0 18            BNE &4613
-&45fb: 20 87 25         JSR &2587 ; increment_timers
+&45fb: 20 87 25         JSR &2587 ; gen_random_num
 &45fe: 4a               LSR
 &45ff: 6a               ROR
 &4600: 10 11            BPL &4613
@@ -10241,7 +10330,7 @@ maggot x = &06 a = &08
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&4631: 20 87 25         JSR &2587 ; increment_timers
+&4631: 20 87 25         JSR &2587 ; gen_random_num
 &4634: 29 3f            AND #&3f
 &4636: d0 07            BNE &463f ; no_sound_from_bird
 &4638: 20 fa 13         JSR &13fa ; play_sound
@@ -10398,7 +10487,7 @@ maggot x = &06 a = &08
 &4749: a5 dc            LDA &dc ; timer_4                                       
 &474b: 29 03            AND #&03                                                # then, with a 1 in 4 chance
 &474d: f0 0d            BEQ &475c                                               # cause triax to teleport away # ?
-&474f: 20 87 25         JSR &2587 ; increment_timers
+&474f: 20 87 25         JSR &2587 ; gen_random_num
 &4752: f0 08            BEQ &475c                                               # otherwise a 1 in 256 chance to teleport
 &4754: 20 f0 46         JSR &46f0 ; handle_crew_member                          # scream if damage, deal with sprite
 &4757: a0 00            LDY #&00
@@ -10431,15 +10520,15 @@ maggot x = &06 a = &08
 &4783: 20 d8 31         JSR &31d8 ; move_towards_target
 &4786: 4c 78 25         JMP &2578 ; flip_object_in_direction_of_travel_on_random_3
 
-; handle_sucker
+; handle_tough_bush
 # called with:
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&4789: 98               TYA                                                     # is the sucker touching anything?
-&478a: 05 dc            ORA &dc ; timer_4                                       # if so, a one in two chance
-&478c: 30 34            BMI &47c2                                       
-&478e: 4c a9 0b         JMP &0ba9 ; set_object_velocities                       # to set its velocities to match
+&4789: 98               TYA                                                     # set A to this_object_supporting - bit 7 is set if nothing being touched
+&478a: 05 dc            ORA &dc ; timer_4                                       # apply a one in two chance
+&478c: 30 34            BMI &47c2												# RTS if bit 7 set
+&478e: 4c a9 0b         JMP &0ba9 ; set_object_velocities                       # or set the velocity of the touching object (e.g. the player) to match the bush, effectively zeroing it
 
 ; handle_engine_fire
 # called with:
@@ -10562,7 +10651,7 @@ maggot x = &06 a = &08
 &484a: 4c 9e 48         JMP &489e ; teleport_away
 &484d: a0 46            LDY #&46
 &484f: 20 8b 48         JSR &488b ; teleport_object_near_player
-&4852: 20 87 25         JSR &2587 ; increment_timers
+&4852: 20 87 25         JSR &2587 ; gen_random_num
 &4855: 4a               LSR
 &4856: d0 07            BNE &485f
 &4858: 20 fa 13         JSR &13fa ; play_sound
@@ -10714,14 +10803,6 @@ maggot x = &06 a = &08
 #4998: a7 b9 10 00
 
 #499c: ea ; (unused)
-
-
-bit 0 set of door data is whether or not it is locked
-bit 1 set indicates door is open
-
-
-bit 7 of data switch when set means that switch is not on screen
-
 
 index		data_ptrs		description
 00			b0 bb 84		turns on engines in lab, opens door to the right
@@ -11022,7 +11103,7 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 &4b06: f0 03            BEQ &4b0b ; no_fireball_collision
 &4b08: 20 b4 0b         JSR &0bb4 ; get_object_velocities
 ; no_fireball_collision
-&4b0b: 20 87 25         JSR &2587 ; increment_timers
+&4b0b: 20 87 25         JSR &2587 ; gen_random_num
 &4b0e: 85 37            STA &37 ; this_object_angle
 &4b10: 0a               ASL
 &4b11: 85 39            STA &39 ; this_object_flags_lefted
@@ -11139,7 +11220,7 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 &4bc3: d0 4f            BNE &4c14                                               # if not, leave
 &4bc5: a5 11            LDA &11 ; this_object_extra		                # this_object_extra = child type
 &4bc7: 20 18 3c         JSR &3c18 ; count_objects_of_type_a_in_stack            # how many children already exist?
-&4bca: 20 87 25         JSR &2587 ; increment_timers
+&4bca: 20 87 25         JSR &2587 ; gen_random_num
 &4bcd: 25 d9            AND &d9 ; timer_1
 &4bcf: 25 db            AND &db ; timer_3
 &4bd1: 29 07            AND #&07                                                # create up to seven children
@@ -11155,7 +11236,7 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 &4be9: 29 80            AND #&80                                                # &00 = straight left, &80 = straight right
 &4beb: 85 b5            STA &b5 ; angle
 &4bed: a9 20            LDA #&20                                                # velocity magnitude = &20
-&4bef: 20 57 23         JSR &2357 ; determine_velocities_from_angle
+&4bef: 20 57 23         JSR &2357 ; build_vector_from_angle
 &4bf2: a5 11            LDA &11 ; this_object_extra                             # this_object_extra = child type
 &4bf4: 20 b8 33         JSR &33b8 ; create_child_object                         # create a child
 &4bf7: b0 1b            BCS &4c14                                               # if we couldn't, leave
@@ -11495,48 +11576,67 @@ door	palette												speed	min_energy
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-; X = this_object_data
-; A = this_object_data
-; Y = this_object_supporting ?
-&4ded: bd 49 4e         LDA &4e49,X ; sucker_palettes			        # X = this_object_data
+&4ded: bd 49 4e         LDA &4e49,X ; sucker_action_and_palette			        # X = this_object_data
 &4df0: 4a               LSR
 &4df1: 85 73            STA &73 ; this_object_palette                           # set colour of sucker
+
 &4df3: a5 07            LDA &07 ; current_object_rotator_low
-&4df5: f0 14            BEQ &4e0b
+&4df5: f0 14            BEQ &4e0b												# 1 in 8 chance to not check for trigger
+
 &4df7: bd 37 4e         LDA &4e37,X ; sucker_attracted_lookup                   # what does the sucker like to suck?
-&4dfa: 30 0d            BMI &4e09 ; no_attraction                               # if nothing, skip
+&4dfa: 30 0d            BMI &4e09 ; no_attraction                               # if always active then skip over
+
 &4dfc: a8               TAY
-&4dfd: c9 55            CMP #&55                                                # &55 = coronium boulder
-&4dff: d0 02            BNE &4e03                                               # if so, then also suck
-&4e01: a0 0b            LDY #&0b                                                # &0b = yellow ball
+&4dfd: c9 55            CMP #&55                                                # is target &55 coronium boulder
+&4dff: d0 02            BNE &4e03                                               # if so, then also look for
+&4e01: a0 0b            LDY #&0b                                                # &0b yellow ball
 &4e03: 20 2a 3c         JSR &3c2a ; find_nearest_object
-&4e06: 8a               TXA                                                     # X = object number of nearest object
-&4e07: 49 ff            EOR #&ff
+&4e06: 8a               TXA                                                     # X = index of nearest object, or &ff if not found
+&4e07: 49 ff            EOR #&ff												# so X becomes 0 if nothing found, therefore bit 7 now set if something found
+
 ; no_attraction
 &4e09: 85 11            STA &11 ; this_object_extra                             # this_object_extra = attracted object
+
 &4e0b: a5 11            LDA &11 ; this_object_extra
-&4e0d: 10 18            BPL &4e27 ; no_attraction_2                             # if no attracted object, skip
+&4e0d: 10 18            BPL &4e27 ; no_attraction_2                             # if no trigger object found, skip
+
 &4e0f: a6 bc            LDX &bc ; this_object_data
-&4e11: bd 49 4e         LDA &4e49,X ; sucker_palettes
-&4e14: 4a               LSR
-&4e15: 66 29            ROR &29 ; sucking_angle_modifier
+&4e11: bd 49 4e         LDA &4e49,X ; sucker_action_and_palette
+&4e14: 4a               LSR														# bit 1 of data to carry (set to suck, cleared to blow)
+&4e15: 66 29            ROR &29 ; sucking_angle_modifier						# set bit 7 of &29 to indicate suck or blow
 &4e17: bd 40 4e         LDA &4e40,X ; sucker_sucking_distances
 &4e1a: 85 35            STA &35 ; sucking_distance
 &4e1c: 20 3a 34         JSR &343a ; suck_or_blow_all_objects                    # suck/blow objects towards/away from us
-&4e1f: a5 db            LDA &db ; timer_3
-&4e21: 85 37            STA &37 ; this_object_angle
-&4e23: c9 50            CMP #&50
+
+&4e1f: a5 db            LDA &db ; timer_3										# get random number
+&4e21: 85 37            STA &37 ; this_object_angle								# change appearance by flipping sprite left/right plotting
+&4e23: c9 50            CMP #&50												# 1 in 256 chance to do &50 damage instead of 2
 &4e25: f0 02            BEQ &4e29
+
 ; no_attraction_2
-&4e27: a9 02            LDA #&02
-&4e29: a4 3b            LDY &3b ; this_object_supporting                        # are we supporting anything?
+&4e27: a9 02            LDA #&02												# preload amount of damage
+&4e29: a4 3b            LDY &3b ; this_object_supporting                        # are we touching anything?
 &4e2b: 30 b1            BMI &4dde                                               # if not, leave
 &4e2d: 20 fa 13         JSR &13fa ; play_sound                          
 #4e30: 57 07 57 95 ; sound data
-&4e34: 4c a6 24         JMP &24a6 ; take_damage                                 # if so, damage it! (damage = 2)
-#4e37: ff 3e 11 55 10 ff 55 10 0f ; sucker_attracted_lookup ; &3e = door, &10 = pirahna, &55 = coronium, &11 = wasp, &0f = worm, &ff = nothing
+&4e34: 4c a6 24         JMP &24a6 ; take_damage                                 # if so, damage it!
+
+#4e37: ff 3e 11 55 10 ff 55 10 0f ; sucker_attracted_lookup ; &3e = door, &10 = pirahna, &55 = coronium, &11 = wasp, &0f = worm, &ff = always active
 #4e40: 50 30 7f 40 50 7f 7f 50 40 ; sucker_sucking_distances
-#4e49: 5f ac bf 3d f9 58 a2 d8 4b ; sucker_palettes
+#4e49: 5f ac bf 3d f9 58 a2 d8 4b ; sucker_action_and_palette
+
+# sucker properties
+
+type	trigger						effect_distance	action_and_palette	action		palette
+0		ff always active			50				5f					1 suck		2F Cyan  Green
+1		3e horizontal stone door	30				ac					0 blow		56 Blue  Magenta
+2		11 wasp						7f				bf					1 suck		5F Cyan  Magenta
+3		55 coronium boulder			40				3d					1 suck		1E Magenta  Red
+4		10 piranha					50				f9					1 suck		7C Yellow  White
+5		ff always active			7f				58					0 blow		2C Yellow  Green
+6		55 coronium boulder			7f				a2					0 blow		51 Red  Magenta
+7		10 piranha					50				d8					0 blow		6C Yellow  Cyan
+8		0f worm						40				4b					1 suck		25 Green  Green
 
 ; handle_maggot
 # called with:
@@ -11555,7 +11655,7 @@ door	palette												speed	min_energy
 &4e64: 20 26 3d         JSR &3d26 ; target_processing
 &4e67: 20 02 2a         JSR &2a02 ; move_npc
 &4e6a: 30 57            BMI &4ec3 ; maggot_moved
-&4e6c: 20 87 25         JSR &2587 ; increment_timers
+&4e6c: 20 87 25         JSR &2587 ; gen_random_num
 &4e6f: 24 1f            BIT &1f ; underwater
 &4e71: 30 02            BMI &4e75
 &4e73: a9 ff            LDA #&ff
@@ -11690,7 +11790,7 @@ door	palette												speed	min_energy
 &4f3d: a9 00            LDA #&00                                                # &00 = player
 &4f3f: 20 f8 3b         JSR &3bf8 ; find_target_occasionally                    # Y = object_type, so other nest dwellers
 &4f42: 20 26 3d         JSR &3d26 ; target_processing
-&4f45: 20 87 25         JSR &2587 ; increment_timers
+&4f45: 20 87 25         JSR &2587 ; gen_random_num
 &4f48: f0 0d            BEQ &4f57
 &4f4a: c5 11            CMP &11 ; this_object_extra
 &4f4c: 90 10            BCC &4f5e
@@ -11717,7 +11817,7 @@ door	palette												speed	min_energy
 &4f7b: 20 da 31         JSR &31da ; move_towards_target_with_probability_x      # move towards target
 &4f7e: 24 c4            BIT &c4 ; loop_counter_every_08                         
 &4f80: 10 19            BPL &4f9b                                               # every 8 cycles,
-&4f82: 20 87 25         JSR &2587 ; increment_timers
+&4f82: 20 87 25         JSR &2587 ; gen_random_num
 &4f85: 29 02            AND #&02                                                # pick a direction at random, x or y
 &4f87: aa               TAX                                             
 &4f88: a5 db            LDA &db ; timer_3

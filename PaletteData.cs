@@ -11,6 +11,6 @@
         /// <summary>
         /// The palette that will be used to render the background sprite.
         /// </summary>
-        public SquarePalette Palette;
+        public Palette Palette;
         }
     }

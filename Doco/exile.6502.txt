@@ -8671,6 +8671,7 @@ ENDIF
     BCC line_of_sight_without_obstructions          ; if not an object, branch
     STA distance_OR_wall_sprite_4 ; distance
     JMP leave_with_carry_set
+
 ;;  distance to consider
 .line_of_sight_without_obstructions
     STA this_object_y_low_bumped_OR_some_kind_of_velocity_copy_OR_distance_left

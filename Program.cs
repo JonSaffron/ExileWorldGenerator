@@ -15,5 +15,6 @@ namespace ExileWorldGenerator
             Application.SetCompatibleTextRenderingDefault(false);
             Application.Run(new MainForm());
             }
+
         }
     }

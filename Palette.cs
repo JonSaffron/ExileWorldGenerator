@@ -5,9 +5,9 @@ using System.Linq;
 
 namespace ExileWorldGenerator
     {
-    internal class SquarePalette
+    internal class Palette
         {
-        public readonly byte Palette;
+        public readonly byte PaletteByte;
         public readonly GameColour Colour1;
         public readonly GameColour Colour2;
         public readonly GameColour PrimaryColour;
@@ -15,18 +15,18 @@ namespace ExileWorldGenerator
         private static readonly Dictionary<GameColour, Color> GameColours = BuildGameColours();
         private static readonly (GameColour leftColour, GameColour rightColour)[] ColourPairs = BuildColourPairs();
 
-        private SquarePalette(byte palette)
+        private Palette(byte palette)
             {
-            this.Palette = palette;
+            this.PaletteByte = palette;
             var colourPair = ColourPairs[palette & 0xf];
             this.Colour1 = colourPair.rightColour;
             this.Colour2 = colourPair.leftColour;
             this.PrimaryColour = (GameColour) (palette >> 4);
             }
 
-        public static SquarePalette FromByte(byte palette)
+        public static Palette FromByte(byte palette)
             {
-            return new SquarePalette(palette);
+            return new Palette(palette);
             }
         
         public Color this[int paletteIndex]
@@ -114,7 +114,7 @@ namespace ExileWorldGenerator
 
         public override string ToString()
             {
-            return $"{this.Palette:X2} ({this.Colour1} {this.Colour2} {this.PrimaryColour})";
+            return $"{this.PaletteByte:X2} ({this.Colour1} {this.Colour2} {this.PrimaryColour})";
             }
         }
     }

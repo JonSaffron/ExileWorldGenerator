@@ -19,6 +19,7 @@ namespace ExileWorldGenerator
         public static readonly byte[] ObjectSpriteLookup = BuildObjectSpriteLookups();
         public static readonly byte[] ObjectPaletteLookup = BuildObjectPaletteLookups();
         private static readonly byte[] DoorPalettes = BuildDoorPalettes();
+        private static readonly Palette[] SuckerPalettes = BuildSuckerPalettes();
 
         private static readonly Size SquareSize = new Size(16, 32);
 
@@ -52,7 +53,7 @@ namespace ExileWorldGenerator
                 }
             }
 
-        public void BuildBackgroundSprite(byte backgroundAndOrientation, SquarePalette palette)
+        public void BuildBackgroundSprite(byte backgroundAndOrientation, Palette palette)
             {
             byte background = (byte) (backgroundAndOrientation & 0x3f);
             bool flipHorizontallyAndRightAlign = (backgroundAndOrientation & 0x80) != 0;
@@ -123,12 +124,20 @@ namespace ExileWorldGenerator
                 }
             }
 
-        public void BuildObjectFromDataSprite(byte data, byte orientation)
+        public void BuildObjectFromDataSprite(byte objectType, byte orientation, byte objectData = 0x0)
             {
-            data = (byte) (data & 0x7f);
-            byte sprite = ObjectSpriteLookup[data];
-            byte objectPalette = ObjectPaletteLookup[data];
-            var palette = SquarePalette.FromByte(objectPalette);
+            objectType = (byte) (objectType & 0x7f);
+            byte sprite = ObjectSpriteLookup[objectType];
+            Palette palette;
+            if (objectType == 0xd)
+                {
+                palette = SuckerPalettes[objectData & 0x7f];
+                }
+            else
+                {
+                var objectPalette = ObjectPaletteLookup[objectType];
+                palette = Palette.FromByte(objectPalette);
+                }
 
             var sourceRectangle = SpritePositions[sprite];
             bool flipHorizontallyAndRightAlign = (orientation & 0x80) != 0;
@@ -170,7 +179,7 @@ namespace ExileWorldGenerator
                 }
             else if (!flipVerticallyAndTopAlign) // so bottom align with flip
                 {
-                int bottom = sourceRectangle.Height - 1;
+                int bottom = SquareSize.Height - 1;
                 toY = y => bottom - y;
                 }
             else            // so top align with flip
@@ -201,7 +210,7 @@ namespace ExileWorldGenerator
             data = (byte) (data & 0x7f);
             byte sprite = ObjectSpriteLookup[data];
             byte objectPalette = ObjectPaletteLookup[data];
-            var palette = SquarePalette.FromByte(objectPalette);
+            var palette = Palette.FromByte(objectPalette);
 
             var sourceRectangle = SpritePositions[sprite];
             bool flipHorizontally = (orientation & 0x80) != 0;
@@ -274,7 +283,7 @@ namespace ExileWorldGenerator
                 }
 
             byte key = (byte) ((data >> 4) & 0b111);
-            SquarePalette palette = SquarePalette.FromByte(DoorPalettes[key]);
+            Palette palette = Palette.FromByte(DoorPalettes[key]);
 
             var sourceRectangle = SpritePositions[sprite];
             bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
@@ -660,6 +669,18 @@ namespace ExileWorldGenerator
                 0x2b, 0x2d, 0x15, 0x1c, 0x42, 0x12, 0x26, 0x4e
                 };
             return data;
+            }
+
+        public static byte[] BuildSuckerPalettesAndAction()
+            {
+            var result = new byte[] {0x5f, 0xac, 0xbf, 0x3d, 0xf9, 0x58, 0xa2, 0xd8, 0x4b};
+            return result;
+            }
+
+        private static Palette[] BuildSuckerPalettes()
+            {
+            var palettesAndActions = BuildSuckerPalettesAndAction();
+            return palettesAndActions.Select(p => Palette.FromByte((byte) (p >> 1))).ToArray();
             }
         }
     }

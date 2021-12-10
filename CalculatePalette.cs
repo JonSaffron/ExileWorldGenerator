@@ -114,7 +114,7 @@ palette_not_five:
 
         palette_not_six:
             var displayedPalette = accumulator;
-            var result = new PaletteData {BackgroundPalette = backgroundPalette, Palette = SquarePalette.FromByte(displayedPalette)};
+            var result = new PaletteData {BackgroundPalette = backgroundPalette, Palette = Palette.FromByte(displayedPalette)};
             return result;
             }
 
