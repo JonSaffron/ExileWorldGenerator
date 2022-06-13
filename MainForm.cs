@@ -807,7 +807,7 @@ namespace ExileWorldGenerator
                 byte contents = (byte) (squareValue.BackgroundObjectData.Result & 0x3f);
                 byte orientation = (byte) (squareValue.BackgroundObjectData.Result & 0xc0);
                 listOverride +=
-                    $"{(contents <= 0xf ? "Handler" : "Appearance")}: {contents:X2}, \r\n" +
+                    $"{(contents <= 0xf ? "Handler" : "Appearance")}: {contents:X2} \r\n" +
                     $"Orientation: {orientation:X2} ({DescribeOrientation(orientation)})";
                 this.txtListOverrideInfo.Text = listOverride;
                 }
@@ -823,10 +823,13 @@ namespace ExileWorldGenerator
             byte calculatedBackground = squareValue.GeneratedBackground.Result;
             mappedGeneratedInfo +=
                 $"{(squareValue.GeneratedBackground.IsMappedData ? "Explicit" : "Generated")} background {calculatedBackground:X2}\r\n";
-            mappedGeneratedInfo +=
-                $"Appearance: {calculatedBackground & 0x3f:X2}, " +
-                $"Orientation: {calculatedBackground & 0xc0:X2} " +
-                $"({DescribeOrientation(calculatedBackground)})";
+            if (!squareValue.GeneratedBackground.IsMappedData || (squareValue.GeneratedBackground.Result & 0x3f) >= 0x9))
+                {
+                mappedGeneratedInfo +=
+                    $"Appearance: {calculatedBackground & 0x3f:X2}, " +
+                    $"Orientation: {calculatedBackground & 0xc0:X2} " +
+                    $"({DescribeOrientation(calculatedBackground)})";
+                }
             this.txtMappedOrGeneratedInfo.Text = mappedGeneratedInfo;
             SetTextBoxHeight(this.txtMappedOrGeneratedInfo);
             }

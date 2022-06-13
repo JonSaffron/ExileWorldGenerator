@@ -1,7 +1,4 @@
-﻿using System;
-using System.Diagnostics;
-
-// The setting of the overflow flag for add and subtract was based on logic set out in http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
+﻿// The setting of the overflow flag for add and subtract was based on logic set out in http://www.righto.com/2012/12/the-6502-overflow-flag-explained.html
 
 namespace ExileWorldGenerator
     {
@@ -13,6 +10,20 @@ namespace ExileWorldGenerator
             public bool Zero;
             public bool Negative;
             public bool Overflow;
+
+            public override string ToString()
+                {
+                char[] result = new string('•', 4).ToCharArray();
+                if (Carry)
+                    result[0] = 'C';
+                if (Zero)
+                    result[1] = 'Z';
+                if (Negative)
+                    result[2] = 'N';
+                if (Overflow)
+                    result[3] = 'V';
+                return new string(result);
+                }
             }
 
         internal static void Load(out byte register, byte data, ref Flags flags)
@@ -39,6 +50,14 @@ namespace ExileWorldGenerator
             flags.Zero = accumulator == 0;
             }
 
+        /// <summary>
+        /// Subtracts the specified amount from the accumulator
+        /// </summary>
+        /// <param name="accumulator">The value to start with</param>
+        /// <param name="data">The value to subtract</param>
+        /// <param name="flags">
+        /// Carry is set if the result is 0 or more (so if data is less than or equal to accumulator). Carry is cleared otherwise.
+        /// </param>
         internal static void SubtractWithBorrow(ref byte accumulator, byte data, ref Flags flags)
             {
             bool carryIntoBit7 = (((accumulator & 0x7f) + (~data & 0x7f) + (flags.Carry ? 1 : 0)) & 0x80) != 0;
@@ -55,6 +74,8 @@ namespace ExileWorldGenerator
             {
             flags.Carry = (accumulator & 1) != 0;
             accumulator = (byte) (accumulator >> 1);
+            flags.Zero = accumulator == 0;
+            flags.Negative = false;
             }
 
         internal static void ArithmeticShiftLeft(ref byte accumulator, ref Flags flags)
@@ -62,6 +83,8 @@ namespace ExileWorldGenerator
             flags.Carry = (accumulator & 0x80) != 0;
             int result = accumulator << 1;
             accumulator = (byte) (result & 0xff);
+            flags.Zero = accumulator == 0;
+            flags.Negative = (accumulator & 0x80) != 0;
             }    
 
         internal static void RotateLeft(ref byte accumulator, ref Flags flags)
@@ -138,7 +161,5 @@ namespace ExileWorldGenerator
             flags.Zero = register == 0;
             flags.Negative = (register & 0x80) != 0;
             }
-
-
         }
     }

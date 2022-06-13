@@ -394,27 +394,30 @@ Disassembly
 ;     &df player_facing
 
 ; wall_base_y_lookup
-#0100: 00 00 00 00 00 00 00 00
-#0108: 00 08 10 18 20 28 30 38
-#0110: 00 10 20 30 40 50 60 70
-#0118: 08 28 48 68 88 a8 c8 e8
-#0120: ff ff 00 00 00 00 00 00
-#0128: 60 98 b8 d0 e0 f0 ff ff
-#0130: 00 00 08 18 28 40 60 98
-#0138: 00 00 ff ff ff ff ff ff
-#0140: 38 30 28 20 18 10 08 00
-#0148: 70 60 50 40 30 20 10 00
-#0150: e8 c8 a8 88 68 48 28 08
-#0158: 00 00 00 00 00 00 ff ff
-#0160: ff ff f0 e0 d0 b8 98 60
-#0168: 98 60 40 28 18 08 00 00
-#0170: ff ff ff ff ff ff 00 00
-#0178: 40 40 00 00 00 00 00 00
-#0180: 00 00 00 00 00 00 40 40
-#0188: 00 00 ff ff ff ff 00 00
-#0190: 40 40 00 00 00 00 40 40
-#0198: 80 68 48 10 00 00 00 00
-#01a0: 00 00 00 00 10 48 68 80
+# describes the solid parts of scenery used to draw the game world and supports collision detection
+# each entry provides 8 different points over the x axis
+#	   000 001 010 011 100 101 110 111
+#0100:	00	00	00	00	00	00	00	00		# used by flat sprites or those without any solid areas
+#0108:	00	08	10	18	20	28	30	38		# used by sprites 27, 28, 29, 2a in original state or flipped both ways
+#0110:	00	10	20	30	40	50	60	70		# used by 34, 35, 36, 37 in original state or flipped both ways
+#0118:	08	28	48	68	88	a8	c8	e8		# used by 43, 38 in original state or flipped both ways, and 44 and 2b when flipped both ways
+#0120:	ff	ff	00	00	00	00	00	00		# used by 26, 42, 30, 41 when vertically flipped
+#0128:	60	98	b8	d0	e0	f0	ff	ff		# used by 23, 24, 33 when flipped both ways
+#0130:	00	00	08	18	28	40	60	98		# used by 23, 24, 33 when not flipped 
+#0138:	00	00	ff	ff	ff	ff	ff	ff		# used by 26, 42, 30, 41 and 2d, 2f when not flipped
+#0140:	38	30	28	20	18	10	08	00		# used by 27, 28, 29, 2a when either vertically or horizontally flipped
+#0148:	70	60	50	40	30	20	10	00		# used by 34, 35, 36, 37 when either vertically or horizontally flipped
+#0150:	e8	c8	a8	88	68	48	28	08		# used by 43, 38 when either vertically or horizontally flipped
+#0158:	00	00	00	00	00	00	ff	ff		# used by 26, 42, 30, 41 when flipped both ways
+#0160:	ff	ff	f0	e0	d0	b8	98	60		# used by 23, 33, 24 when flipped vertically
+#0168:	98	60	40	28	18	08	00	00		# used by 23, 33, 24 when flipped horizontally
+#0170:	ff	ff	ff	ff	ff	ff	00	00		# used by 26, 42, 30, 41 and 2d, 2f when horizontally flipped
+#0178:	40	40	00	00	00	00	00	00		# used by 2d, 2f when verticallly flipped
+#0180:	00	00	00	00	00	00	40	40		# used by 2d, 2f when flipped both ways
+#0188:	00	00	ff	ff	ff	ff	00	00		# used by 6a, 39, 6a (hollow wall, plant pots, airlocks) in original state, or flipped horizontally
+#0190:	40	40	00	00	00	00	40	40		# used by 6a, 39, 6a (hollow wall, plant pots, airlocks) when flipped vertically or flipped both ways
+#0198:	80	68	48	10	00	00	00	00		# used by 44, 2b when flipped horizontally
+#01a0:	00	00	00	00	10	48	68	80		# used by 44, 2b when not flipped, and 25, 45 when flipped both ways
 
 ; process_keys - called from handle_player_object
 &01a8: a2 26            LDX #&26										# init loop counter - there are &26 different key commands
@@ -465,7 +468,7 @@ Disassembly
 &01ea: 8e 01 fe         STX &fe01 	                                        # write to video controller (register value)
 &01ed: 4c b6 19         JMP &19b6 ; main_loop
 
-; &01ff and descending is the 6502 stack
+; &01ff and descending is space for the 6502 stack
 #01f0: aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa aa
 
 #0200: aa aa aa aa
@@ -750,10 +753,10 @@ the data byte is simply passed to the new object so is specific to the type
 ; object_handler_table
 ; low byte of addresses of handler routines which are stored relative to the address of handlers_start
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f  
-#03b9: d7 c8 a4 7d 7a 9c 9c 9c b2 00 00 26 6f 88 fd b7			# background objects
-#03c9: 7b a3 a0 aa												# explosions
+#03b9: d7 c8 a4 7d 7a 9c 9c 9c b2 00 00 26 6f 88 fd b7			# background object types
+#03c9: 7b a3 a0 aa												# 4 explosion types
 
-#03cd: f6 bc d5 6d 94 94 48 5c 5a ae 0f 4b 6e d2 46 ef ; 00		# stack objects
+#03cd: f6 bc d5 6d 94 94 48 5c 5a ae 0f 4b 6e d2 46 ef ; 00		# object types 10 to 64
 #03dd: 06 06 dc a4 f9 0b 17 2f 00 6d cc d0 c3 c3 c7 bd ; 10
 #03ed: bd e9 04 04 04 04 e9 37 55 d4 d4 d4 d4 d4 16 16 ; 20
 #03fd: 06 10 e6 7d 7d 76 7e bb a6 0b 81 fa 68 68 68 68 ; 30
@@ -763,9 +766,9 @@ the data byte is simply passed to the new object so is specific to the type
 
 ; object_handler_table_h
 ; high byte of addresses of handler routines which are stored relative to the address of handlers_start
-# & &c0 = how the object explodes
+# top bits are used to store additional information 
 ;            0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
-#0432:	00:	20 b0 91 f0 f0 b1 b1 b1 b1 b0 b0 31 90 31 30 31		# background objects - top 4 bits indicate background conditions
+#0432:	00:	20 b0 91 f0 f0 b1 b1 b1 b1 b0 b0 31 90 31 30 31		# background object types - top 4 bits indicate background conditions
 #0442:	10:	02 02 02 02											# explosions
 
 #0446: 0b 0a 88 84 cd cd 86 86 86 09 04 04 09 0f 89 83 ; 00		# stack objects - top 2 bits indicate explosion type
@@ -777,82 +780,20 @@ the data byte is simply passed to the new object so is specific to the type
 #04a6: 0d 0d 0d 0d 05                                  ; 60
 
 ; background_sprite_lookup 
-; Format: hvssssss
-; h: horizontal flip
-; v: vertical flip
+; Format: esssssss
+; e: edge from which solid parts for the sprite (described in wall_base_y_lookup) are added by used during line_of_sight calculation
 ; s: sprite number
 
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #04ab: c6 ce c6 c6 c6 bb c6 18 2d 70 6a c6 23 39 c6 62
-	0	46 nothing (handle_background_invisible_switch)
-	1	4e teleporter base (handle_background_teleport_beam)
-	2	46 nothing (handle_background_object_from_data)
-	3	46 nothing (handle_background_door)
-	4	46 nothing (handle_background_stone_door)
-	5	3b half a wall (handle_background_object_from_type)
-	6	46 nothing (handle_background_object_from_type)
-	7	18 foliage (handle_background_object_from_type)
-	8	2d switch box (handle_background_switch)
-	9	70 sucker/bush (handle_background_object_emerging)
-	a	6a pipe top/plant pot/airlock (handle_background_object_emerging)
-	b	46 nothing (handle_background_object_fixed_wind)
-	c	23 half an engine (handle_background_engine_thruster)
-	d	39 full wall with all colours set to blue (handle_background_object_water)
-	e	46 nothing (handle_background_object_random_wind)
-	f	62 mushrooms (handle_background_mushrooms)
 #04bb: c0 8e 39 44 47 26 48 49 df c6 99 9a 25 2b 39 3b
-	10	40 wall with grass
-	11	0e grass frond
-	12	39 full wall with hollow passage from top to bottom
-	13	44 part of wall with bottom right corner removed and edged
-	14	47 spaceship pipework
-	15	26 thin strip of spaceship
-	16	48 spaceship 50% wall
-	17	49 spaceship 25% wall
-	18	5f flag/alarm bell
-	19	46 nothing
-	1a	19 shrub
-	1b	1a tree
-	1c	25 small corner of spaceship
-	1d	2b spaceship with corner removed
-	1e	39 full wall
-	1f	3b half a wall
 #04cb: 3c 55 8e 43 34 35 27 28 29 2a 42 bf 40 3d 38 36
-	20	3c quarter of wall / door
-	21	55 pillar
-	22	4e transporter
-	23	43 half wall as a triangle
-	24	34 wall with corner removed and edged
-	25	35 small triangle of wall
-	26	27 spaceship, full height with corner missing
-	27	28 spaceship, 3/4 height with corner missing
-	28	29 spaceship, 1/2 height with corner missing
-	29	2a spaceship, 1/4 height with corner missing
-	2a	42 thin strip of wall, full height, steeply sloped 
-	2b	3f grass/wall edging
-	2c	40 quarter of wall with grass/edging
-	2d	3d full wall
-	2e	38 half wall as a triangle
-	2f	36 wall, full height with corner missing
 #04db: 37 3e 33 31 2f 30 2c 24 32 41 45 3a 6a 23 60 cc
-	30	37 half wall as a triangle
-	31	3e half of wall with grass/edging
-	32	33 spaceship pipework with a rounded corner
-	33	31 part of pipe, quarter height
-	34	2f corner of pipe
-	35	30 thin strip of pipe
-	36	2c half height wedge of spaceship
-	37	24 spaceship pipework with a rounded corner
-	38	32 half height spaceship pipework with a rounded corner
-	39	41 thin strip of wall
-	3a	45 gargoyle
-	3b	3a three quarter height wall
-	3c	6a pipe top/plant pot/airlock
-	3d	23 half an spaceship foot
-	3e	60 computer console
-	3f	4c hydraulic leg
 
 ; background_y_offset_lookup
+# the lowest nibble is used by get_wall_start_7c_7f and get_wall_start_80_83 as a lookup into background_wall_y_start_lookup
+# the top nibble is used to offset the drawing of the sprite along y 
+;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #04eb: 00 00 00 00 00 00 00 d0 c5 b0 c7 00 06 00 00 c0
 #04fb: b0 a0 07 08 00 04 80 c0 70 00 b0 80 99 08 00 80
 #050b: c0 00 a0 03 02 82 01 41 81 c1 04 f0 b0 00 03 02
@@ -866,6 +807,8 @@ the data byte is simply passed to the new object so is specific to the type
 #055b: 04 04 02 01 01 01 02 02 02 00 00 00 82 02 64 ee
 
 ; background_wall_y_start_base_lookup
+# the top nibble is used if the square isn't vertically flipped, and the bottom is used if it is which is shifted left to become the top nibble
+# if the result is not 0, then the bottom 4 bits are set to 1
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #056b: 0f 3a 0f 0f 0f 77 0f f0 b0 f0 c0 0f 00 f0 0f f0
 #057b: 0f 0f 00 06 0f 00 77 b3 0f 0f 0f 0f 90 06 0f 77
@@ -873,18 +816,92 @@ the data byte is simply passed to the new object so is specific to the type
 #059b: 70 77 00 b3 b0 00 77 00 77 00 90 2c c0 00 90 0f
 
 ; background_wall_y_start_lookup
-# Add &100 to get address in wall_base_y_lookup
+# the lowest nibble from background_y_offset_lookup is used by get_wall_start_7c_7f and get_wall_start_80_83
+# to index into this table, plus the horizontal and vertical flipped flags in the format 00yyyyhv
+# where yyyy is in the range 0 to 9
+# The value in this table is added to &100 to get address in the wall_base_y_lookup table
 ;      -- -V H- HV
-#05ab: 00 00 00 00
-#05af: 08 40 40 08
-#05b3: 10 48 48 10
-#05b7: 18 50 50 18
-#05bb: 38 20 70 58
-#05bf: 38 78 70 80
-#05c3: 30 60 68 28
-#05c7: 88 90 88 90
-#05cb: a0 50 98 18
-#05cf: 18 98 50 a0
+#05ab: 00 00 00 00	# index 0 used for flat sprites or those without any solid areas
+#05af: 08 40 40 08	# index 1 used by background items 26, 27, 28, 29 which correspond to sprites 27, 28, 29, 2a
+#05b3: 10 48 48 10	# index 2 used by 24, 25, 2f, 30 which correspond to sprites 34, 35, 36, 37
+#05b7: 18 50 50 18	# index 3 used by 23, 2e which correspond to sprites 43, 38
+#05bb: 38 20 70 58	# index 4 used by 15, 2a, 35, 39 which correspond to sprites 26, 42, 30, 41
+#05bf: 38 78 70 80	# index 5 used by 8, 34 which correspond to sprites 2d, 2f
+#05c3: 30 60 68 28	# index 6 used by c, 32, 37, 3d which correspond to sprites 23, 33, 24, 23
+#05c7: 88 90 88 90	# index 7 used by a, 12, 3c which correspond to sprites 6a, 39, 6a (these are the hollow walls, and pipes and airlocks you can move through)
+#05cb: a0 50 98 18	# index 8 used by 13, 1d which correspond to sprites 44, 2b
+#05cf: 18 98 50 a0	# index 9 used by 1c, 3a, 3e which correspond to sprites 25, 45, 603
+
+background objects data in one place:
+
+	sprite	edge	offset	walllkup	pallete	wallbase	wallbasev	description
+0	46		1		0		0			80		0			ff			nothing (handle_background_invisible_switch)
+1	4e		1		0		0			02		3f			af			teleporter base (handle_background_teleport_beam)
+2	46		1		0		0			91		0			ff			nothing (handle_background_object_from_data)
+3	46		1		0		0			91		0			ff			nothing (handle_background_door)
+4	46		1		0		0			91		0			ff			nothing (handle_background_stone_door)
+5	3b		1		0		0			00		7f			7f			50% brick wall (handle_background_object_from_type)
+6	46		1		0		0			91		0			ff			nothing (handle_background_object_from_type)
+7	18		0		d		0			a8		ff			0			foliage (handle_background_object_from_type)
+8	2d		0		c		5			dc		bf			0			switch box (handle_background_switch)
+9	70		0		b		0			b8		ff			0			bush (handle_background_object_emerging)
+a	6a		0		c		7			8c		cf			0			pipe top/plant pot/airlock (handle_background_object_emerging)
+b	46		1		0		0			80		0			ff			nothing (handle_background_object_fixed_wind)
+c	23		0		0		6			c9		0			0			half an engine (handle_background_engine_thruster)
+d	39		0		0		0			4a		ff			0			water (brick wall sprite with all colours set to blue) (handle_background_object_water)
+e	46		1		0		0			80		0			ff			nothing (handle_background_object_random_wind)
+f	62		0		c		0			06		ff			0			mushrooms (handle_background_mushrooms)
+
+10	40		1		b		0			88		00			ff			green foliage (can be walked through)
+11	0e		1		a		0			05		00			ff			grass frond
+12	39		0		0		7			04		00			00			full brick wall with a hollow passage from top to bottom
+13	44		0		0		8			00		0			6f			part of brick wall with corner from North to East removed and edged
+14	47		0		0		0			02		0			ff			full spaceship pipework
+15	26		0		0		4			02		0			0			25% vertical strip of spaceship
+16	48		0		8		0			02		7f			7f			spaceship bottom 50% 
+17	49		0		c		0			02		bf			3f			spaceship bottom 25%
+18	5f		1		7		0			02		0			ff			flag/alarm bell
+19	46		1		0		0			91		0			ff			nothing
+1a	19		1		b		0			03		0			ff			shrub
+1b	1a		1		8		0			03		0			ff			tree
+1c	25		0		9		9			02		9f			0			small triangle of spaceship
+1d	2b		0		0		8			02		0			6f			spaceship with North to East corner removed
+1e	39		0		0		0			00		0			ff			full solid brick wall
+1f	3b		0		8		0			00		7f			7f			bottom 50% brick wall
+
+20	3c		0		c		0			00		bf			3f			bottom 25% brick wall (same sprite also used for tile door)
+21	55		0		0		0			bc		ff			00			roman pillar (can be walked through)
+22	0e		1		a		0			b1		0			ff			grass frond
+23	43		0		0		3			00		1f			0			50% triangle brick wall 
+24	34		0		0		2			00		0			7f			brick wall with North-West to East corner removed and edged
+25	35		0		8		2			00		7f			0			brick wall small triangle from West to South-East
+26	27		0		0		1			01		0			bf			spaceship, full height with North-West corner missing
+27	28		0		4		1			01		3f			7f			spaceship, 3/4 height with North-West corner missing
+28	29		0		8		1			01		7f			3f			spaceship, 1/2 height with North-West corner missing
+29	2a		0		c		1			01		bf			0			spaceship, 1/4 height with North-West corner missing
+2a	42		0		0		4			00		0			0			thin strip of brick wall, full height, steeply sloped 
+2b	3f		1		f		0			04		0			ff			grass/wall edging
+2c	40		0		b		0			04		bf			3f			25% earth with grass/edging
+2d	3d		0		0		0			04		0			ff			full earth 
+2e	38		0		0		3			04		1f			0			50% triangle earth
+2f	36		0		0		2			04		0			7f			earth with North-West to East corner removed
+
+30	37		0		8		2			04		7f			0			earth triangle from West to South-East
+31	3e		0		7		0			04		7f			7f			bottom 50% earth with grass/edging
+32	33		0		0		6			02		0			0			spaceship pipework with a slightly rounded corner to North-East
+33	31		0		c		0			01		bf			3f			25% horizontal pipe
+34	2f		0		c		5			01		bf			0			small corner of pipe in South-West
+35	30		0		0		4			01		0			0			25% vertical pipe
+36	2c		0		8		0			02		7f			7f			50% height part of spaceship
+37	24		0		0		6			02		0			0			spaceship pipework with a rounded corner to North-East
+38	32		0		8		0			02		7f			7f			half height spaceship part with pipework
+39	41		0		0		4			00		0			0			25% vertical strip of brick wall (sprite also used for tile door)
+3a	45		0		9		9			00		9f			0			gargoyle
+3b	3a		0		3		0			00		2f			cf			75% height brick wall
+3c	6a		0		c		7			82		cf			0			hatch/airlock
+3d	23		0		0		6			02		0			0			half a spaceship foot
+3e	60		0		a		9			64		9f			0			computer console
+3f	4c		1		0		0			ee		0			ff			hydraulic leg
 
 ; background_objects_range_minus_one
 #05d3: 00
@@ -1644,15 +1661,18 @@ f $FE                        ; white bg, cyan bg
 ; on exit, carry is clear if it has, carry is set otherwise
 &0bc5: a9 4e            LDA #&4e				                # &4e = remote control device
 ; has_object_been_hit_by_other
+; on entry, A = type of the object that is being fired
 ; on exit, carry is clear if it has, carry is set otherwise
 &0bc7: 38               SEC
-&0bc8: ae d7 29         LDX &29d7 ; object_being_fired          
+&0bc8: ae d7 29         LDX &29d7 ; object_being_fired          # get index of object being fired on the primary stack
 &0bcb: 30 1a            BMI &0be7			                        # if no control has been fired, leave with carry set
-&0bcd: 5d 60 08         EOR &0860,X ; object_stack_type         
+&0bcd: 5d 60 08         EOR &0860,X ; object_stack_type				# eor with the type of the object being fired, so A will now be 0 if the object type matches
 &0bd0: d0 15            BNE &0be7			                        # if not the control we care about, leave with carry set
-&0bd2: a9 18            LDA #&18
-&0bd4: 20 9c 35         JSR &359c ; is_object_close_enough                      # is the object close enough?
-&0bd7: b0 0e            BCS &0be7                                               # if not, leave with carry set
+
+&0bd2: a9 18            LDA #&18									# range that the object must be within
+&0bd4: 20 9c 35         JSR &359c ; is_object_close_enough          # is the object close enough?
+&0bd7: b0 0e            BCS &0be7                                   # if not, leave with carry set
+
 &0bd9: 20 a0 22         JSR &22a0 ; get_angle_between_objects                   # get angle 
 &0bdc: e5 34            SBC &34 ; firing_angle                                  # minus firing_angle
 &0bde: e9 80            SBC #&80                                                # minus 180 degrees
@@ -5011,8 +5031,8 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2287: 60               RTS
 
 ; get_object_centre for current object
-; sets 87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d this_object_y_center
-; on exit, A will be the same value placed in 8b (this_object_x_center)
+; sets 87 (this_object_x_centre_low), 89 (this_object_y_centre_low), 8b (this_object_x_centre), 8d this_object_y_centre
+; on exit, A will be the same value placed in 8b (this_object_x_centre)
 ; the value of X is maintained
 &2288: 86 9d            STX &9d ; temp
 &228a: a2 02            LDX #&02
@@ -5036,10 +5056,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; get_angle_between_objects
 # compares the current object's centre agains another specified object
 # on entry, X specifies the second object
-# on exit,  &87 this_object_x_center_low
-#			&8b this_object_x_center
-#			&89 this_object_y_center_low 
-#			&8d this_object_y_center
+# on exit,  &87 this_object_x_centre_low
+#			&8b this_object_x_centre
+#			&89 this_object_y_centre_low 
+#			&8d this_object_y_centre
 #			&88 stack_object_x_centre_low
 #			&8c stack_object_x_centre
 #			&8a stack_object_y_centre_low
@@ -5047,7 +5067,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #			&b5 angle (0 being straight to the right and increasing in a clockwise direction)
 #			&b7 the greater of distance_x and distance_y
 &22a0: 20 88 22         JSR &2288 # get_object_centre for this_object 
-                                  # sets 87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d (this_object_y_center)
+                                  # sets 87 (this_object_x_centre_low), 89 (this_object_y_centre_low), 8b (this_object_x_centre), 8d (this_object_y_centre)
 
 &22a3: bc 70 08         LDY &0870,X ; object_stack_sprite       # get sprite indicated in object_stack_sprite,X
 
@@ -5068,7 +5088,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &22c4: 85 8e            STA &8e ; stack_object_y_centre         # store result
 
 &22c6: 20 fe 22         JSR &22fe ; calculate_object_centre_deltas
-				# returns with A = distance x, &b7 = distance y, &b8 = delta_magnitude which should be 1 to 8
+				# returns with A = distance x, &b7 = distance y, &b8 = delta_magnitude which will be between 1 to 8
 				#	&99 velocity bits
 
 &22c9: 4c d7 22         JMP &22d7 ; calculate_angle
@@ -5115,14 +5135,17 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &22fd: 60               RTS
 
 ; calculate_object_centre_deltas
+# this routine calculates the approximate distance from the centre of this_object to the centre of stack_object
 # on entry, data should be supplied in:
-#   87 (this_object_x_center_low), 89 (this_object_y_center_low), 8b (this_object_x_center), 8d (this_object_y_center)
+#   87 (this_object_x_centre_low), 89 (this_object_y_centre_low), 8b (this_object_x_centre), 8d (this_object_y_centre)
 #   88 (stack_object_x_centre_low), 8a (stack_object_y_centre_low), 8c (stack_object_x_centre), 8e (stack_object_y_centre)
 # on exit:
-#	A = abs(support_delta_x_low), 
-#	&b7 = abs(support_delta_y_low), 
-#	&b8 = delta_magnitude which should be 1 to 8
-#	&99 has bit 0 set if the X delta is +ve, bit 1 set if the Y delta is +ve.
+#	A = abs(support_delta_x_low),	the 8 most significant bits of distance along x
+#	&b7 = abs(support_delta_y_low), the 8 most significant bits of distance along y
+#	&b8 = delta_magnitude which will be between 1 to 8, the number of bits that the x and y amounts are shifted by in order to retain only those that are most significant
+#	&99 has 
+#		bit 0 set if stack_object is to the right of this_object,  and
+#		bit 1 set if stack_object is below this_object
 &22fe: a0 04            LDY #&04        # first y direction (Y = 4), then x direction (Y = 2)
 
 ; calculate_centre_diffs_loop
@@ -5131,7 +5154,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 # &7e support_delta_y = &8e stack_object_y_centre - &8d this_object_y_centre
 # &7b support_delta_x_low = &88 stack_object_x_centre_low - &87 this_object_x_centre_low
 # &7c support_delta_x = &8c stack_object_x_centre - &8b this_object_x_centre
-# also &99 has bit 0 set if the X delta is +ve, bit 1 set if the Y delta is +ve.
+# also &99 has bit 0 set if the X delta is >= 0, bit 1 set if the Y delta is >= 0.
 &2300: 85 b7            STA &b7 ; tmp   # on 2nd time around loop stores abs(support_delta_y)
 
 &2302: b9 86 00         LDA &0086,Y     # Y = 4, &8a stack_object_y_centre_low; Y = 2, &88 stack_object_x_centre_low
@@ -5146,7 +5169,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2315: 10 03            BPL &231a		; branch if stack object > this object
 &2317: 20 56 32         JSR &3256 ; make_positive (as part of operation bit 7 will be set to 0, and C will be cleared)
 
-&231a: 26 99            ROL &99 ; velocity-signs	# shift left and set bit 0 to value of carry flag: set if that_x > this_x, or that_y > this_y, cleared otherwise 
+&231a: 26 99            ROL &99 ; velocity-signs	# shift left and set bit 0 to value of carry flag: set when that_x > this_x, or that_y > this_y, and will be cleared otherwise 
 &231c: 88               DEY
 &231d: 88               DEY
 &231e: d0 e0            BNE &2300 ; calculate_centre_diffs_loop      # now do it again for the x direction
@@ -5175,7 +5198,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &232c: 4a               LSR A
 &232d: d0 f4            BNE &2323 ; count_magnitude_loop # keep halving A until zero
 
-&232f: 84 b8            STY &b8 ; delta_magnitude	# should be 1 to 8
+&232f: 84 b8            STY &b8 ; delta_magnitude	# will be between 1 to 8
 &2331: a5 7d            LDA &7d                         # support_delta_y_low
 &2333: 20 56 32         JSR &3256 ; make_positive
 &2336: 85 b7            STA &b7 ; some_kind_of_velocity
@@ -5336,7 +5359,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; Translate background sprite to object sprite.
 
 &2416: b9 ab 04         LDA &04ab,Y ; background_sprite_lookup
-&2419: 29 7f            AND #&7f												# remove vertical flip flag
+&2419: 29 7f            AND #&7f												# remove edge flag
 &241b: aa               TAX
 &241c: 85 75            STA &75 ; this_object_sprite                            # set the sprite for this square
 &241e: 85 76            STA &76 ; this_object_sprite_old
@@ -5346,7 +5369,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2420: b9 eb 04         LDA &04eb,Y ; background_y_offset_lookup
 &2423: 29 f0            AND #&f0
 &2425: 24 09            BIT &09 ; square_orientation
-&2427: 50 07            BVC &2430                                       # branch if not upside down
+&2427: 50 07            BVC &2430												# branch if not upside down
 &2429: 7d 89 5e         ADC &5e89,X ; sprite_height_lookup
 &242c: 09 07            ORA #&07
 &242e: 49 ff            EOR #&ff
@@ -5374,10 +5397,21 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &244f: 60               RTS
 
 ; get_wall_start_80_83
-; A determines X on leaving
+# gets information on the specified object
+# on entry, &95 and &97 specify the square to return data on
+# on exit,  &80 and &81 point into the wall_base_y_lookup table
+#			&82 is based on background_wall_y_start_base_lookup
+#			&83 is the sprite drawn in the square, with bit 7 set if vertically flipped
+#			the value of X is maintained
 &2450: a9 04            LDA #&04
 &2452: 2c				(BIT	)				# interlaced code
 ; get_wall_start_7c_7f
+# gets information on the specified object
+# on entry, &95 and &97 specify the square to return data on
+# on exit,  &7c and &7d point into the wall_base_y_lookup table
+#			&7e is based on background_wall_y_start_base_lookup
+#			&7f is the sprite drawn in the square, with bit 7 set if vertically flipped
+#			the value of X is maintained
 #2453: a9 00              LDA #&00
 &2455: 48               PHA
 &2456: 8e 90 24         STX &2490                                               # self modifying code - preserve X
@@ -5385,30 +5419,35 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &245c: a8               TAY                                                     # set Y = background
 &245d: 68               PLA														# retrieve offset for storing results (0 or 4)
 &245e: aa               TAX                                                     # X is set based on how we were called
+
 &245f: b9 6b 05         LDA &056b,Y ; background_wall_y_start_base_lookup
 &2462: 24 09            BIT &09 ; square_orientation
-&2464: 50 04            BVC &246a                                               # is the square flipped vertically? (&40)
-&2466: 0a               ASL                                                     # if so, consider lowest nibble
+&2464: 50 04            BVC &246a ; wall_not_flipped                            # branch if the square is not flipped vertically (&40)
+&2466: 0a               ASL                                                     # if flipped, use lowest nibble
 &2467: 0a               ASL
 &2468: 0a               ASL
 &2469: 0a               ASL
 
-&246a: 29 f0            AND #&f0                                                # otherwise use highest nibble
-&246c: f0 02            BEQ &2470
-&246e: 09 0f            ORA #&0f
+; wall_not_flipped
+&246a: 29 f0            AND #&f0                                                # mask to get highest nibble
+&246c: f0 02            BEQ &2470												# branch over if result is 0
+&246e: 09 0f            ORA #&0f												# set the bottom 4 bits
+
 &2470: 95 7e            STA &7e,X       # X = 0, &7e wall_y_start_base; X = 4, &82 wall_y_start_base_4
 
 &2472: a5 09            LDA &09 ; square_orientation
-&2474: 0a               ASL                                                     # carry set if horizontally flipped
-&2475: 85 9c            STA &9c ; v_flipped                       
-&2477: 59 ab 04         EOR &04ab,Y ; background_sprite_lookup                  # sprite_lookup ^ &80 if vertically flipped
+&2474: 0a               ASL                                                     # move vertical flip flag from bit 6 to bit 7
+&2475: 85 9c            STA &9c ; v_flipped										# store vertical flip flag in bit 7 of &9c
+&2477: 59 ab 04         EOR &04ab,Y ; background_sprite_lookup                  # eor the vertical flip flag with the vertical inversion flag from background_sprite_lookup
 &247a: 95 7f            STA &7f,X       # X = 0, &7f wall_sprite; X = 4, &83 wall_sprite_4
 
-&247c: b9 eb 04         LDA &04eb,Y ; background_y_offset_lookup                # offset_lookup * 4
-&247f: 2a               ROL                                                     # + h_flipped * 2
-&2480: 06 9c            ASL &9c ; v_flipped
-&2482: 2a               ROL                                                     # + v_flipped
-&2483: 29 3f            AND #&3f                                                
+&247c: b9 eb 04         LDA &04eb,Y ; background_y_offset_lookup                # get background_y_offset_lookup for background
+&247f: 2a               ROL                                                     # double it, and add horizontal flipped flag
+
+&2480: 06 9c            ASL &9c ; v_flipped										# move vertically flipped flag into carry
+&2482: 2a               ROL                                                     # double it, and add vertical flipped flag
+&2483: 29 3f            AND #&3f                                                # mask to get bottom 6 bits, i.e. 00yyyyhv 
+																				# lowest nibble of background_y_offset_lookup plus horizontal flip flag, plus vertical flip flag 
 &2485: a8               TAY
 &2486: b9 ab 05         LDA &05ab,Y ; background_wall_y_start_lookup
 &2489: 95 7c            STA &7c,X       # X = 0, &7c wall_y_start_lookup_pointer; X = 4, &80 wall_y_start_lookup_pointer_4
@@ -5852,7 +5891,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2778: a5 9d            LDA &9d ;tmp_a
 &277a: 20 2a 3c         JSR &3c2a ; find_nearest_object
 &277d: 30 0a            BMI &2789                                               # is there something to fire at? if not, leave
-&277f: a0 18            LDY #&18        # modified by &2775, actually LDY #X    # set bullet type
+&277f: a0 18            LDY #xx         # modified by &2775, actually LDY #X    # set bullet type
 &2781: 20 8a 27         JSR &278a ; enemy_fire
 &2784: 30 03            BMI &2789
 &2786: 20 36 31         JSR &3136 ; invert_angle
@@ -6636,14 +6675,18 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2da2: 60               RTS                                                     # carry clear = weapon failed
 
 ; lookup_and_store_object_energy
-&2da3: 20 b0 2d         JSR &2db0 ; convert_object_to_range_a
+&2da3: 20 b0 2d         JSR &2db0 ; get_range_for_object_type
 &2da6: bd f8 29         LDA &29f8,X ; energy_by_range 
 &2da9: 99 26 09         STA &0926,Y ; object_stack_energy
 &2dac: 60               RTS
 
 ; convert_object_to_range
+# on entry, Y is the index of the object on the primary stack
+# on exit, X is the range of the object type 
 &2dad: b9 60 08         LDA &0860,Y ; object_stack_type
-; convert_object_to_range_a
+; get_range_for_object_type
+# on entry, A is the type of the object to return the range for
+# on exit, X is the range of the object type 
 &2db0: a2 0a            LDX #&0a
 &2db2: ca               DEX
 &2db3: dd ee 29         CMP &29ee,X ; object_type_ranges
@@ -7742,46 +7785,55 @@ e336d: 90 02            BCC &3371
 #3592: 00 03 ; scroll_square_offset_y
 #3594: 00 1e 1c 1a ; scroll_screen_address_offsets
 
-#3598: 00 ; los_consider_water
+#3598: 00 ; los_consider_water								# bit 7 set if line_of_sight code should consider the water level to be an obstruction
+															# choose_route_to_target clears flag, line_of_sight sets it at end of routine
 #3599: 00 ; door_data_pointer_store
 
 ; is_object_close_enough_80
 &359a: a9 80            LDA #&80
 # X = object
 ; is_object_close_enough
-# A = range
-# X = object
-# on exit, on success carry is clear and &83 contains the distance to object X
-&359c: 8d cd 35         STA &35cd                                               # store range in self modifying code
+# on entry, A = the range that the object must be within, in units of 32 
+#				The range is compared to the greater of the X and Y distances
+#				A value of 0 is used to simply return the distance to the object.
+#			X = object index
+# on exit, carry is clear if the greatest distance is less than the range and has a line of sight
+#		   otherwise carry is set and &83 contains the distance to object X
+&359c: 8d cd 35         STA &35cd                                               # modify compare instruction below with range
 &359f: bd b4 08         LDA &08b4,X ; object_stack_y							# get whether there's an object at index X
-&35a2: 38               SEC
+&35a2: 38               SEC														# set default return flag for failure and set up for subtract
 &35a3: f0 29            BEQ &35ce  ; no_object_exists                           # branch if there is no object at index X
+
 &35a5: bd 60 08         LDA &0860,X ; object_stack_type
 &35a8: e9 3c            SBC #&3c                                                # &3c - &3f various doors
 &35aa: c9 04            CMP #&04
 &35ac: b0 06            BCS &35b4 ; not_door                                    # branch if not a door
+
 &35ae: bd 66 09         LDA &0966,X ; object_stack_data_pointer					# get data pointer for door
 &35b1: 8d 99 35         STA &3599 ; door_data_pointer_store                     # store data pointer for door
+
 ; not_door
-&35b4: a9 20            LDA #&20                                                # magnitude to obtain a vector around the perimeter of a 32x32 square
+&35b4: a9 20            LDA #&20                                                # specifies magnitude required to obtain a vector around the perimeter of a 32x32 square
 &35b6: 20 47 33         JSR &3347 ; get_object_centres_and_build_vector_from_angle
 
 &35b9: a4 b8            LDY &b8 ; delta_magnitude								# value should be between 1 and 8
 &35bb: c8               INY
 &35bc: c8               INY
-&35bd: c8               INY														# so now we should have a value between 4 and 11
-&35be: a9 00            LDA #&00
+&35bd: c8               INY														# initial loop counter value - presumably between 4 and 11
+&35be: a9 00            LDA #&00												# initialise result
 ; closeness_loop                                                
-&35c0: 06 84            ASL &84 ; highest_distance_copy							# push lowest bit into carry
-&35c2: 2a               ROL                                                     # move the bit into A
-&35c3: 90 02            BCC &35c7												# branch over if no set bit fell out of A into carry
+&35c0: 06 84            ASL &84 ; highest_distance_copy							# push highest bit into carry
+&35c2: 2a               ROL A                                                   # move the bit into A at the bottom, move the highest bit into C
+&35c3: 90 02            BCC &35c7												# branch over if no overflow
 &35c5: a9 fd            LDA #&fd                                                # reset A to &fd if it did
 
 &35c7: 88               DEY														# decrement loop counter
 &35c8: d0 f6            BNE &35c0 ; closeness_loop								# loop around
 
-&35ca: 69 01            ADC #&01												# add 1 to make comparison work with range being 
-&35cc: c9 40            CMP #(range)                                            # operand modifed by &359c
+&35ca: 69 01            ADC #&01												# add 1 + C (probably set) to result
+&35cc: c9 40            CMP #(range)                                            # operand modifed by &359c.
+																				# carry set if range <= accumulator
+
 ; no_object_exists
 &35ce: 90 05            BCC &35d5 ; line_of_sight_without_obstructions          # if range > A, branch to check that the object can be seen
 &35d0: 85 83            STA &83 ; distance
@@ -7790,8 +7842,9 @@ e336d: 90 02            BCC &3371
 ; line_of_sight_without_obstructions
 # distance to consider
 &35d5: 85 84            STA &84 ; distance_left
-&35d7: 86 9d            STX &9d ; tmp_x                                         # preserve X, presumably still the object index that was passed in
+&35d7: 86 9d            STX &9d ; tmp_x                                         # preserve X, which is still the object index that was passed in
 &35d9: a2 02            LDX #&02        # init loop counter: first y direction (X = 2), then x direction (X = 0)
+
 ; los_dir_loop
 	# modify code according to the value of velocity_y
 	# if velocity_y is between -1 and -64, or between 64 and 127 then the result is BCS and DEC, otherwise it's BCC and INC
@@ -7807,7 +7860,7 @@ e336d: 90 02            BCC &3371
 &35ec: b5 53            LDA &53,X       # get this_object_y or this_object_x
 &35ee: 69 00            ADC #&00		# add any carry from the addition
 &35f0: 95 95            STA &95,X       # store in square_y or square_x
-	# generate BCS or BCC instruction according to value of velocity_y or velocity_x (though this result isn't used)
+	# generate BCS or BCC instruction according to value of velocity_y or velocity_x (though this result isn't used - see &35fd)
 &35f2: b5 b4            LDA &b4,X       # get velocity_y or velocity_x (a signed value, we're only interested in bit 6 though)
 &35f4: 4a               LSR				# move bit 6 to bit 5
 &35f5: 29 20            AND #&20		# mask to get only bit 5
@@ -7828,59 +7881,67 @@ e336d: 90 02            BCC &3371
 
 	# compare centre point of object to water level
 &3609: a5 95            LDA &95 ; square_x
-&360b: 20 bc 2c         JSR &2cbc ; get_water_level_for_x						# result placed in &14d0 and &14d1
+&360b: 20 bc 2c         JSR &2cbc ; get_water_level_for_x						# result (a y co-ordinate) placed in &14d0 and &14d1
 &360e: a5 82            LDA &82 ; square_y_low
-&3610: cd d0 14         CMP &14d0 ; water_level_low
+&3610: cd d0 14         CMP &14d0 ; water_level_low								# set or clear carry flag
 &3613: a5 97            LDA &97 ; square_y
 &3615: ed d1 14         SBC &14d1 ; water_level
-&3618: 6a               ROR														# move -ve bit down
+&3618: 6a               ROR														# move -ve bit down - this is set if object level < water level
 &3619: 6a               ROR
 &361a: 6a               ROR
-&361b: 29 20            AND #&20                                                # mask out what was the -ve bit
-&361d: 49 b0            EOR #&b0												# if -ve then we end up with BCS, otherwise BCC
-&361f: 8d 70 36         STA &3670       # A = &b0 (BCS) or &90 (BCC)            # self modifying code
+&361b: 29 20            AND #&20                                                # mask to isolate was the -ve bit
+&361d: 49 b0            EOR #&b0												# if N was clear we get B0 (BCS), if set we get 90 (BCC)
+&361f: 8d 70 36         STA &3670       # A = &b0 (BCS) or &90 (BCC)            # self modifying code - BCS if object below water, BCC if object above water
 
-&3622: a6 9d            LDX &9d ; tmp_x											# restore the saved value of X
-&3624: 20 53 24         JSR &2453 ; get_wall_start_7c_7f
+&3622: a6 9d            LDX &9d ; tmp_x											# restore the saved value of X (the object index)
+&3624: 20 53 24         JSR &2453 ; get_wall_start_7c_7f						# get info on contents of square_x, square_y (the starting point)
+
 ; los_loop
+
+# adjust y co-ordinate
 &3627: a5 82            LDA &82 ; square_y_low                                  # consider the next point on our route
 &3629: 18               CLC
 &362a: 65 b6            ADC &b6 ; velocity_y                                    # (by adding velocities to current point)
 &362c: 85 82            STA &82 ; square_y_low
-&362e: 29 f8            AND #&f8
-&3630: 09 04            ORA #&04
+&362e: 29 f8            AND #&f8												# clear bottom 3 bits
+&3630: 09 04            ORA #&04												# set bit 2
 &3632: 85 81            STA &81 ; square_y_low_max
 &3634: b0 05            BCS / BCC &363b                 # modified by &35db; either BCS &363b or BCC &363b, depending on sign of velocity_x
 &3636: e6 97            INC / DEC &97 ; square_y        # modified by &35e0; either DEC &97 or &INC &97, depending on sign of velocity_x
-&3638: 20 53 24         JSR &2453 ; get_wall_start_7c_7f                        # redundant?
+&3638: 20 53 24         JSR &2453 ; get_wall_start_7c_7f                        # get info on contents of square_x, square_y
 
+# adjust x co-ordinate
 &363b: a5 80            LDA &80 ; square_x_low
 &363d: 18               CLC
 &363e: 65 b4            ADC &b4 ; velocity_x
 &3640: 85 80            STA &80 ; square_x_low
 &3642: b0 05            BCS / BCC &3649                 # modified by &35fd; either BCS &3649 or BCC &3649, depending on sign of velocity_y
 &3644: e6 95            INC / DEC &95 ; square_x        # modified by &3602; either DEC &95 or &INC &95, depending on sign of velocity_y
-&3646: 20 53 24         JSR &2453 ; get_wall_start_7c_7f
+&3646: 20 53 24         JSR &2453 ; get_wall_start_7c_7f						# get info on contents of square_x, square_y
 
-&3649: a5 80            LDA &80 ; square_x_low                                  # check whether there's a wall there
-&364b: 29 e0            AND #&e0                                                
-&364d: 0a               ASL     
+# check whether there's an obstruction to the line of sight
+&3649: a5 80            LDA &80 ; square_x_low                                  # get low byte of x position 
+&364b: 29 e0            AND #&e0                                                # mask to get top 3 bits
+&364d: 0a               ASL														# move top 3 bits to bottom 3 bits
 &364e: 2a               ROL
 &364f: 2a               ROL
 &3650: 2a               ROL
-&3651: a8               TAY
-&3652: b1 7c            LDA (&7c),Y ; wall_y_start_lookup_pointer
-&3654: 65 7e            ADC &7e ; wall_y_start_base
+&3651: a8               TAY														# move result to Y (0 to 7)
+&3652: b1 7c            LDA (&7c),Y ; wall_y_start_lookup_pointer				# get value at address &7c/&7d + Y which is a value in the table wall_base_y_lookup
+&3654: 65 7e            ADC &7e ; wall_y_start_base								# add the base level for the square
 &3656: 90 02            BCC &365a
-&3658: a9 ff            LDA #&ff        
+&3658: a9 ff            LDA #&ff												# if result > FF then reset to FF
 
-&365a: c5 81            CMP &81 ; square_y_low_max      
-&365c: 6a               ROR                             
-&365d: 45 7f            EOR &7f ; wall_sprite
-&365f: 10 19            BPL &367a ; leave_with_carry_set                        # if so, there's an obstruction
+&365a: c5 81            CMP &81 ; square_y_low_max								# compare to y in order to set carry or clear carry (if square_y_low_max > wall_level)
+&365c: 6a               ROR														# move carry flag into bit 7
+&365d: 45 7f            EOR &7f ; wall_sprite									# bit 7 of wall_sprite set indicates object grows downward, clear and the object grows upward
+&365f: 10 19            BPL &367a ; leave_with_carry_set                        # branch if there's an obstruction
+																				# this happens if edge flag = carry flag
+																				# therefore if square_y_low_max > wall_level AND not edge flag
+																				#	OR square_y_low_max <= wall_level AND object grows down
+&3661: 2c 98 35         BIT &3598 ; los_consider_water							# bit 7 set if water should be considered an obstruction
+&3664: 10 0c            BPL &3672 ; los_ignore_water                            # branch over if line of sight continues through the water level
 
-&3661: 2c 98 35         BIT &3598 ; los_consider_water
-&3664: 10 0c            BPL &3672 ; los_ignore_water                            # branch over if water is not considered a barrier
 &3666: a5 82            LDA &82 ; square_y_low
 &3668: cd d0 14         CMP &14d0 ; water_level_low                             # if so, have we passed through the water?
 &366b: a5 97            LDA &97 ; square_y
@@ -7898,7 +7959,7 @@ e336d: 90 02            BCC &3371
 #367a: 38                 SEC                                                   # obstructions found; return carry set
 &367b: a9 ff            LDA #&ff
 &367d: 8d 99 35         STA &3599 ; door_data_pointer_store						# reset door_data_pointer_store
-&3680: 8d 98 35         STA &3598 ; los_consider_water                          # default to consider water
+&3680: 8d 98 35         STA &3598 ; los_consider_water                          # default to considering water an obstruction
 &3683: 60               RTS
 
 ; redraw_screen
@@ -8681,7 +8742,7 @@ maggot x = &06 a = &08
 # leaves with Y = count
 &3c18: a0 7f            LDY #&7f
 &3c1a: 38               SEC
-&3c1b: 20 30 3c         JSR &3c30 ; in_find_nearest_object
+&3c1b: 20 30 3c         JSR &3c30 ; count_matching_objects
 &3c1e: a4 9f            LDY &9f ; count
 &3c20: 60               RTS
 
@@ -8706,103 +8767,121 @@ maggot x = &06 a = &08
 &3c2a: 18               CLC
 &3c2b: 24				(BIT &38)					# interlaced code
 
-; find_nearest_object_for_fluffy
-&3c2c: 38				SEC
+; find_objects_for_fluffy
+&3c2c: 38					SEC
 
-&3c2d: 66 9b            ROR &9b ; weight_bit									# set bit 7 from C
-&3c2f: 18               CLC
+&3c2d: 66 9b            ROR &9b ; weight_bit		# set bit 7 from C (so will be set if called from handle_fluffy)
+&3c2f: 18               CLC							# this will find the nearest object, rather than count matches
 
-; in_find_nearest_object
-# 
-# and also, if C is set:
-#   the routine counts the number of matching objects in the primary stack, returning the result in &9f
-# or, if C is clear:
-#   the nearest matching object is found in the primary stack and its index is returned in X
+; count_matching_objects
+# entry here will be from count_objects_of_type_a_in_stack with C set
+#   - the routine counts the number of matching objects in the primary stack, returning the result in &9f
 &3c30: 66 a1            ROR &a1 ; find_carry                                    # note whether we're finding or counting
-&3c32: 8d 29 3c         STA &3c29 ; find_first
-&3c35: 29 7f            AND #&7f
-&3c37: 8d 26 3c         STA &3c26 ; find_first_7f
-&3c3a: 8c 27 3c         STY &3c27 ; find_second
+
+&3c32: 8d 29 3c         STA &3c29 ; find_first									# store the spec of the first object type to look for
+&3c35: 29 7f            AND #&7f												# remove the flag to specify that the player is included
+&3c37: 8d 26 3c         STA &3c26 ; find_first_7f								# store the spec of the first object type to look for, without the bit that specifies whether or not to include the player
+
+&3c3a: 8c 27 3c         STY &3c27 ; find_second									# store the spec of the second object type/range to look for
+
 &3c3d: a2 ff            LDX #&ff
-&3c3f: 8e 25 3c         STX &3c25 ; nearest_object                              # initially &ff
-&3c42: 8e 28 3c         STX &3c28 ; nearest_distance                            # initially &ff
-&3c45: e8               INX
-&3c46: 86 a0            STX &a0 ; result                                        # initially &00
-&3c48: 86 9f            STX &9f ; count                                         # initially &00
-&3c4a: 20 87 25         JSR &2587 ; gen_random_num
-&3c4d: 29 0f            AND #&0f
-&3c4f: 85 a3            STA &a3 ; rnd_0f                                        # get a random number &00 - &0f
-&3c51: a0 0f            LDY #&0f
+&3c3f: 8e 25 3c         STX &3c25 ; nearest_object                              # initialise to &ff
+&3c42: 8e 28 3c         STX &3c28 ; nearest_distance                            # initialise to &ff
+
+&3c45: e8               INX														# x = 0
+&3c46: 86 a0            STX &a0 ; result_status                                 # initialise to &00
+&3c48: 86 9f            STX &9f ; count                                         # initialise to &00
+
+&3c4a: 20 87 25         JSR &2587 ; gen_random_num								# get random number
+&3c4d: 29 0f            AND #&0f												# in the range 0 to 15
+&3c4f: 85 a3            STA &a3 ; rnd_0f                                        # store - this will be used to examine the primary stack in a random order
+&3c51: a0 0f            LDY #&0f												# initialise loop counter
+
 ; find_object_object_loop
-&3c53: 84 9e            STY &9e ; y_store                                       # starting at that random place
+&3c53: 84 9e            STY &9e ; y_store                                       # store loop counter
 &3c55: 98               TYA
-&3c56: 45 a3            EOR &a3 ; rnd_0f
-&3c58: a8               TAY                                                     
-&3c59: b9 b4 08         LDA &08b4,Y ; object_stack_y                            # consider the objects in turn
-&3c5c: f0 6b            BEQ &3cc9 ; find_object_next_object                     # does it exist? if not, move to next
+&3c56: 45 a3            EOR &a3 ; rnd_0f										# apply randomisation to get the next index on the primary stack to examine
+&3c58: a8               TAY                                                     # y is now the index on the primary stack to be examined in this iteration
+&3c59: b9 b4 08         LDA &08b4,Y ; object_stack_y                            # if the high_y position of the item on the stack is 0 then there is no object present
+&3c5c: f0 6b            BEQ &3cc9 ; find_object_next_object                     # if there's no object, then move to check the next 
+
 &3c5e: c4 aa            CPY &aa ; current_object                               
-&3c60: f0 67            BEQ &3cc9 ; find_object_next_object                     # don't consider the npc
-&3c62: b9 60 08         LDA &0860,Y ; object_stack_type
-&3c65: d0 05            BNE &3c6c ; find_object_object_not_player               # is the object the player?
-&3c67: 2c 29 3c         BIT &3c29 ; find_first
-&3c6a: 30 05            BMI &3c71                                               # if find_first & &80, then note that in result
+&3c60: f0 67            BEQ &3cc9 ; find_object_next_object                     # don't consider the object currently being handled
+
+&3c62: b9 60 08         LDA &0860,Y ; object_stack_type							# get the type of the object being considered
+&3c65: d0 05            BNE &3c6c ; find_object_object_not_player               # branch over if the object is not the player (type 0)
+&3c67: 2c 29 3c         BIT &3c29 ; find_first									# get whether or not to consider the player (stored in bit 7)
+&3c6a: 30 05            BMI &3c71 ; find_object_found_match_to_find_first       # if find_first & &80, then note that in result
+
 ; find_object_object_not_player
 &3c6c: cd 26 3c         CMP &3c26 ; find_first_7f                               # is it the type we're interested in?
-&3c6f: d0 06            BNE &3c77 ; find_object_not_special
-&3c71: a5 a0            LDA &a0 ; result
-&3c73: 09 01            ORA #&01                                                # if so, note it in the result
+&3c6f: d0 06            BNE &3c77 ; find_object_no_match_to_find_first			# branch if not a match
+
+; find_object_found_match_to_find_first
+&3c71: a5 a0            LDA &a0 ; result_status									# get current result_status
+&3c73: 09 01            ORA #&01                                                # set bit 1
 &3c75: d0 14            BNE &3c8b ; find_object_found_one
-; find_object_not_special
-&3c77: 2c 27 3c         BIT &3c27 ; find_second
-&3c7a: 10 06            BPL &3c82 ; find_object_y_positive
-&3c7c: 20 b0 2d         JSR &2db0 ; convert_object_to_range_a                   # returns object range in X
+
+; find_object_no_match_to_find_first
+&3c77: 2c 27 3c         BIT &3c27 ; find_second									# bit 7 will be set if looking for a range of object types, as opposed to a specific type
+&3c7a: 10 06            BPL &3c82 ; find_object_is_match_for_find_second		# branch if looking for one specific type of object
+&3c7c: 20 b0 2d         JSR &2db0 ; get_range_for_object_type                   # returns object range in X
 &3c7f: 8a               TXA
-&3c80: 09 80            ORA #&80                                                # A = range | &80
-; find_object_y_positive
-&3c82: cd 27 3c         CMP &3c27 ; find_second                                 # in other words, if in_Y & &80
-&3c85: d0 42            BNE &3cc9 ; find_object_next_object                     # only count results not in our range
-&3c87: a5 a0            LDA &a0 ; result                                        # (the range set by find_second &7f)
-&3c89: 29 02            AND #&02                                                # clear bottom bit of result
+&3c80: 09 80            ORA #&80                                                # set bit 7 so it easily be matched to find_second
+
+; find_object_is_match_for_find_second
+&3c82: cd 27 3c         CMP &3c27 ; find_second                                 # is there a match to find_second
+&3c85: d0 42            BNE &3cc9 ; find_object_next_object                     # branch if there is no match
+
+&3c87: a5 a0            LDA &a0 ; result_status									# get current result_status
+&3c89: 29 02            AND #&02                                                # clear lowest bit of result
+
 ; find_object_found_one
-&3c8b: 29 03            AND #&03
-&3c8d: 85 a0            STA &a0 ; result
-&3c8f: aa               TAX
-&3c90: e6 9f            INC &9f ; count                                         # count contains total number of matches
-&3c92: 24 a1            BIT &a1 ; find_carry                                    # was the carry set when function called?
-&3c94: 30 33            BMI &3cc9 ; find_object_next_object                     # if so, move on to the next object
+&3c8b: 29 03            AND #&03												# mask to get lowest two bits
+&3c8d: 85 a0            STA &a0 ; result_status									# store result_status
+&3c8f: aa               TAX														# store type of result in X
+&3c90: e6 9f            INC &9f ; count                                         # increment total number of matches
+&3c92: 24 a1            BIT &a1 ; find_carry                                    # get bit 7 - are we finding an object or counting them?
+&3c94: 30 33            BMI &3cc9 ; find_object_next_object                     # branch if counting all object
+
 &3c96: 20 87 25         JSR &2587 ; gen_random_num
 &3c99: dd 21 3c         CMP &3c21,X ; find_object_probabilities                 # X = result
 &3c9c: b0 2b            BCS &3cc9 ; find_object_next_object                     # a random chance based on result to skip
+
 &3c9e: 98               TYA
 &3c9f: aa               TAX                                                     # X = object being considered
-&3ca0: 24 9b            BIT &9b ; weight_bit									# retrieve whether search is being done for fluffy (bit 7 set) 
-&3ca2: 10 0e            BPL &3cb2 ; find_object_unset_weight_bit				# branch if not searching for fluffy
-&3ca4: a9 00            LDA #&00												# 
+&3ca0: 24 9b            BIT &9b ; weight_bit									# retrieve whether search is being done for handle_fluffy (bit 7 set) 
+&3ca2: 10 0e            BPL &3cb2 ; find_object_check_distance					# branch if not searching for handle_fluffy
+
+	# only used from handle_fluffy
+&3ca4: a9 00            LDA #&00												# specifies range 0
 &3ca6: 20 9c 35         JSR &359c ; is_object_close_enough                      # get distance to object
-&3ca9: a5 83            LDA &83 ; distance
+&3ca9: a5 83            LDA &83 ; distance										# &83 has the returned distance
 &3cab: cd 28 3c         CMP &3c28 ; nearest_distance                            # is it nearer than earlier finds?
 &3cae: 90 11            BCC &3cc1 ; find_object_store_distance                  # if nearer, store it
 &3cb0: b0 17            BCS &3cc9 ; find_object_next_object                     # if further away, ignore it
 
-; find_object_unset_weight_bit
-&3cb2: 20 87 25         JSR &2587 ; gen_random_num
-&3cb5: 29 4f            AND #&4f
-&3cb7: 4d 28 3c         EOR &3c28 ; nearest_distance
-&3cba: 20 9c 35         JSR &359c ; is_object_close_enough                      # otherwise, pick one at random
-&3cbd: b0 0a            BCS &3cc9
-&3cbf: a5 83            LDA &83 ; distance
+; find_object_check_distance
+&3cb2: 20 87 25         JSR &2587 ; gen_random_num								# get random number
+&3cb5: 29 4f            AND #&4f												# mask to get 0x00xxxx 
+&3cb7: 4d 28 3c         EOR &3c28 ; nearest_distance							# toggle specified bits
+&3cba: 20 9c 35         JSR &359c ; is_object_close_enough                      # is found object X within range A?
+&3cbd: b0 0a            BCS &3cc9 ; find_object_next_object						# carry set means no, therefore find another object
+&3cbf: a5 83            LDA &83 ; distance										# distance to object returned in &83
+
 ; find_object_store_distance
-&3cc1: 8d 28 3c         STA &3c28 ; nearest_distance
-&3cc4: 06 a0            ASL &a0 ; result
-&3cc6: 8e 25 3c         STX &3c25 ; nearest_object
+&3cc1: 8d 28 3c         STA &3c28 ; nearest_distance							# store distance to found object
+&3cc4: 06 a0            ASL &a0 ; result_status									# adjust result_status to affect next check against find_object_probabilities
+&3cc6: 8e 25 3c         STX &3c25 ; nearest_object								# store index of found object
+
 ; find_object_next_object
-&3cc9: a4 9e            LDY &9e ; y_store                                       # move on to considering the next object
-&3ccb: 88               DEY
+&3cc9: a4 9e            LDY &9e ; y_store                                       # get loop counter
+&3ccb: 88               DEY														# decremement loop counter
 &3ccc: 10 85            BPL &3c53 ; find_object_object_loop                     # until we've done all sixteen
 
-&3cce: 46 a0            LSR &a0 ; result
-&3cd0: 46 a0            LSR &a0 ; result                                        # carry set to be result & &02
-&3cd2: ae 25 3c         LDX &3c25 ; nearest_object
+&3cce: 46 a0            LSR &a0 ; result_status
+&3cd0: 46 a0            LSR &a0 ; result_status                                 # ??? 
+&3cd2: ae 25 3c         LDX &3c25 ; nearest_object								# index of found object, or &ff if nothing found
 &3cd5: 60               RTS
 
 ; compare_this_object_x_y_tx_ty
@@ -8954,7 +9033,7 @@ maggot x = &06 a = &08
 &3dcd: 20 87 25         JSR &2587 ; gen_random_num
 &3dd0: 29 1f            AND #&1f                                                # consider a random distance &10 - &3f
 &3dd2: 69 10            ADC #&10
-&3dd4: 4e 98 35         LSR &3598 ; los_consider_water                          # ignore water
+&3dd4: 4e 98 35         LSR &3598 ; los_consider_water                          # clear bit 7 to indicate ignore water
 &3dd7: 20 d5 35         JSR &35d5 ; line_of_sight_without_obstructions          # are there any obstacles over that distance?
 &3dda: 68               PLA
 &3ddb: 90 28            BCC &3e05 ; store_square_x_y_in_tx_ty                   # if not, we've got a route - use it
@@ -9486,7 +9565,7 @@ maggot x = &06 a = &08
 ; handle_explosion_type_c0
 &40c5: 20 b5 14         JSR &14b5 ; play_squeal
 &40c8: a5 41            LDA &41 ; this_object_type
-&40ca: 20 b0 2d         JSR &2db0 ; convert_object_to_range_a
+&40ca: 20 b0 2d         JSR &2db0 ; get_range_for_object_type
 &40cd: bd f8 29         LDA &29f8,X ; energy_by_range
 &40d0: 4a               LSR
 &40d1: 4a               LSR
@@ -9785,10 +9864,11 @@ maggot x = &06 a = &08
 &42a8: a5 06            LDA &06 ; current_object_rotator
 &42aa: 29 0b            AND #&0b
 &42ac: d0 2d            BNE &42db
+
 &42ae: a9 2a            LDA #&2a							# look for red/yellow imps
 &42b0: a0 86            LDY #&86							# also look for range 6, flying things & imps
-&42b2: 20 2c 3c         JSR &3c2c ; find_nearest_object_for_fluffy 		# find objects
-&42b5: 30 12            BMI &42c9
+&42b2: 20 2c 3c         JSR &3c2c ; find_objects_for_fluffy	# find objects
+&42b5: 30 12            BMI &42c9							# branch if nothing found
 &42b7: ad 28 3c         LDA &3c28 ; nearest_distance
 &42ba: c5 da            CMP &da ; timer_2
 &42bc: b0 0b            BCS &42c9
@@ -9796,6 +9876,7 @@ maggot x = &06 a = &08
 #42c1: b0 24 b6 e2 ; sound data
 &42c5: 66 12            ROR &12 ; this_object_timer
 &42c7: 30 12            BMI &42db
+
 &42c9: a5 11            LDA &11 ; this_object_extra
 &42cb: 20 4c 32         JSR &324c ; make_negative
 &42ce: c5 da            CMP &da ; timer_2
@@ -11161,7 +11242,7 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 &4b6b: a4 07            LDY &07 ; current_object_rotator_low
 &4b6d: d0 3a            BNE &4ba9 ; handle_bush                                 # if not, make stationary
 &4b6f: a5 bc            LDA &bc ; this_object_data
-&4b71: 20 b0 2d         JSR &2db0 ; convert_object_to_range_a
+&4b71: 20 b0 2d         JSR &2db0 ; get_range_for_object_type
 &4b74: e0 09            CPX #&09                                                # is it range 9? (indestructible equipment)
 &4b76: f0 31            BEQ &4ba9 ; handle_bush                                 # if so, remain stationary
 &4b78: a2 00            LDX #&00                                                # X = 0, player object
@@ -11581,22 +11662,23 @@ door	palette												speed	min_energy
 &4df1: 85 73            STA &73 ; this_object_palette                           # set colour of sucker
 
 &4df3: a5 07            LDA &07 ; current_object_rotator_low
-&4df5: f0 14            BEQ &4e0b												# 1 in 8 chance to not check for trigger
+&4df5: f0 14            BEQ &4e0b ; no_check_for_trigger_object					# 1 in 8 chance to not check for trigger
 
-&4df7: bd 37 4e         LDA &4e37,X ; sucker_attracted_lookup                   # what does the sucker like to suck?
+&4df7: bd 37 4e         LDA &4e37,X ; sucker_attracted_lookup                   # get the trigger for the sucker
 &4dfa: 30 0d            BMI &4e09 ; no_attraction                               # if always active then skip over
 
 &4dfc: a8               TAY
 &4dfd: c9 55            CMP #&55                                                # is target &55 coronium boulder
 &4dff: d0 02            BNE &4e03                                               # if so, then also look for
 &4e01: a0 0b            LDY #&0b                                                # &0b yellow ball
-&4e03: 20 2a 3c         JSR &3c2a ; find_nearest_object
-&4e06: 8a               TXA                                                     # X = index of nearest object, or &ff if not found
-&4e07: 49 ff            EOR #&ff												# so X becomes 0 if nothing found, therefore bit 7 now set if something found
+&4e03: 20 2a 3c         JSR &3c2a ; find_nearest_object							# sets X to the index of the object on the primary stack, or &ff if not found
+&4e06: 8a               TXA                                                     # move result to accumulator
+&4e07: 49 ff            EOR #&ff												# so A becomes 0 if nothing found, alternatively bit 7 will be set if a match was found
 
 ; no_attraction
 &4e09: 85 11            STA &11 ; this_object_extra                             # this_object_extra = attracted object
 
+; no_check_for_trigger_object
 &4e0b: a5 11            LDA &11 ; this_object_extra
 &4e0d: 10 18            BPL &4e27 ; no_attraction_2                             # if no trigger object found, skip
 
