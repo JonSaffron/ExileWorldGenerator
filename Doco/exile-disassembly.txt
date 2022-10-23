@@ -37,13 +37,15 @@ For display purposes, not all of the bits are used:
  - For the Y axis the top 13 bits are relevant.
 The non-visible lower bits are maintained to give smoother movement.
 The world is defined using 256x256 squares which correspond to the high byte in 
-the X and Y co-ordinate. Therefore each square is displayed using 16x32 pixels.
+the X and Y co-ordinate. Therefore each square is physically displayed using 16x32 pixels,
+but because of the screen resolution will appear to the player to be square.
 The position of each game object identifies its top-left corner.
 
-The screen is 128x128 pixels, with each pixel taking 4 bits to give 16 colours.
+The screen for this standard version of the game is 128x128 pixels, with each pixel taking 4 bits to give 16 colours.
 Therefore screen memory is 8Kb between &6000 and &7FFF.
 There are 16 characters per character row, so each character takes 32 bytes,
 so each character row is &200 bytes. There are 16 rows.
+The window shows 8 squares horizontally, and 4 squares vertically. This equates to 2048x1024 points in game co-ordinates.
 
 Areas of particular interest:
 
@@ -217,7 +219,7 @@ Disassembly
 ;     &2e objects_to_reserve
 ;     &2f objects_two_reserve
 ;     &30 child_created
-;     &31 player_crawling
+;     &31 player_crawling							# bit 7 set if player crawling
 ;     &32 gun_aim_value
 ;     &33 gun_aim_velocity
 ;     &34 firing_angle
@@ -323,8 +325,8 @@ Disassembly
 ;     &98 temp_a supporting_object_xy
 ;     &99 velocity_signs pixel_colour
 ;     &9a (various)
-;     &9b (various)
-;     &9c (various)
+;     &9b sound_data_l (also various) points to lsb-1 of the 4 byte sound data block
+;     &9c sound_data_h (also various) points to msb of the 4 byte sound data block
 ;     &9d (various)
 ;     &9e (various)
 ;     &9f number_particles this_object_gravity_flags
@@ -354,8 +356,8 @@ Disassembly
 ;     &b7 some_kind_of_velocity
 ;     &b8 delta_magnitude
 ;     &b9 something_player_collision_value
-;     &ba player_immobility_daze
-;     &bb player_nothrust_daze
+;     &ba player_immobility_daze			# dazed if not 0, counts down to 0
+;     &bb player_nothrust_daze				# dazed if not 0, counts down to 0
 ;     &bc this_object_data
 ;     &bd new_object_data_pointer
 ;     &be new_object_type_pointer
@@ -389,7 +391,7 @@ Disassembly
 ;     &da timer_2
 ;     &db timer_3
 ;     &dc timer_4
-;     &dd object_held
+;     &dd object_held						# index on the primary stack of the object being held, bit 7 set if nothing
 ;     &de player_angle
 ;     &df player_facing
 
@@ -419,7 +421,8 @@ Disassembly
 #0198:	80	68	48	10	00	00	00	00		# used by 44, 2b when flipped horizontally
 #01a0:	00	00	00	00	10	48	68	80		# used by 44, 2b when not flipped, and 25, 45 when flipped both ways
 
-; process_keys - called from handle_player_object
+; process_keys
+# called from handle_player_object
 &01a8: a2 26            LDX #&26										# init loop counter - there are &26 different key commands
 &01aa: 86 ac            STX &ac ; key_number
 
@@ -427,14 +430,15 @@ Disassembly
 &01ae: bd 6b 12         LDA &126b,X ; keys_pressed						# bit 7 will be set if that key command is to be triggered
 &01b1: 10 0f            BPL &01c2 ; not_pressed							# branch if key not pressed
 
-&01b3: c9 c0            CMP #&c0										# set carry flag if C0 <= A
+&01b3: c9 c0            CMP #&c0										# set carry flag if C0 <= A, so if the key was pressed previously
 &01b5: bd 1d 12         LDA &121d,X ; function_table_h					# get high byte of key command handler
-&01b8: 6a               ROR												# divide by 2, set bit 7 from carry
-&01b9: 10 04            BPL &01bf										# branch to call the handler where 
-&01bb: b0 05            BCS &01c2 ; not_pressed
-&01bd: 29 7f            AND #&7f
+&01b8: 6a               ROR												# shift right, set bit 7 from carry (previously pressed flag), set carry from bit 0 (auto repeat flag)
+&01b9: 10 04            BPL &01bf ; call_key_handler					# branch to call the handler where carry wasn't set
+&01bb: b0 05            BCS &01c2 ; not_pressed							# if bit 0 of function_table_h set then branch over - cannot press again immediately
+&01bd: 29 7f            AND #&7f										# set bit 7 to 0 to correct high byte of function call
 
-&01bf: 20 ca 01         JSR &01ca ; call_function
+; call_key_handler
+&01bf: 20 ca 01         JSR &01ca ; jump_to_key_handler
 
 ; not_pressed
 &01c2: c6 ac            DEC &ac ; key_number							# decrement loop counter
@@ -443,7 +447,7 @@ Disassembly
 &01c6: ee f5 11         INC &11f5 ; keys_processed						# set processing flag to 1
 &01c9: 60               RTS
 
-; call_function
+; jump_to_key_handler
 &01ca: 48               PHA
 &01cb: bd f6 11         LDA &11f6,X ; function_table
 &01ce: 48               PHA
@@ -853,7 +857,7 @@ e	46		1		0		0			80		0			ff			nothing (handle_background_object_random_wind)
 f	62		0		c		0			06		ff			0			mushrooms (handle_background_mushrooms)
 
 10	40		1		b		0			88		00			ff			green foliage (can be walked through)
-11	0e		1		a		0			05		00			ff			grass frond
+11	0e		1		a		0			05		00			ff			grass frond (various colours)
 12	39		0		0		7			04		00			00			full brick wall with a hollow passage from top to bottom
 13	44		0		0		8			00		0			6f			part of brick wall with corner from North to East removed and edged
 14	47		0		0		0			02		0			ff			full spaceship pipework
@@ -871,7 +875,7 @@ f	62		0		c		0			06		ff			0			mushrooms (handle_background_mushrooms)
 
 20	3c		0		c		0			00		bf			3f			bottom 25% brick wall (same sprite also used for tile door)
 21	55		0		0		0			bc		ff			00			roman pillar (can be walked through)
-22	0e		1		a		0			b1		0			ff			grass frond
+22	0e		1		a		0			b1		0			ff			grass frond (green with red and yellow)
 23	43		0		0		3			00		1f			0			50% triangle brick wall 
 24	34		0		0		2			00		0			7f			brick wall with North-West to East corner removed and edged
 25	35		0		8		2			00		7f			0			brick wall small triangle from West to South-East
@@ -1012,25 +1016,28 @@ These are a list of square_x values in sections delimited by background_objects_
 #080c: 00 ; blue/cyan/green key
 #080d: 00 ; (unused - no key available for tile door)
 
-#080e: 00 ; booster_collected
-#080f: 00 ; pistol
-#0810: 00 ; icer
-#0811: 00 ; discharge device
-#0812: 00 ; plasma gun
-#0813: 00 ; protection_suit_collected
-#0814: 00 ; fire_immunity_collected
-#0815: 00 ; mushroom_pill_collected
-#0816: 00 ; whistle1_collected
-#0817: 00 ; whistle2_collected
-#0818: 00 ; radiation_pill_collected
+; equipment_collected
+# the six pieces of equipment that require energy
+#080e: 00 ; booster_collected			# bit 7 set once collected
+#080f: 00 ; pistol						# bit 7 set once collected
+#0810: 00 ; icer						# bit 7 set once collected
+#0811: 00 ; discharge device			# bit 7 set once collected
+#0812: 00 ; plasma gun					# bit 7 set once collected
+#0813: 00 ; protection_suit_collected	# bit 7 set once collected
+
+#0814: 00 ; fire_immunity_collected		# bit 7 set once collected
+#0815: 00 ; mushroom_pill_collected		# bit 7 set once collected
+#0816: 00 ; whistle1_collected			# bit 7 set once collected
+#0817: 00 ; whistle2_collected			# bit 7 set once collected
+#0818: 00 ; radiation_pill_collected	# bit 7 set once collected
 
 #0819: 00 ; door_timer					# counts down to 0
 #081a: 00 ; red_mushroom_daze			# counts down to 0
 #081b: 00 ; blue_mushroom_daze			# counts down to 0
 #081c: 00 ; chatter_energy_level
-#081d: 00 ; explosion_timer
-#081e: 00 ; endgame_value
-#081f: 00 ; earthquake_triggered
+#081d: 00 ; explosion_timer				# normally 0 when no explosion happening, but when an explosion happens it starts at ce and increments around to 0 again
+#081e: 00 ; endgame_value				# bit 7 set when maggot machine destroyed
+#081f: 00 ; earthquake_triggered		# bit 7 set when maggot machine destroyed, then increments back to 0
 
 #0820: ff ; (unused)
 
@@ -1048,16 +1055,20 @@ These are a list of square_x values in sections delimited by background_objects_
 
 #083a: 04 0a 01 01 0a ; imp_gift_counts
 
-#083f: 80 80 80 80 ; clawed_robot_availability
+#083f: 80 80 80 80 ; clawed_robot_availability					# bit 7 set if never been disturbed, set to 1 if in use, 0 otherwise
 #0843: 00 00 00 00 ; clawed_robot_energy_when_last_used
 
 #0847: 00 ; pockets_used
 #0848: 50 50 50 50 50 ; contents of pockets
-#084d: 00 current_weapon
-;       0  1  2  3  4  5 jetpack, pistol, icer, discharge, plasma, suit
-#084e: 00 00 00 00 00 00 weapon_energy
-#0854: 30 10 10 01 08 10 weapon_energy_h
-#085a: 01 06 10 ff 32 00 energy_per_shot
+
+#084d: 00 current_selected_equipment							# 0 to 5
+
+;       0  1  2  3  4  5	jetpack, pistol, icer, discharge, plasma, suit
+#084e: 00 00 00 00 00 00	equipment_energy
+#0854: 30 10 10 01 08 10	equipment_energy_h
+#085a: 01 06 10 ff 32		energy_per_use
+
+#085f: 00 ; damage
 
 ###############################################################################
 #
@@ -1088,7 +1099,8 @@ These are a list of square_x values in sections delimited by background_objects_
 # holds the higher 8 bits of the Y co-ordinate of the object's top left corner
 # the slot is considered empty if the value here is 0
 #08b4: 3b 3b 00 00 00 00 00 00 00 00 00 00 00 00 00 00 ; object_stack_y
-#08c4: 04 dc
+#08c4: 04 
+#08c5: dc		; waterfall
 
 ; object_stack_flags
 ; 80 set = horizontal invert (facing left)
@@ -1098,7 +1110,7 @@ These are a list of square_x values in sections delimited by background_objects_
 ; 08 set = damaged
 ; 04 set = ???? but it's set at 1ed6 - checked at 4daf
 ; 02 set = collision detected
-; 01 set at load positon?
+; 01 set at load position?
 #08c6: 81 11 01 01 01 01 01 01 01 01 01 01 01 01 01 01 ; object_stack_flags
 
 ; object_stack_palette:
@@ -1551,6 +1563,10 @@ Range 8:                          -- -- -- -- -- -- -- --
 #0b52: dc ; possible_checksum
 
 ; secondary_object_stack_energy_and_low
+# format eeeexxyy
+# where eeee1111 is the object's energy when restored to the primary stack
+#       xx is the top two bits of the low X co-ordinate of the object's position
+#       yy is the top two bits of the low Y co-ordinate of the object's position
 #0b53: f0 f3 71 79 fb 42 f5 47 f3 f2 f3 f2 f0 fb f2 40
 #0b63: fb f0 f1 00 00 00 00 00 00 00 00 00 00 00 00 00
 
@@ -1653,6 +1669,7 @@ f $FE                        ; white bg, cyan bg
 &0bbe: 60               RTS
 
 ; has_object_been_fired
+# on exit, Zero flag will be set if the current object has been fired
 &0bbf: a5 aa            LDA &aa ; current_object
 &0bc1: cd d7 29         CMP &29d7 ; object_being_fired
 &0bc4: 60               RTS
@@ -1676,7 +1693,7 @@ f $FE                        ; white bg, cyan bg
 &0bd9: 20 a0 22         JSR &22a0 ; get_angle_between_objects                   # get angle 
 &0bdc: e5 34            SBC &34 ; firing_angle                                  # minus firing_angle
 &0bde: e9 80            SBC #&80                                                # minus 180 degrees
-&0be0: 20 56 32         JSR &3256 ; make_positive
+&0be0: 20 56 32         JSR &3256 ; reverse_sign
 &0be3: 65 83            ADC &83 ; distance
 &0be5: c9 18            CMP #&18                                                # clear if object has been hit
 &0be7: 60               RTS
@@ -1734,6 +1751,7 @@ f $FE                        ; white bg, cyan bg
 &0c48: a9 00            LDA #&00
 &0c4a: 9d 12 0b         STA &0b12,X ; secondary_object_stack_y			# remove from secondary stack
 &0c4d: 60               RTS
+
 ; push_near_objects_from_secondary_to_primary_stack
 &0c4e: a2 1f            LDX #&1f                                                # start with last slot of secondary stack
 &0c50: bd 12 0b         LDA &0b12,X ; secondary_object_stack_y
@@ -2587,14 +2605,34 @@ f $FE                        ; white bg, cyan bg
 
 #119c: 00 40 84 b6 ; sound_data_119c
 #11a0: e0 10 4a 80 ; sound_data_11a0
-#11a4: e0 c0 a0 80 f0 d0 b0 90 ; sound_data_11a4
-#11ac: 00 00 00 00 00 00 00 00 ; sound_duration
-#11b4: 33 22 11 00 33 22 11 00 ; sound_data_11b4
-#11bc: 33 22 11 00 33 22 11 00 ; sound_data_11bc
-#11c4: 33 22 11 00 33 22 11 00 ; sound_data_11c4
-#11cc: 00 00 00 00 00 00 00 00 ; sound_duration_low
-#11d4: 33 22 11 00 33 22 11 00 ; sound_data_11d4
-#11dc: 00 00 00 00 00 00 00 00 ; sound_data_11dc
+
+#11a4: e0 c0 a0 80 ; sound_chip_frequency_command		# instructions to the sound chip (described on pages 421 and 422 of advanced user guide)
+	e0 first byte noise generator control
+	c0 first byte tone channel 1 frequency
+	a0 first byte tone channel 2 frequency
+	80 first byte tone channel 3 frequency
+
+#11a8: f0 d0 b0 90 ; sound_chip_volume_command		# instructions to the sound chip (described on pages 421 and 422 of advanced user guide)
+	f0 noise generator volume
+	d0 tone channel 1 volume
+	b0 tone channel 2 volume
+	90 tone channel 3 volume
+
+        0  1  2  3  0  1  2  3	# sound channel
+		--volume-- ---pitch---  # 0 for sound data block 1st and 3rd bytes, 1 for sound data block 2nd and 4th bytes
+#11ac: 00 00 00 00 00 00 00 00 ; volume_and_pitch		# init to most significant nibble of 2nd and 4th bytes of sound data block
+#11b4: 33 22 11 00 33 22 11 00 ; sound_data_ptr			# init to 1st and 3rd bytes of sound data block. tracks value of Y in process_sound
+#11bc: 33 22 11 00 33 22 11 00 ; sound_phase_length		# init to 0 
+#11c4: 33 22 11 00 33 22 11 00 ; sound_repeat_count		# init to 0
+
+#11cc: 00 00 00 00 00 00 00 00 ; sound_phase_count		# init to least significant nibble of 2nd and 4th bytes of sound data block
+														# if 0 then the channel is considered free
+
+#11d4: 33 22 11 00 33 22 11 00 ; snd_ptr_to_repeated_section
+
+#11dc: 00 00 00 00 ; sound_distance_from_screen_centre		# squares from screen center * 16
+
+#11e0: 00 00 00 00 ; sound_id		# lsb of sound data block being played - used to id the different sounds
 
 #11e4: 00 ; palette_register_updating
 #11e5: 07 16 25 34 43 52 61 70 87 96 a5 b4 c3 d2 e1 f0 ; palette_register_data
@@ -2609,10 +2647,12 @@ f $FE                        ; white bg, cyan bg
 #11f6: 75 e1 e1 e1 e1 e1 e1 e1 e1 e1 e1 d5 f7 32 1f 1c 1c 1c 1c 28 25 80 79 18 98 ab c0 3b d8 c7 b5 b0 99 6c 69 72 92 6f 9b
 ; function_table_h
 #121d: 6a 59 59 59 59 59 59 59 59 59 59 28 69 5b 62 59 59 59 59 62 62 58 58 3d 59 59 19 59 64 64 64 69 25 58 58 58 77 58 28
-; keys_to_check
+; keys_to_check		# scan codes to check - see https://beebwiki.mdfs.net/Keyboard
 #1244: 69 20 71 72 73 14 74 75 16 76 77 77 53 62 25 19 79 39 29 46 36 47 01 60 44 35 23 33 67 65 66 51 63 10 21 37 37 56 00
-; keys_pressed
+
+; keys_pressed		# bits are rotated right each time process keys loop runs, a 1 in bit 7 indicates key just pressed
 #126b: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+
 #1281: ctrl_held_duration
 #1291: shift_held_duration
 
@@ -2620,60 +2660,61 @@ f $FE                        ; white bg, cyan bg
 #
 #   Function Table
 #   ==============
-#   offset sym  h  l        key     address function
-#   00      69 6a 75        copy    &3576   pause               # mapped as END in mess
-#   01      20 59 e1        f0      &2ce2   change_to_weapon
-#   02      71 59 e1        f1      &2ce2   change_to_weapon
-#   03      72 59 e1        f2      &2ce2   change_to_weapon
-#   04      73 59 e1        f3      &2ce2   change_to_weapon
-#   05      14 59 e1        f5      &2ce2   change_to_weapon
-#   06      74 59 e1        f5      &2ce2   change_to_weapon
-#   07      75 59 e1        f6      &2ce2   change_to_weapon
-#   08      16 59 e1        f7      &2ce2   change_to_weapon
-#   09      76 59 e1        f8      &2ce2   change_to_weapon
-#   0a      77 59 e1        f9      &2ce2   change_to_weapon
-#   0b      77 28 d5        f9      &14d6   f9_pressed
-#   0c      53 69 f7        g       &34f8   retrieve_object
-#   0d      62 5b 32        space   &2d33   fire_weapon
-#   0e      25 62 1f        i       &3120   reset_gun_aim
-#   0f      19 59 1c        left    &2c1d   scroll_viewpoint
-#   10      79 59 1c        right   &2c1d   scroll_viewpoint
-#   11      39 59 1c        up      &2c1d   scroll_viewpoint
-#   12      29 59 1c        down    &2c1d   scroll_viewpoint
-#   13      46 62 28        k       &3129   lower_gun_aim
-#   14      36 62 25        o       &3126   raise_gun_aim
-#   15      47 58 80        @       &2c81   use_booster         # mapped as \ in mess
-#   16      01 58 79        ctrl    &2c80   (null)
-#   17      60 3d 18        tab     &1e19   swap_direction
-#   18      44 59 98        y       &2c99   play_whistle_1
-#   19      35 59 ab        u       &2cac   play_whistle_2
-#   1a      23 19 c0        t       &0cc1   teleport_player
-#   1b      33 59 3b        r       &2c3c   store_teleport
-#   1c      67 64 d8        .       &32d9   throw_object
-#   1d      65 64 c7        m       &32c8   drop_object
-#   1e      66 64 b5        ,       &32b6   pick_up_object
-#   1f      51 69 b0        s       &34b1   store_object
-#   20      63 25 99        v       &129a   volume_control
-#   21      10 58 6c        q       &2c6d   move_left
-#   22      21 58 69        w       &2c6a   move_right
-#   23      37 58 72        p       &2c73   move_up
-#   24      37 77 92        p       &3b93   p_pressed
-#   25      56 58 6f        l       &2c70   move_down
-#   26      00 28 9b        shift   &149c   (null)
+#   offset	scan code	key		h  l	address		repeatable	function
+#   00			69		copy	6a 75	&3576		yes			pause               # mapped as END in mess
+#   01			20		f0		59 e1	&2ce2		no			change_selected_equipment	(jetpack)
+#   02			71		f1		59 e1	&2ce2		no			change_selected_equipment	(pistol)
+#   03			72		f2		59 e1	&2ce2		no			change_selected_equipment	(icer)
+#   04			73		f3		59 e1	&2ce2		no			change_selected_equipment	(blaster / discharge)
+#   05			14		f4		59 e1	&2ce2		no			change_selected_equipment	(plasma gun)
+#   06			74		f5		59 e1	&2ce2		no			change_selected_equipment	(protection suit)
+#   07			75		f6		59 e1	&2ce2		no			change_selected_equipment
+#   08			16		f7		59 e1	&2ce2		no			change_selected_equipment
+#   09			76		f8		59 e1	&2ce2		no			change_selected_equipment
+#   0a			77		f9		59 e1	&2ce2		no			change_selected_equipment
+#   0b			77		f9		28 d5	&14d6		yes			f9_pressed
+#   0c			53		g		69 f7	&34f8		no			retrieve_object
+#   0d			62		space	5b 32	&2d33		no			fire_weapon
+#   0e			25		i		62 1f	&3120		yes			reset_gun_aim
+#   0f			19		left	59 1c	&2c1d		no			scroll_viewpoint
+#   10			79		right	59 1c	&2c1d		no			scroll_viewpoint
+#   11			39		up		59 1c	&2c1d		no			scroll_viewpoint
+#   12			29		down	59 1c	&2c1d		no			scroll_viewpoint
+#   13			46		k		62 28	&3129		yes			lower_gun_aim
+#   14			36		o		62 25	&3126		yes			raise_gun_aim
+#   15			47		@		58 80	&2c81		yes			use_booster         # mapped as \ in mess
+#   16			01		ctrl	58 79	&2c80		yes			(null)
+#   17			60		tab		3d 18	&1e19		no			swap_direction
+#   18			44		y		59 98	&2c99		no			play_whistle_1
+#   19			35		u		59 ab	&2cac		no			play_whistle_2
+#   1a			23		t		19 c0	&0cc1		no			teleport_player
+#   1b			33		r		59 3b	&2c3c		no			store_teleport
+#   1c			67		.		64 d8	&32d9		yes			throw_object
+#   1d			65		m		64 c7	&32c8		yes			drop_object
+#   1e			66		,		64 b5	&32b6		yes			pick_up_object
+#   1f			51		s		69 b0	&34b1		no			store_object
+#   20			63		v		25 99	&129a		no			volume_control
+#   21			10		q		58 6c	&2c6d		yes			move_left
+#   22			21		w		58 69	&2c6a		yes			move_right
+#   23			37		p		58 72	&2c73		yes			move_up
+#   24			37		p		77 92	&3b93		no			p_pressed
+#   25			56		l		58 6f	&2c70		yes			move_down
+#   26			00		shift	28 9b	&149c		yes			(null)
 #
 ###############################################################################
 
-#1292: ff ; volume
+#1292: ff ; volume																# game volume - ff for sound, 0 for silence
 
-; increment_game_time
+; increment_game_time_index
 &1293: e8               INX
 ; increment_game_time_X
+# used to increment player_deaths too
 &1294: fe ff 07         INC &07ff,X ; game_time
-&1297: f0 fa            BEQ &1293
+&1297: f0 fa            BEQ &1293 ; increment_game_time_index
 &1299: 60               RTS
 
 ; volume_control
-&129a: ad 92 12         LDA &1292 ; volume
+&129a: ad 92 12         LDA &1292 ; volume										# invert volume
 &129d: 49 ff            EOR #&ff
 &129f: 8d 92 12         STA &1292 ; volume
 &12a2: 60               RTS
@@ -2686,22 +2727,23 @@ f $FE                        ; white bg, cyan bg
 &12a8: 8a               TXA
 &12a9: 48               PHA
 &12aa: 2c 4d fe         BIT &fe4d                                               # get system VIA interrupt flag register
-&12ad: 10 f4            BPL &12a3	                                        # has the VIA caused an interrupt? if not, leave
+&12ad: 10 f4            BPL &12a3												# has the VIA caused an interrupt? if not, leave
 &12af: a9 7f            LDA #&7f
-&12b1: 8d 4d fe         STA &fe4d                                               # set system VIA interrupt flag register
-&12b4: 50 12            BVC &12c8												# overflow will be set if bit 6 of &fe4d was set, indicating timer 1 running at 100Hz
+&12b1: 8d 4d fe         STA &fe4d                                               # clear all flags in the system VIA interrupt flag register
+&12b4: 50 12            BVC &12c8 ; vertical_sync_indicated						# overflow will be set if bit 6 of &fe4d was set, indicating timer 1 running at 100Hz
 
-		; set the palette for the water - top of water is cyan, then blue from then on down
+		; timer 1 interrupt - set the palette for the water - top of water is cyan, then blue from then on down
 &12b6: a9 01            LDA #&01                                                # colour 0 = cyan (1 eor 7 = 6)
 &12b8: 8d 21 fe         STA &fe21                                               # video ULA palette register
 &12bb: a0 18            LDY #&18
 &12bd: 88               DEY
-&12be: d0 fd            BNE &12bd
+&12be: d0 fd            BNE &12bd												# short delay 
 &12c0: a9 03            LDA #&03                                                # colour 0 = blue (3 eor 7 = 4)
 &12c2: 8d 21 fe         STA &fe21                                               # video ULA palette register
 &12c5: 4c 92 13         JMP &1392 ; leave_interrupt
 
-		
+		; interrupt courtesy of vertical sync
+; vertical_sync_indicated
 &12c8: ad cf 14         LDA &14cf ; water_level_on_screen
 &12cb: f0 09            BEQ &12d6
 &12cd: ac ce 14         LDY &14ce ; water_level_interrupt
@@ -2711,10 +2753,10 @@ f $FE                        ; white bg, cyan bg
 &12d6: a9 07            LDA #&07                                                # colour 0 = black (7 eor 7 = 0 black)
 &12d8: 8d 21 fe         STA &fe21                                               # video ULA palette register
 &12db: ee e4 11         INC &11e4 ; palette_register_updating
-&12de: ad be 14         LDA &14be ; palette_register_data_updated	        # has the palette register data changed to flash the screen?
+&12de: ad be 14         LDA &14be ; palette_register_data_updated				# has the palette register data changed to flash the screen?
 &12e1: f0 06            BEQ &12e9 ; no_update_to_palette		
-&12e3: 20 0f 3e         JSR &3e0f ; push_palette_register_data		        # update palette
-&12e6: 8c be 14         STY &14be ; palette_register_data_updated	        # and mark it as having been updated (set to 0)
+&12e3: 20 0f 3e         JSR &3e0f ; push_palette_register_data					# update palette (also sets Y = 0)
+&12e6: 8c be 14         STY &14be ; palette_register_data_updated				# and mark it as having been updated (set to 0)
 
 ; no_update_to_palette
 &12e9: a9 7f            LDA #&7f                                                # input on bit 7, all others outputs
@@ -2737,7 +2779,7 @@ f $FE                        ; white bg, cyan bg
 &1307: ca               DEX														# decrement loop counter
 &1308: 10 f0            BPL &12fa												# and loop around
 
-&130a: a9 0b            LDA #&0b                                                # restart auto scan of keyboard
+&130a: a9 0b            LDA #&0b                                                # restart auto scan of keyboard 00001011
 &130c: 8d 40 fe         STA &fe40												# port b - addressable latch
 
 &130f: e8               INX														# x := 0
@@ -2748,72 +2790,87 @@ f $FE                        ; white bg, cyan bg
 
 &1318: 20 94 12         JSR &1294 ; increment_game_time_X
 
+		; process playing sounds
+
 &131b: a9 ff            LDA #&ff												# all bits will be for output
 &131d: 8d 43 fe         STA &fe43												# set sysvia data direction register A
 
-&1320: ae 9a 11         LDX &119a ; sound_max_channels                          # handle sounds
-&1323: 20 99 13         JSR &1399 ; process_sound
-&1326: b0 0a            BCS &1332
+&1320: ae 9a 11         LDX &119a ; sound_max_channels                          # X = 3 (and at this point, Y should be 0)
 
-&1328: bd ac 11         LDA &11ac,X ; sound_duration
-&132b: e9 01            SBC #&01
-&132d: 90 47            BCC &1376 ; sound_run_out
-&132f: 9d ac 11         STA &11ac,X ; sound_duration
+; process_sound_loop
+&1323: 20 99 13         JSR &1399 ; process_sound								# process change of volume
+&1326: b0 0a            BCS &1332												# branch over if sound processed
+
+&1328: bd ac 11         LDA &11ac,X ; volume_and_pitch							# get current volume
+&132b: e9 01            SBC #&01												# carry is clear, so subtract 2
+&132d: 90 47            BCC &1376 ; set_channel_volume							# branch if result was -ve
+&132f: 9d ac 11         STA &11ac,X ; volume_and_pitch							# store reduced volume
 
 &1332: e8               INX
 &1333: e8               INX
 &1334: e8               INX
-&1335: e8               INX
-&1336: 20 99 13         JSR &1399 ; process_sound
+&1335: e8               INX														# x = x + 4
+&1336: 20 99 13         JSR &1399 ; process_sound								# process change of pitch
 &1339: ca               DEX
 &133a: ca               DEX
 &133b: ca               DEX
-&133c: ca               DEX
-&133d: 90 37            BCC &1376 ; sound_run_out
-&133f: d0 04            BNE &1345
-&1341: c5 23            CMP &23 ; used_in_sound
-&1343: f0 31            BEQ &1376 ; sound_run_out
-&1345: 49 ff            EOR #&ff
-&1347: a0 04            LDY #&04
-&1349: 84 23            STY &23 ; used_in_sound
-&134b: 88               DEY
-&134c: d9 9c 11         CMP &119c,Y ; sound_data_119c
+&133c: ca               DEX														# x = x - 4
+&133d: 90 37            BCC &1376 ; set_channel_volume							# branch if process_sound didn't process
+&133f: d0 04            BNE &1345												# branch over if dealing with tone channel
+
+&1341: c5 23            CMP &23 ; used_in_sound									# has type of noise changed?
+&1343: f0 31            BEQ &1376 ; set_channel_volume							# branch if it hasn't
+
+&1345: 49 ff            EOR #&ff												# invert bits
+
+&1347: a0 04            LDY #&04												# initialise loop counter
+&1349: 84 23            STY &23 ; used_in_sound									# clear bottom two bits of &23
+
+&134b: 88               DEY														# y = y - 1
+&134c: d9 9c 11         CMP &119c,Y ; sound_data_119c							# find first entry in table that does not exceed value
 &134f: 90 fa            BCC &134b
-&1351: f9 a0 11         SBC &11a0,Y ; sound_data_11a0
-&1354: 88               DEY
-&1355: 30 06            BMI &135d
-&1357: 0a               ASL
-&1358: 26 23            ROL &23 ; used_in_sound
-&135a: 4c 54 13         JMP &1354
-&135d: 48               PHA
-&135e: 29 0f            AND #&0f
-&1360: 1d a4 11         ORA &11a4,X ; sound_data_11a4
-&1363: 20 e4 13         JSR &13e4 ; push_sound_to_chip
-&1366: 68               PLA
-&1367: e0 00            CPX #&00
-&1369: f0 0b            BEQ &1376 ; sound_run_out
-&136b: 46 23            LSR &23 ; used_in_sound
-&136d: 6a               ROR
-&136e: 46 23            LSR &23 ; used_in_sound
-&1370: 6a               ROR
-&1371: 4a               LSR
-&1372: 4a               LSR
-&1373: 20 e4 13         JSR &13e4 ; push_sound_to_chip
-; sound_run_out
-&1376: bd ac 11         LDA &11ac,X ; sound_duration
-&1379: fd dc 11         SBC &11dc,X ; sound_data_11dc
-&137c: b0 02            BCS &1380
-&137e: a9 00            LDA #&00
-&1380: 2d 92 12         AND &1292 ; volume
-&1383: 49 ff            EOR #&ff
+&1351: f9 a0 11         SBC &11a0,Y ; sound_data_11a0							# subtract corresponding amount
+
+&1354: 88               DEY														# y = y - 1
+&1355: 30 06            BMI &135d												# leave loop once y goes negative
+&1357: 0a               ASL														# move top bit to carry
+&1358: 26 23            ROL &23 ; used_in_sound									# and then move it into &23
+&135a: 4c 54 13         JMP &1354												# loop around
+
+&135d: 48               PHA														# store remaining 8 bits of frequency on stack
+&135e: 29 0f            AND #&0f												# mask for bottom 4 bits (can only initially send bottom 4 bits to sound generator)
+&1360: 1d a4 11         ORA &11a4,X ; sound_chip_frequency_command				# apply instruction to sound generator
+&1363: 20 e4 13         JSR &13e4 ; push_sound_to_chip							# send 1st byte of frequency data (or noise data) to sound generator
+&1366: 68               PLA														# retrieve least significant bits of frequency
+&1367: e0 00            CPX #&00												# are we dealing with noise channel?
+&1369: f0 0b            BEQ &1376 ; set_channel_volume							# branch if so
+
+&136b: 46 23            LSR &23 ; used_in_sound									# move bit 8 of frequency data into carry
+&136d: 6a               ROR														# add bit 8 of frequency data onto A
+&136e: 46 23            LSR &23 ; used_in_sound									# move bit 9 of frequency data into carry
+&1370: 6a               ROR														# add bit 9 of frequence data onto A
+&1371: 4a               LSR														# shift frequency data right 
+&1372: 4a               LSR														# shift frequency data right 
+&1373: 20 e4 13         JSR &13e4 ; push_sound_to_chip							# send 2nd byte of frequency data to sound generator (6 bits of data, and the top 2 bits are 00 for the subsequent instruction to the sound generator)
+
+; set_channel_volume
+&1376: bd ac 11         LDA &11ac,X ; volume_and_pitch							# get volume level for sound
+&1379: fd dc 11         SBC &11dc,X ; sound_distance_from_screen_centre			# adjust for distance
+&137c: b0 02            BCS &1380												# branch over if still audible
+&137e: a9 00            LDA #&00												# set volume level to be silent
+
+&1380: 2d 92 12         AND &1292 ; volume										# apply game volume control setting
+&1383: 49 ff            EOR #&ff												# invert (volume value 0 is loudest, value 15 is silence)
 &1385: 4a               LSR
 &1386: 4a               LSR
 &1387: 4a               LSR
-&1388: 4a               LSR
-&1389: 1d a8 11         ORA &11a8,X
-&138c: 20 e4 13         JSR &13e4 ; push_sound_to_chip
-&138f: ca               DEX
-&1390: 10 91            BPL &1323
+&1388: 4a               LSR														# volume only uses 4 bits of data
+&1389: 1d a8 11         ORA &11a8,X ; sound_chip_volume_command					# apply instruction to sound generator
+&138c: 20 e4 13         JSR &13e4 ; push_sound_to_chip							# send volume control byte to sound generator
+
+&138f: ca               DEX														# decrement loop counter (indicates channel)
+&1390: 10 91            BPL &1323 ; process_sound_loop							# loop around
+
 ; leave_interrupt
 &1392: 68               PLA
 &1393: aa               TAX
@@ -2822,60 +2879,85 @@ f $FE                        ; white bg, cyan bg
 &1396: a5 fc            LDA &fc
 &1398: 40               RTI
 
-; X = channel
 ; process_sound
+# on entry, X will be in range 0 to 7 in form tcc where cc indicate the channel, and t = 1 controls pitch and t = 0 is volume
+# on exit, A is the new pitch/volume
+#			&23 is the old pitch/volume
+# on exit, carry is set if the channel X was processed
 &1399: 18               CLC
-&139a: bd cc 11         LDA &11cc,X ; sound_duration_low                        # is this channel playing?
-&139d: f0 44            BEQ &13e3 ; process_sound_out                           # if not, leave
-&139f: bc b4 11         LDY &11b4,X ; sound_data_11b4
-&13a2: bd bc 11         LDA &11bc,X ; sound_data_11bc
-&13a5: d0 2d            BNE &13d4
-&13a7: bd c4 11         LDA &11c4,X ; sound_data_11c4
-&13aa: d0 05            BNE &13b1
-&13ac: de cc 11         DEC &11cc,X ; sound_duration_low
-&13af: f0 32            BEQ &13e3 ; process_sound_out
-&13b1: c8               INY
-&13b2: b9 b9 2d         LDA &2db9,Y ; sound_data_big_lookup_table
-&13b5: 10 15            BPL &13cc
-&13b7: de c4 11         DEC &11c4,X ; sound_data_11c4
-&13ba: 10 0a            BPL &13c6
-&13bc: 29 7f            AND #&7f
-&13be: 9d c4 11         STA &11c4,X ; sound_data_11c4
-&13c1: c8               INY
-&13c2: 98               TYA
-&13c3: 9d d4 11         STA &11d4,X ; sound_data_11d4
-&13c6: bc d4 11         LDY &11d4,X ; sound_data_11d4
-&13c9: b9 b9 2d         LDA &2db9,Y ; sound_data_big_lookup_table
-&13cc: 9d bc 11         STA &11bc,X ; sound_data_11bc
-&13cf: c8               INY
-&13d0: 98               TYA
-&13d1: 9d b4 11         STA &11b4,X ; sound_data_11b4
-&13d4: bd ac 11         LDA &11ac,X ; sound_duration
+&139a: bd cc 11         LDA &11cc,X ; sound_phase_count							# is this channel playing?
+&139d: f0 44            BEQ &13e3 ; process_sound_out							# if not, leave
+
+&139f: bc b4 11         LDY &11b4,X ; sound_data_ptr							# load current position in data
+&13a2: bd bc 11         LDA &11bc,X ; sound_phase_length						# get remaining phase length
+&13a5: d0 2d            BNE &13d4 ; set_volume_or_pitch							# branch if phase not finished
+
+	# so this is the end of the current phase
+	# check to see if phase is being repeated
+	# and whether there are any phases left
+&13a7: bd c4 11         LDA &11c4,X ; sound_repeat_count						# get repeat count
+&13aa: d0 05            BNE &13b1 ; get_next_sound_data							# branch over if repeat count is not zero
+&13ac: de cc 11         DEC &11cc,X ; sound_phase_count							# decrement sound_phase_count
+&13af: f0 32            BEQ &13e3 ; process_sound_out							# leave if no more phases left
+
+; get_next_sound_data
+&13b1: c8               INY														# increment data pointer
+&13b2: b9 b9 2d         LDA &2db9,Y ; sound_data_big_lookup_table				# get next byte of data - if +ve this will be the new sound_phase_length
+&13b5: 10 15            BPL &13cc ; init_new_sound_phase						# branch if data is positive (why???)
+
+&13b7: de c4 11         DEC &11c4,X ; sound_repeat_count						# decrement repeat count
+&13ba: 10 0a            BPL &13c6 ; reset_for_repeated_section					# branch over if &11c4 remains 0 or more to start the next repeat loop
+
+&13bc: 29 7f            AND #&7f												# clear bit 7 from the data
+&13be: 9d c4 11         STA &11c4,X ; sound_repeat_count						# and save the result to the repeat counter
+&13c1: c8               INY														# increment data pointer
+&13c2: 98               TYA														# and transfer to A
+&13c3: 9d d4 11         STA &11d4,X ; snd_ptr_to_repeated_section				# store data pointer to the start of the data being repeated
+
+; reset_for_repeated_section
+&13c6: bc d4 11         LDY &11d4,X ; snd_ptr_to_repeated_section				# reset data pointer for next iteration of repeating section
+&13c9: b9 b9 2d         LDA &2db9,Y ; sound_data_big_lookup_table				# get next byte of data which will be sound_phase_length
+
+; init_new_sound_phase
+&13cc: 9d bc 11         STA &11bc,X ; sound_phase_length						# set phase length
+&13cf: c8               INY														# increment data pointer
+&13d0: 98               TYA														# transfer to A
+&13d1: 9d b4 11         STA &11b4,X ; sound_data_ptr							# store current data position
+
+; set_volume_or_pitch
+&13d4: bd ac 11         LDA &11ac,X ; volume_and_pitch							# get current pitch or volume
 &13d7: 85 23            STA &23 ; used_in_sound
 &13d9: 79 b9 2d         ADC &2db9,Y ; sound_data_big_lookup_table
-&13dc: 9d ac 11         STA &11ac,X ; sound_duration
-&13df: de bc 11         DEC &11bc,X ; sound_data_11bc
+&13dc: 9d ac 11         STA &11ac,X ; volume_and_pitch							# store new pitch/volume
+
+&13df: de bc 11         DEC &11bc,X ; sound_phase_length						# decrement phase length counter
 &13e2: 38               SEC
+
 ; process_sound_out
 &13e3: 60               RTS
 
 ; push_sound_to_chip
 &13e4: 8d 4f fe         STA &fe4f
-&13e7: a9 00            LDA #&00
-&13e9: 8d 40 fe         STA &fe40
-&13ec: a9 22            LDA #&22
-&13ee: 4a               LSR
-&13ef: 90 fd            BCC &13ee
-&13f1: 8d 40 fe         STA &fe40
-&13f4: 4a               LSR
-&13f5: 90 fd            BCC &13f4
+&13e7: a9 00            LDA #&00						# addressable latch value 0 is the write enable/disable to sound chip
+&13e9: 8d 40 fe         STA &fe40						# send value to addressable latch
+
+&13ec: a9 22            LDA #&22						# in binary: 10 0010
+; wait_with_sound_generater_write_disabled
+&13ee: 4a               LSR								# shift right-> to wait a little
+&13ef: 90 fd            BCC &13ee ; wait_with_sound_generater_write_disabled		# loop (needs to last at least 8 microseconds)
+
+&13f1: 8d 40 fe         STA &fe40						# send 1000 to addressable latch to re-enable the sound chip
+
+; wait_with_sound_generator_write_enabled
+&13f4: 4a               LSR								# shift right-> to wait a little
+&13f5: 90 fd            BCC &13f4 ; wait_with_sound_generator_write_enabled			# loop
 &13f7: 60               RTS
 
-; play_sound2
+; play_whitenoise
 &13f8: 38               SEC
-&13f9: 24 18            BIT &18							# nop
+&13f9: 24				BIT ....						# nop
 ; play_sound
-&13fa: 18				CLC
+&13fa: 18					CLC
 &13fb: 85 98            STA &98 ; temp_a                # store registers
 &13fd: 86 99            STX &99 ; temp_x
 &13ff: 84 9a            STY &9a ; temp_y
@@ -2897,70 +2979,92 @@ f $FE                        ; white bg, cyan bg
 &1414: 48               PHA                             # push processor status
 &1415: 20 59 35         JSR &3559 ; get_object_distance_from_screen_centre
 &1418: c9 10            CMP #&10                        # is it too far away?
-&141a: b0 78            BCS &1494 ; play_sound_out      # if so, it makes no noise
+&141a: b0 78            BCS &1494 ; play_sound_out      # branch out if 16 or more - it's too far away so it makes no noise
+
 &141c: 0a               ASL
 &141d: 0a               ASL
 &141e: 0a               ASL
 &141f: 0a               ASL
-&1420: a8               TAY                             # Y = distance * 16
+&1420: a8               TAY                             # Y = distance * 16 (can't overflow)
+
 &1421: 28               PLP                             # pull processor status
-&1422: 90 09            BCC &142d
-&1424: a2 00            LDX #&00
-&1426: ad cc 11         LDA &11cc ; sound_duration_low
-&1429: f0 39            BEQ &1464 ; sound_slot_found
-&142b: b0 22            BCS &144f
-&142d: ae 9a 11         LDX &119a ; sound_max_channels
-&1430: bd cc 11         LDA &11cc,X ; sound_duration_low
-&1433: f0 2f            BEQ &1464 ; sound_slot_found
-&1435: ca               DEX
-&1436: d0 f8            BNE &1430
-&1438: ad e1 11         LDA &11e1
-&143b: 4d e2 11         EOR &11e2
-&143e: 4d e3 11         EOR &11e3
-&1441: ae 9a 11         LDX &119a ; sound_max_channels
-&1444: dd e0 11         CMP &11e0,X
-&1447: f0 15            BEQ &145e
+&1422: 90 09            BCC &142d ; find_unused_tone_generating_channel		# branch if need a tone generating channel
+
+&1424: a2 00            LDX #&00							# indicates noise generating channel
+&1426: ad cc 11         LDA &11cc ; sound_phase_count
+&1429: f0 39            BEQ &1464 ; init_new_sound			# branch if channel currently unused
+&142b: b0 22            BCS &144f ; can_takeover_channel	# always jump
+
+; find_unused_tone_generating_channel
+&142d: ae 9a 11         LDX &119a ; sound_max_channels		# init loop counter with constant 3
+; find_unused_tone_generating_channel_loop
+&1430: bd cc 11         LDA &11cc,X ; sound_phase_count
+&1433: f0 2f            BEQ &1464 ; init_new_sound			# branch if channel currently unused
+&1435: ca               DEX									# decrement loop counter
+&1436: d0 f8            BNE &1430 ; find_unused_tone_generating_channel_loop	# loop around
+
+&1438: ad e1 11         LDA &11e1 ; sound_id+1				# get id of sound playing on channel 1
+&143b: 4d e2 11         EOR &11e2 ; sound_id+2				# eor with id of sound playing on channel 2
+&143e: 4d e3 11         EOR &11e3 ; sound_id+3				# eor with id of sound playing on channel 3
+&1441: ae 9a 11         LDX &119a ; sound_max_channels		# init loop counter with constant 3
+
+; tone_generating_channel_loop
+&1444: dd e0 11         CMP &11e0,X ; sound_id
+&1447: f0 15            BEQ &145e ;	select_tone_channel		# branch if sound ids match - this would happen if at least 2 sounds are the same
 &1449: ca               DEX
-&144a: d0 f8            BNE &1444
-&144c: ae 9a 11         LDX &119a ; sound_max_channels
-; find_sound_slot_loop
-&144f: 98               TYA                             # A = distance * 16
-&1450: dd dd 11         CMP &11dd,X
-&1453: f0 0f            BEQ &1464 ; sound_slot_found
-&1455: 90 0d            BCC &1464 ; sound_slot_found
+&144a: d0 f8            BNE &1444 ; tone_generating_channel_loop
+
+&144c: ae 9a 11         LDX &119a ; sound_max_channels		# init loop counter with constant 3 for each channel
+
+; can_takeover_channel
+# check to see if a channel that is already playing a sound can be repurposed
+&144f: 98               TYA									# A = distance * 16
+&1450: dd dd 11         CMP &11dd,X ; sound_distance_from_screen_centre+1		# suspect this is a bug - should be &11dc!
+&1453: f0 0f            BEQ &1464 ; init_new_sound			# branch if same distance
+&1455: 90 0d            BCC &1464 ; init_new_sound			# branch if new distance greater
 &1457: ca               DEX
-&1458: f0 3b            BEQ &1495 ; play_sound_out2     # couldn't find a slot
-&145a: 10 f3            BPL &144f ; find_sound_slot_loop
-&145c: 30 37            BMI &1495 ; play_sound_out2     # couldn't find a slot
-&145e: ca               DEX
-&145f: d0 03            BNE &1464 ; sound_slot_found
-&1461: ae 9a 11         LDX &119a ; sound_max_channels
-; sound_slot_found                                      # X = 
-&1464: 98               TYA                             # A = distance * 16
-&1465: 9d dc 11         STA &11dc,X ; sound_data_11dc
-&1468: a5 9b            LDA &9b ; sound_data_l
-&146a: 9d e0 11         STA &11e0,X
-&146d: a0 01            LDY #&01
-&146f: 08               PHP
-&1470: 78               SEI
-&1471: b1 9b            LDA (&9b),Y ; sound_data        # pitch increase?
-&1473: 9d b4 11         STA &11b4,X ; sound_data_11b4
+&1458: f0 3b            BEQ &1495 ; play_sound_out2			# couldn't find a slot (when searching tone channels)
+&145a: 10 f3            BPL &144f ; can_takeover_channel
+&145c: 30 37            BMI &1495 ; play_sound_out2			# couldn't find a slot (when examining noise channel)
+
+; select_tone_channel
+# selects a channel that is playing a duplicate sound
+&145e: ca               DEX									# decrement channel index
+&145f: d0 03            BNE &1464 ; init_new_sound			# branch over if not 0
+&1461: ae 9a 11         LDX &119a ; sound_max_channels		# use channel 3 instead
+
+; init_new_sound											# X = sound channel
+&1464: 98               TYA									# A = distance * 16
+&1465: 9d dc 11         STA &11dc,X ; sound_distance_from_screen_centre		# store sound distance
+&1468: a5 9b            LDA &9b ; sound_data_l				# get sound id
+&146a: 9d e0 11         STA &11e0,X ; sound_id				# store it
+&146d: a0 01            LDY #&01							# init index into sound data block
+&146f: 08               PHP									# store processor flags for a later CLI affect
+
+&1470: 78               SEI									# prevent incomplete sound being played
+
+; store_sound_data_loop
+&1471: b1 9b            LDA (&9b),Y ; sound_data			# get sound_data + 1 and 3 (pitch increase?)
+&1473: 9d b4 11         STA &11b4,X ; sound_data_ptr		# save sound_data + 1 and 3
+
 &1476: c8               INY
-&1477: b1 9b            LDA (&9b),Y ; sound_data
-&1479: 29 f0            AND #&f0
-&147b: 9d ac 11         STA &11ac,X ; sound_duration
-&147e: 51 9b            EOR (&9b),Y ; sound_data
-&1480: 9d cc 11         STA &11cc,X ; sound_duration_low
+&1477: b1 9b            LDA (&9b),Y ; sound_data			# get sound_data + 2 and 4
+&1479: 29 f0            AND #&f0							# mask for msb
+&147b: 9d ac 11         STA &11ac,X ; volume_and_pitch			# store msb
+&147e: 51 9b            EOR (&9b),Y ; sound_data			# get lsb of sound_data + 2 and 4
+&1480: 9d cc 11         STA &11cc,X ; sound_phase_count	# store lsb
+
 &1483: c8               INY
 &1484: a9 00            LDA #&00
-&1486: 9d bc 11         STA &11bc,X ; sound_data_11bc
-&1489: 9d c4 11         STA &11c4,X ; sound_data_11c4
+&1486: 9d bc 11         STA &11bc,X ; sound_phase_length		# set to 0
+&1489: 9d c4 11         STA &11c4,X ; sound_repeat_count		# set to 0
 &148c: e8               INX
 &148d: e8               INX
 &148e: e8               INX
-&148f: e8               INX
-&1490: e0 08            CPX #&08
-&1492: 90 dd            BCC &1471
+&148f: e8               INX									# x = x + 4
+&1490: e0 08            CPX #&08							# have all 4 bytes of sound data been stored?
+&1492: 90 dd            BCC &1471 ; store_sound_data_loop	# loop around if not
+
 ; play_sound_out
 &1494: 28               PLP                             # restore processor status
 ; play_sound_out2
@@ -2987,7 +3091,7 @@ f $FE                        ; white bg, cyan bg
 
 ; play_squeal
 &14b5: 20 fa 13         JSR &13fa ; play_sound
-#14b8: 33 03 2d 84
+#14b8: 33 03 2d 84 ; sound data
 &14bc: 60		RTS
 
 #14bd: 92 ; game_paused							# game is paused whilst bit 7 is 0
@@ -3015,13 +3119,18 @@ f $FE                        ; white bg, cyan bg
 #14cd: 00 ; call_object_handlers_when_redrawing_screen
 #14ce: 00 ; water_level_interrupt				# used to set the sysvia timer 1 low counter in microseconds
 #14cf: 00 ; water_level_on_screen				# when not zero, sets sysvia timer 1 high counter
-#14d0: 00 ; water_level_low
-#14d1: 00 ; water_level
+#14d0: 00 ; water_level_low						# low byte of the y co-ordinate of the water level as determined by get_water_level
+#14d1: 00 ; water_level							# high byte of the y co-ordinate of the water level as determined by get_water_level
 
-#14d2: 00 54 74 a0 ; x_ranges		# gives the start of the 4 ranges of water level
+#14d2: 00 54 74 a0 ; x_ranges		# gives the X start of the 4 ranges of water level
+									# and indicates what the y should be from tables at 82e and 832
+									# so the 4th range starts at x >= a0
+									# the 3rd: x >= 74 and x < a0
+									# the 2nd: x >= 54 and x < 74
+									# the 1st: x >= 0 and x < 54
 
 ; f9_pressed
-&14d6: 2c 91 12		BIT &1291 ; shift_held_duration                         # if shift held?
+&14d6: 2c 91 12			BIT &1291 ; shift_held_duration                         # if shift held?
 &14d9: 10 4e            BPL &1529                                               # if not, leave
 ; save our position data somewhere more stable...
 &14db: 20 4e 39         JSR &394e ; null_function
@@ -3070,7 +3179,7 @@ f $FE                        ; white bg, cyan bg
 &1530: a2 00            LDX #&00                                                # first, x direction
 &1532: 20 d2 15         JSR &15d2 ; do_someting_in_one_direction_scrolls
 &1535: 85 a2            STA &a2
-&1537: 20 54 32         JSR &3254 ; make_positive_cmp_0
+&1537: 20 54 32         JSR &3254 ; make_positive
 &153a: 85 9d            STA &9d
 &153c: c9 0c            CMP #&0c
 &153e: b0 4e            BCS &158e
@@ -3091,12 +3200,12 @@ f $FE                        ; white bg, cyan bg
 &1557: 98               TYA
 
 &1558: 24 a2            BIT &a2
-&155a: 20 56 32         JSR &3256 ; make_positive
+&155a: 20 56 32         JSR &3256 ; reverse_sign
 &155d: 85 cf            STA &cf ; scroll_x_direction
 &155f: a2 02            LDX #&02
 &1561: 20 d2 15         JSR &15d2 ; do_something_in_one_direction_scrolls        # then y direction
 &1564: a8               TAY
-&1565: 20 56 32         JSR &3256 ; make_positive
+&1565: 20 56 32         JSR &3256 ; reverse_sign
 &1568: c5 9d            CMP &9d
 &156a: 90 1d            BCC &1589
 &156c: c9 0c            CMP #&0c
@@ -3109,7 +3218,7 @@ f $FE                        ; white bg, cyan bg
 &1579: 70 02            BVS &157d
 &157b: a9 02            LDA #&02
 &157d: c0 00            CPY #&00
-&157f: 20 56 32         JSR &3256 ; make_positive
+&157f: 20 56 32         JSR &3256 ; reverse_sign
 &1582: 85 d1            STA &d1 ; scroll_y_direction
 &1584: a9 00            LDA #&00
 &1586: 85 cf            STA &cf ; scroll_x_direction
@@ -3306,7 +3415,7 @@ f $FE                        ; white bg, cyan bg
 &16d7: 10 b7            BPL &1690
 
 &16d9: a5 c8            LDA &c8 ; screen_start_square_x						# get high byte of left of screen 
-&16db: 20 bc 2c         JSR &2cbc ; get_water_level_for_x					# get the water level
+&16db: 20 bc 2c         JSR &2cbc ; get_water_level					# get the water level
 &16de: a0 01            LDY #&01											# prepare for water level being fully on or off
 &16e0: ad d0 14         LDA &14d0 ; water_level_low
 &16e3: e5 c9            SBC &c9 ; screen_start_square_y_low
@@ -3821,7 +3930,7 @@ f $FE                        ; white bg, cyan bg
 &19dc: ca               DEX                                                     # decrement loop counter
 &19dd: 10 f5            BPL &19d4												# loop until X = &FF
 
-&19df: ad 1d 08         LDA &081d ; explosion_timer			        # increase explosion_timer if not zero
+&19df: ad 1d 08         LDA &081d ; explosion_timer								# increase explosion_timer if not zero
 &19e2: f0 03            BEQ &19e7
 &19e4: ee 1d 08         INC &081d ; explosion_timer
 &19e7: 4c b6 19         JMP &19b6 ; main_loop                                   # go round the loop again
@@ -3929,7 +4038,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1a99: 29 0f            AND #&0f
 &1a9b: 85 07            STA &07 ; current_object_rotator_low		        # random number from &00-&0f, unique for each object
 &1a9d: a5 53            LDA &53 ; this_object_x
-&1a9f: 20 bc 2c         JSR &2cbc ; get_water_level_for_x		        # calculate water_level
+&1a9f: 20 bc 2c         JSR &2cbc ; get_water_level						# calculate water_level
 &1aa2: a4 aa            LDY &aa ; current_object
 &1aa4: cc d8 29         CPY &29d8 ; whistle2_played
 &1aa7: d0 03            BNE &1aac ; not_being_used
@@ -4001,7 +4110,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1b2b: a5 3a            LDA &3a ; this_object_width
 &1b2d: 69 10            ADC #&10					        # if not, add player width to x_low
 &1b2f: ca               DEX
-&1b30: 20 56 32         JSR &3256 ; make_positive
+&1b30: 20 56 32         JSR &3256 ; reverse_sign
 &1b33: 18               CLC
 &1b34: 6d 80 08         ADC &0880 ; object_stack_x_low                          # player x_low
 &1b37: 85 4f            STA &4f ; this_object_x_low                             # set object x_low to match
@@ -4024,14 +4133,14 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1b5b: a5 1c            LDA &1c ; wall_collision_angle
 &1b5d: e5 de            SBC &de ; player_angle
 &1b5f: e9 40            SBC #&40
-&1b61: 20 56 32         JSR &3256 ; make_positive
+&1b61: 20 56 32         JSR &3256 ; reverse_sign
 &1b64: 4a               LSR
 &1b65: 4a               LSR
 &1b66: 69 c0            ADC #&c0
 &1b68: 65 1d            ADC &1d ; wall_collision_frict_y_vel
 &1b6a: 90 06            BCC &1b72 ; not_player2
 &1b6c: 4a               LSR
-&1b6d: 20 0c 25         JSR &250c ; damage_object                               # take damage from colliding with scenery
+&1b6d: 20 0c 25         JSR &250c ; damage_object_without_killing_it                               # take damage from colliding with scenery
 &1b70: 85 15            STA &15 ; this_object_energy
 ; not_player2
 &1b72: a5 18            LDA &18 ; wall_collision_bottom_minus_top
@@ -4064,7 +4173,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1baa: 08               PHP
 &1bab: a9 10            LDA #&10
 &1bad: 28               PLP
-&1bae: 20 56 32         JSR &3256 ; make_positive                               # if so, alter x velocity accordingly
+&1bae: 20 56 32         JSR &3256 ; reverse_sign                               # if so, alter x velocity accordingly
 &1bb1: 20 38 2a         JSR &2a38 ; move_object_in_one_direction_with_given_velocity
 &1bb4: 20 48 2a         JSR &2a48 ; calculate_object_maxes
 ; static_object
@@ -4158,7 +4267,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1c59: a4 38            LDY &38 ; this_object_weight
 &1c5b: c8               INY
 &1c5c: 66 9d            ROR &9d
-&1c5e: 20 54 32         JSR &3254 ; make_positive_cmp_0
+&1c5e: 20 54 32         JSR &3254 ; make_positive
 &1c61: c9 1e            CMP #&1e
 &1c63: 90 22            BCC &1c87
 &1c65: c9 32            CMP #&32
@@ -4177,7 +4286,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1c79: 10 02            BPL &1c7d
 &1c7b: a0 00            LDY #&00
 &1c7d: 24 9d            BIT &9d
-&1c7f: 20 56 32         JSR &3256 ; make_positive
+&1c7f: 20 56 32         JSR &3256 ; reverse_sign
 &1c82: 95 b4            STA &b4,X ; # X = 2, &b6 velocity_y; X = 0, &b4 velocity_x 
 &1c84: 20 94 3f         JSR &3f94
 &1c87: a5 53            LDA &53 ; this_object_x                                 # consider wind for (x - &9b) next
@@ -4549,18 +4658,18 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1f0a: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &1f0d: a8               TAY
 &1f0e: 28               PLP
-&1f0f: 20 56 32         JSR &3256 ; make_positive
+&1f0f: 20 56 32         JSR &3256 ; reverse_sign
 &1f12: e9 3f            SBC #&3f
 &1f14: c9 40            CMP #&40
 &1f16: b0 12            BCS &1f2a
 &1f18: b4 43            LDY &43,X	# X = 2, &45 = this_object_vel_y ; X = 0, &43 = this_object_vel_x
 &1f1a: 98               TYA
-&1f1b: 20 56 32         JSR &3256 ; make_positive
+&1f1b: 20 56 32         JSR &3256 ; reverse_sign
 &1f1e: c9 40            CMP #&40
 &1f20: b0 08            BCS &1f2a
 &1f22: a9 40            LDA #&40
 &1f24: c0 00            CPY #&00
-&1f26: 20 56 32         JSR &3256 ; make_positive
+&1f26: 20 56 32         JSR &3256 ; reverse_sign
 &1f29: a8               TAY
 &1f2a: 24 c3            BIT &c3 ; loop_counter_every_10
 &1f2c: 10 08            BPL &1f36
@@ -4777,7 +4886,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2088: a9 4c            LDA #&4c
 &208a: 8d 5a 21         STA &215a		# &215a = JMP &2122
 &208d: a5 c8            LDA &c8 ; screen_start_square_x
-&208f: 20 bc 2c         JSR &2cbc ; get_water_level_for_x
+&208f: 20 bc 2c         JSR &2cbc ; get_water_level
 &2092: ae 59 1e         LDX &1e59 ; number_of_particles_x8
 &2095: 86 9e            STX &9e
 &2097: bd dd 28         LDA &28dd,X ; particle_stack_type
@@ -5167,7 +5276,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 &2314: 38               SEC
 &2315: 10 03            BPL &231a		; branch if stack object > this object
-&2317: 20 56 32         JSR &3256 ; make_positive (as part of operation bit 7 will be set to 0, and C will be cleared)
+&2317: 20 56 32         JSR &3256 ; reverse_sign (as part of operation bit 7 will be set to 0, and C will be cleared)
 
 &231a: 26 99            ROL &99 ; velocity-signs	# shift left and set bit 0 to value of carry flag: set when that_x > this_x, or that_y > this_y, and will be cleared otherwise 
 &231c: 88               DEY
@@ -5200,10 +5309,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 &232f: 84 b8            STY &b8 ; delta_magnitude	# will be between 1 to 8
 &2331: a5 7d            LDA &7d                         # support_delta_y_low
-&2333: 20 56 32         JSR &3256 ; make_positive
+&2333: 20 56 32         JSR &3256 ; reverse_sign
 &2336: 85 b7            STA &b7 ; some_kind_of_velocity
 &2338: a5 7b            LDA &7b                         # support_delta_x_low
-&233a: 4c 56 32         JMP &3256 ; make_positive	# and rts
+&233a: 4c 56 32         JMP &3256 ; reverse_sign	# and rts
 
 ; get_opposite_velocities
 # returns &b7 as y_vel, A as x_vel
@@ -5467,28 +5576,34 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &24a5: 60               RTS
 
 ; take_damage
-; A = damage, Y = stack object to damage
-&24a6: c0 00            CPY #&00                                                # is it the player being damaged?
-&24a8: d0 41            BNE &24eb ; not_player_being_damaged
-&24aa: 8d 5f 08         STA &085f ; damage
-&24ad: 24 da            BIT &da ; timer_2
-&24af: 30 08            BMI &24b9 ; no_daze
-&24b1: 46 31            LSR &31 ; player_crawling
-&24b3: c5 ba            CMP &ba ; player_immobility_daze        
-&24b5: 90 02            BCC &24b9 ; no_daze
+# on entry, A = amount of damage
+#           Y = stack object to damage
+# on exit, A contains the remaining energy
+#		   Z will be set if remaining energy is 0
+#          &9c contains the object's energy before the damage was done    
+&24a6: c0 00            CPY #&00                                                # set carry. is it the player being damaged?
+&24a8: d0 41            BNE &24eb ; record_damage								# branch if it isn't
+
+&24aa: 8d 5f 08         STA &085f ; damage										# save damage done
+&24ad: 24 da            BIT &da ; timer_2										# set N randomly
+&24af: 30 08            BMI &24b9 ; no_daze										# branch if N set and avoid daze
+&24b1: 46 31            LSR &31 ; player_crawling								# set bit 7 from carry to make player crawl
+&24b3: c5 ba            CMP &ba ; player_immobility_daze						# compare damage done to immobility daze
+&24b5: 90 02            BCC &24b9 ; no_daze										# branch over if player_immobility_daze > damage
 &24b7: 85 ba            STA &ba ; player_immobility_daze                        # daze the player when seriously damaged
+
 ; no_daze
 &24b9: 8a               TXA                                                     # preserve X
 &24ba: 48               PHA
 &24bb: 2c 13 08         BIT &0813 ; protection_suit_collected                   # have we got the protection suit?
 &24be: 10 0d            BPL &24cd ; no_protection_suit
-&24c0: a2 05            LDX #&05						# identifies the protection suit
-&24c2: 20 79 2d         JSR &2d79 ; reduce_weapon_energy_for_x                  # drain its energy
-&24c5: 20 79 2d         JSR &2d79 ; reduce_weapon_energy_for_x
+&24c0: a2 05            LDX #&05												# identifies the protection suit
+&24c2: 20 79 2d         JSR &2d79 ; reduce_equipment_energy_for_x                  # drain its energy
+&24c5: 20 79 2d         JSR &2d79 ; reduce_equipment_energy_for_x
 &24c8: 20 92 2d         JSR &2d92 ; make_firing_erratic_at_low_energy
 &24cb: b0 0d            BCS &24da ; suit_working                                # carry set if suit is working
 ; no_protection_suit
-&24cd: a0 03            LDY #&03						# init loop counter
+&24cd: a0 03            LDY #&03												# init loop counter
 &24cf: 0e 5f 08         ASL &085f ; damage
 &24d2: 90 03            BCC &24d7
 &24d4: 6e 5f 08         ROR &085f ; damage                                      # if no suit, multiply the damage by 8
@@ -5503,36 +5618,34 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &24e6: 68               PLA
 &24e7: aa               TAX                                                     # restore X
 &24e8: ad 5f 08         LDA &085f ; damage
-; not_player_being_damaged
+
+; record_damage
 &24eb: 85 9d            STA &9d ; damage
 &24ed: c9 08            CMP #&08
 &24ef: 90 08            BCC &24f9                                               # branch over if the damage is more than &08 (why?)
 &24f1: b9 c6 08         LDA &08c6,Y ; object_stack_flags
 &24f4: 09 08            ORA #&08                                                # mark the object as being damaged
 &24f6: 99 c6 08         STA &08c6,Y ; object_stack_flags
+
 &24f9: b9 26 09         LDA &0926,Y ; object_stack_energy
 &24fc: 85 9c            STA &9c ; old_energy
 &24fe: 38               SEC
 &24ff: e5 9d            SBC &9d ; damage                                        # reduce energy by damage
-&2501: b0 05            BCS &2508
-&2503: a9 00            LDA #&00                                                # setting to zero if too much
+&2501: b0 05            BCS &2508 ; set_stack_object_energy						# branch over if remaining energy >= 0
 
-*** interlaced code *** 
-
-&2505: 2c a9 01         BIT &01a9						# set zero flag
-&2508: 99 26 09         STA &0926,Y ; object_stack_energy
-&250b: 60               RTS
-
-*** alternative code ***
+&2503: a9 00            LDA #&00                                                # reset to zero
+&2505: 2c 				(  BIT &01a9  )											# interlaced code
 
 ; set_stack_object_energy_to_one
-#2506:    a9 01         LDA #&01
+#2506:    a9 01				LDA #&01
+
+; set_stack_object_energy
 &2508: 99 26 09         STA &0926,Y ; object_stack_energy
 &250b: 60               RTS
 
 *** interlaced code ends
 
-; damage_object
+; damage_object_without_killing_it
 &250c: 20 a6 24         JSR &24a6 ; take_damage                                 # have we still got energy?
 &250f: d0 04            BNE &2515                                               # if so, leave
 &2511: a5 9c            LDA &9c ; old_energy                                    # if we had energy before being damaged,
@@ -5540,6 +5653,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2515: 60               RTS
 
 ; mark_stack_object_for_removal
+# on entry, Y contains the index of the object to remove from the primary stack
 &2516: b9 c6 08         LDA &08c6,Y ; object_stack_flags
 &2519: 09 20            ORA #&20
 &251b: 99 c6 08         STA &08c6,Y ; object_stack_flags
@@ -5571,7 +5685,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &253b: 60               RTS
 
 ; is_this_object_damaged
-; on exit, Z will be set if the current object is marked damaged
+; on exit, C will be set if the current object is marked damaged
 &253c: 48               PHA
 &253d: a5 6f            LDA &6f ; this_object_flags
 &253f: 29 08            AND #&08
@@ -5646,226 +5760,270 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; process_events
 &259a: a9 67            LDA #&67                                                # desired water level = &67 in endgame
 &259c: 2c 1e 08         BIT &081e ; endgame_value                               # are we in the endgame?
-&259f: 30 3e            BMI &25df ; no_maggot_machine                           # if not, the maggot machine exists
-&25a1: a9 60            LDA #&60
-&25a3: 8d 88 09         STA &0988 ; background_object_data	                # reset number of maggots
+&259f: 30 3e            BMI &25df ; process_earthquake                          # branch over if maggot machine destroyed
+
+&25a1: a9 60            LDA #&60												# data for handle_background_object_emerging: 24 objects and enabled
+&25a3: 8d 88 09         STA &0988 ; background_object_data						# reset data for background object 2 (object_emerging_from_sucker/bush : maggot x 24)
 &25a6: 24 c1            BIT &c1 ; loop_counter_every_40
-&25a8: 10 19            BPL &25c3 ; no_maggots                                  # once every &40 cycles,
-&25aa: a9 27            LDA #&27				                # &27 = maggot
-&25ac: 20 60 1e         JSR &1e60 ; reserve_object_low_priority		        # try to create a maggot
-&25af: b0 12            BCS &25c3 ; no_maggots			                # leave if we couldn't find a slot
-&25b1: a9 d9            LDA #&d9				                # (&61, &d9)
-&25b3: 99 b4 08         STA &08b4,Y ; object_stack_y    	                
+&25a8: 10 19            BPL &25c3 ; process_stone_door                          # branch &3f out of &40 cycles
+
+&25aa: a9 27            LDA #&27												# object type &27 = maggot
+&25ac: 20 60 1e         JSR &1e60 ; reserve_object_low_priority					# try to create a maggot
+&25af: b0 12            BCS &25c3 ; process_stone_door			                # leave if we couldn't find a free slot
+
+# set position of new maggot to in the teleport below the maggot machine
+&25b1: a9 d9            LDA #&d9												# for high byte of y co-ordinate
+&25b3: 99 b4 08         STA &08b4,Y ; object_stack_y    						# set high byte of y co-ordinate
 &25b6: a9 61            LDA #&61                                                # create maggot at (&61.&61, &d9.&70)
-&25b8: 99 91 08         STA &0891,Y ; object_stack_x                            # ie, by the teleporter in the maggot machine
+&25b8: 99 91 08         STA &0891,Y ; object_stack_x                            # ie, in the teleporter underneath the maggot machine
 &25bb: 99 80 08         STA &0880,Y ; object_stack_x_low
 &25be: a9 70            LDA #&70
 &25c0: 99 a3 08         STA &08a3,Y ; object_stack_y_low
-; no_maggots
-&25c3: ad 48 0a         LDA &0a48 ; background_object_data	                # for stone door at (&6b, &e1)
+
+; process_stone_door
+&25c3: ad 48 0a         LDA &0a48 ; background_object_data						# get background data byte for stone door at (&6b, &e1)
 &25c6: 24 c2            BIT &c2 ; loop_counter_every_20
-&25c8: 10 0b            BPL &25d5                                               # once every &20 cycles,
-&25ca: 29 fd            AND #&fd
-&25cc: ac 33 08         LDY &0833 ; water_level_by_x_range_range1
-&25cf: c0 e0            CPY #&e0
-&25d1: b0 02            BCS &25d5                                               # open door
-&25d3: 09 02            ORA #&02
-&25d5: 8d 48 0a         STA &0a48 ; background_object_data                      # for stone door at (&6b, &e1)
-&25d8: 29 02            AND #&02
-&25da: 0a               ASL
+&25c8: 10 0b            BPL &25d5                                               # branch &1f out of &20 cycles
+
+&25ca: 29 fd            AND #&fd												# mask for the top 6 bits
+&25cc: ac 33 08         LDY &0833 ; water_level_by_x_range_range1				# get water level by door
+&25cf: c0 e0            CPY #&e0												# comp
+&25d1: b0 02            BCS &25d5                                               # branch if water level e0 or below
+&25d3: 09 02            ORA #&02												# cause door to open when above
+
+&25d5: 8d 48 0a         STA &0a48 ; background_object_data                      # set data for stone door at (&6b, &e1), thereby opening or closing it
+&25d8: 29 02            AND #&02												# get open/close state
+&25da: 0a               ASL														# move bit to bit 5
 &25db: 0a               ASL
-&25dc: 0a               ASL                                                     # desired water level varies depending on door
-&25dd: 69 d2            ADC #&d2                                                # around &d2 if maggot machine operational
-; no_maggot_machine
-&25df: 8d 37 08         STA &0837 ; desired_water_level_by_x_range_range1
-&25e2: ad 1f 08         LDA &081f ; earthquake_triggered
-&25e5: 10 2b            BPL &2612 ; no_earthquake                               # is the earth quaking?
-&25e7: 0a               ASL
-&25e8: c5 db            CMP &db ; timer_3
-&25ea: 29 10            AND #&10
-&25ec: 2a               ROL
-&25ed: f0 0b            BEQ &25fa
-&25ef: 24 c4            BIT &c4 ; loop_counter_every_08
-&25f1: 10 07            BPL &25fa                       
-&25f3: c9 21            CMP #&21
-&25f5: f0 03            BEQ &25fa
-&25f7: ee 1f 08         INC &081f ; earthquake_triggered
-&25fa: 4a               LSR
-&25fb: d0 15            BNE &2612
-&25fd: 20 87 25         JSR &2587 ; gen_random_num                            # shudder screen
-&2600: 29 01            AND #&01
-&2602: 09 5a            ORA #&5a
-&2604: a0 02            LDY #&02
+&25dc: 0a               ASL                                                     
+&25dd: 69 d2            ADC #&d2                                                # and add &d2 
+
+; process_earthquake
+&25df: 8d 37 08         STA &0837 ; desired_water_level_by_x_range_range1		# set desired water level
+
+&25e2: ad 1f 08         LDA &081f ; earthquake_triggered						# bit 7 set if earthquake triggered
+&25e5: 10 2b            BPL &2612 ; process_waterfall_sound                     # branch over if earthquake not happening
+
+&25e7: 0a               ASL														# multiply by 2
+&25e8: c5 db            CMP &db ; timer_3										# set carry randomly
+&25ea: 29 10            AND #&10												# get bit 4
+&25ec: 2a               ROL														# move to bit 5 and place carry in bit 0
+&25ed: f0 0b            BEQ &25fa												# branch over if result is 0
+&25ef: 24 c4            BIT &c4 ; loop_counter_every_08							
+&25f1: 10 07            BPL &25fa												# branch over 7 out of 8 times 
+&25f3: c9 21            CMP #&21												
+&25f5: f0 03            BEQ &25fa												# branch over if result is 21
+&25f7: ee 1f 08         INC &081f ; earthquake_triggered						# increment earthquake timer
+
+&25fa: 4a               LSR														# divide by 2
+&25fb: d0 15            BNE &2612												# branch over if timer_3 bit 4 set
+&25fd: 20 87 25         JSR &2587 ; gen_random_num								# get random num
+&2600: 29 01            AND #&01												# mask for bit 0
+&2602: 09 5a            ORA #&5a												# set bits to get 5a or 5b
+&2604: a0 02            LDY #&02												# 6845 register 2 is horizontal sync position
 &2606: 78               SEI
-&2607: 8c 00 fe         STY &fe00 	                                        # write to video controller
-&260a: 8d 01 fe         STA &fe01 	                                        # write to video controller
+&2607: 8c 00 fe         STY &fe00 												# write to video controller to set which register
+&260a: 8d 01 fe         STA &fe01 												# write to video controller to set register value
 &260d: 58               CLI
-&260e: a0 00            LDY #&00
+&260e: a0 00            LDY #&00												# primary stack slot 0 is the player
 &2610: f0 07            BEQ &2619
-; no_earthquake
+
+; process_waterfall_sound
 &2612: 2c 1e 08         BIT &081e ; endgame_value                               # are we in the endgame?
-&2615: 30 0f            BMI &2626 ; no_waterfall_sound
-&2617: a0 11            LDY #&11
-&2619: 84 aa            STY &aa ; current_object                                # use the eighteenth slot for the waterfall
+&2615: 30 0f            BMI &2626 ; process_water_level
+&2617: a0 11            LDY #&11												# pseudo slot on the primary stack for waterfall
+
+&2619: 84 aa            STY &aa ; current_object                                # set current object to 0 (player) or 11 (waterfall)
 &261b: 24 c4            BIT &c4 ; loop_counter_every_08
-&261d: 10 07            BPL &2626                                               # every 8 cycles,
-&261f: 20 f8 13         JSR &13f8 ; play_sound2                                 # make a noise if it's close enough
+&261d: 10 07            BPL &2626                                               # branch over 7 out of 8 cycles
+&261f: 20 f8 13         JSR &13f8 ; play_whitenoise                             # make a noise if it's close enough
 #2622: 70 c2 6e a3 ; sound data
 
-; no_waterfall_sound
-&2626: a2 fe            LDX #&fe
-&2728: a5 c0            LDA &c0 ; loop_counter
-&262a: 29 20            AND #&20                                                # every &40 cycles, there's &20 cycles each
-&262c: d0 02            BNE &2630                                               # of &fe or &02 water level movements
-&262e: a2 02            LDX #&02                                                # so the water level bobs up and down
-&2630: 86 a2            STX &a2 ; water_level_change
-&2632: a2 03            LDX #&03
-; water_level_loop
-&2634: a9 18            LDA #&18
-&2636: 38               SEC
-&2637: fd 2e 08         SBC &082e,X ; water_level_low_by_x_range                # alter the water levels to match
-&263a: bd 36 08         LDA &0836,X ; desired_water_level_by_x_range            # aiming for the desired water level
-&263d: fd 32 08         SBC &0832,X ; water_level_by_x_range
-&2640: 65 a2            ADC &a2 ; water_level_change
-&2642: 08               PHP
-&2643: a0 02            LDY #&02
-&2645: 20 5e 32         JSR &325e ; keep_within_range
-&2648: 7d 2e 08         ADC &082e,X ; water_level_low_by_x_range
-&264b: 9d 2e 08         STA &082e,X ; water_level_low_by_x_range
-&264e: 90 03            BCC &2653
-&2650: fe 32 08         INC &0832,X ; water_level_by_x_range
-&2653: 28               PLP
-&2654: 10 03            BPL &2659
-&2656: de 32 08         DEC &0832,X ; water_level_by_x_range
-&2659: ca               DEX
-&265a: 10 d8            BPL &2634 ; water_level_loop
+; process_water_level
+# every &40 cycles, there's &20 cycles each of &fe or &02 water level movements so the water level bobs up and down
+&2626: a2 fe            LDX #&fe												# start off assuming water level will raise
+&2728: a5 c0            LDA &c0 ; loop_counter									# get current counter
+&262a: 29 20            AND #&20                                                # get bit 6
+&262c: d0 02            BNE &2630                                               # branch over if set
+&262e: a2 02            LDX #&02                                                # water level will instead lower
 
-&265c: a9 10            LDA #&10
-&265e: 85 2d            STA &2d ; background_processing_flag
-&2660: a9 07            LDA #&07                                                # consider a random square near the player
-&2662: 20 43 27         JSR &2743 ; get_random_square_near_player
-&2665: 20 15 17         JSR &1715 ; determine_background
-&2668: c9 2d            CMP #&2d                                                # is it empty space?
-&266a: d0 5c            BNE &26c8 ; no_emerging_objects
-&266c: a5 c3            LDA &c3 ; loop_counter_every_10                         # if so,
-&266e: 10 58            BPL &26c8 ; no_emerging_objects                         # once every &10 cycles,
-&2670: ad 1e 08         LDA &081e ; endgame_value
-&2673: 29 80            AND #&80
-&2675: 49 80            EOR #&80                                                # objects less likely to emerge in endgame
-&2677: 05 da            ORA &da ; timer_2
-&2679: c5 97            CMP &97 ; square_y                                      # objects more likely to emerge deeper down
-&267b: b0 4b            BCS &26c8 ; no_emerging_objects
-&267d: 2c 1d 08         BIT &081d ; explosion_timer                             # is an explosion in progress?
-&2680: 30 06            BMI &2688                                               
-&2682: a5 db            LDA &db ; timer_3
-&2684: 29 70            AND #&70
-&2686: d0 40            BNE &26c8 ; no_emerging_objects                         # if not, objects less likely to emerge
-&2688: a0 01            LDY #&01                                # indicates background object id 1 (a worm) 
-&268a: 20 87 25         JSR &2587 ; gen_random_num
-&268d: c9 08            CMP #&08                                # set if >&8
-&268f: 6a               ROR
-&2690: 2c 1e 08         BIT &081e ; endgame_value               # or endgame
-&2693: 30 06            BMI &269b
-&2695: 2c aa 19         BIT &19aa ; player_east_of_76
-&2698: 20 56 32         JSR &3256 ; make_positive
-&269b: 0a               ASL
-&269c: 90 01            BCC &269f
-&269e: c8               INY										# use background object 2 instead (a maggot)
-&269f: 84 bd            STY &bd ; new_object_data_pointer		
-&26a1: 84 be            STY &be ; new_object_type_pointer
-&26a3: b9 86 09         LDA &0986,Y ; background_objects_data
-&26a6: 0a               ASL
-&26a7: c5 db            CMP &db ; timer_3
-&26a9: 90 1d            BCC &26c8 ; no_emerging_objects
+&2630: 86 a2            STX &a2 ; water_level_change							# store water level change
+&2632: a2 03            LDX #&03												# init loop counter for the 4 ranges
+
+; water_level_loop
+&2634: a9 18            LDA #&18												# hardcoded desired low byte water level
+&2636: 38               SEC
+&2637: fd 2e 08         SBC &082e,X ; water_level_low_by_x_range                # calculate difference with current water level
+&263a: bd 36 08         LDA &0836,X ; desired_water_level_by_x_range            # get desired high byte water level
+&263d: fd 32 08         SBC &0832,X ; water_level_by_x_range					# calculate difference with current water level
+&2640: 65 a2            ADC &a2 ; water_level_change							# adjust result with raise or lower change
+&2642: 08               PHP														# negative flag gives direction of travel - save it for later
+&2643: a0 02            LDY #&02												# specify maximum range
+&2645: 20 5e 32         JSR &325e ; keep_within_range							# keep A to between -2 and 2
+
+&2648: 7d 2e 08         ADC &082e,X ; water_level_low_by_x_range				# calculate new low byte of level
+&264b: 9d 2e 08         STA &082e,X ; water_level_low_by_x_range				# save result
+&264e: 90 03            BCC &2653												# branch over if no overflow 
+&2650: fe 32 08         INC &0832,X ; water_level_by_x_range					# increment high byte of level
+
+&2653: 28               PLP														# restore N flag
+&2654: 10 03            BPL &2659												# branch over if N clear
+&2656: de 32 08         DEC &0832,X ; water_level_by_x_range					# decrement high byte of level
+
+&2659: ca               DEX														# decrement loop counter
+&265a: 10 d8            BPL &2634 ; water_level_loop							# loop around
+
+# deal with emerging objects
+&265c: a9 10            LDA #&10												# indicates time passing to background event handlers
+&265e: 85 2d            STA &2d ; background_processing_flag					# set background_processing_flag
+&2660: a9 07            LDA #&07                                                # specifies a diameter in sqaures around the player
+&2662: 20 43 27         JSR &2743 ; get_random_square_near_player				# select a random square around player, result returned in &95 for x, &97 for y
+&2665: 20 15 17         JSR &1715 ; determine_background						# get the background for the square
+&2668: c9 2d            CMP #&2d                                                # things only emerge from the full earth background
+&266a: d0 5c            BNE &26c8 ; process_stars								# branch out if it's not
+
+&266c: a5 c3            LDA &c3 ; loop_counter_every_10                         
+&266e: 10 58            BPL &26c8 ; process_stars								# branch out 15 out of 16 cycles
+
+&2670: ad 1e 08         LDA &081e ; endgame_value								# get endgame flag
+&2673: 29 80            AND #&80												# mask for bit 7 (set once maggot machine destroyed) 
+&2675: 49 80            EOR #&80                                                # toggle the bit, this decreases the chance of objects emerging in the endgame
+&2677: 05 da            ORA &da ; timer_2										# add in a random value
+&2679: c5 97            CMP &97 ; square_y                                      # compare to the y co-ordinate chosen
+&267b: b0 4b            BCS &26c8 ; process_stars								# branch out if the generated value if equal or more than the y co-ordinate chosen
+																				# therefore objects are more likely to emerge deeper down
+
+&267d: 2c 1d 08         BIT &081d ; explosion_timer                             # is an explosion in progress? bit 7 set if so
+&2680: 30 06            BMI &2688												# branch over if so (objects are more likely to emerge)
+
+&2682: a5 db            LDA &db ; timer_3										# get random number
+&2684: 29 70            AND #&70												# mask for 3 bits
+&2686: d0 40            BNE &26c8 ; process_stars								# branch out 7 out of 8 times
+
+&2688: a0 01            LDY #&01												# indicates background object id 1 (object_emerging_from_sucker/bush : worm x 31) 
+&268a: 20 87 25         JSR &2587 ; gen_random_num								# get random number
+&268d: c9 08            CMP #&08												# carry set if number was >= &8
+&268f: 6a               ROR														# halve value, and move carry to bit 7 (so bit 7 set most of the time)
+&2690: 2c 1e 08         BIT &081e ; endgame_value								# are we in endgame?
+&2693: 30 06            BMI &269b												# branch over if so - this increases the chance of a maggot rather than a worm
+
+&2695: 2c aa 19         BIT &19aa ; player_east_of_76							# set N if player is at or beyond &76 on the x co-ordinate (true for the early game)
+&2698: 20 56 32         JSR &3256 ; reverse_sign								# negate if N set (so bit 7 will be clear most of the time if player is in early game)
+
+&269b: 0a               ASL A													# move bit 7 to carry											
+&269c: 90 01            BCC &269f												# branch over if carry clear
+&269e: c8               INY														# change to use background object 2 instead (a maggot)
+
+&269f: 84 bd            STY &bd ; new_object_data_pointer						# store index to background object data
+&26a1: 84 be            STY &be ; new_object_type_pointer						# store index to background object type
+&26a3: b9 86 09         LDA &0986,Y ; background_objects_data					# get background object data (&7c for worm, &60 for maggot)
+&26a6: 0a               ASL														# double it (F8 for worm, c0 for maggot)
+&26a7: c5 db            CMP &db ; timer_3										# compare against random number
+&26a9: 90 1d            BCC &26c8 ; process_stars								# branch out if random number was greater (not often for worm, reasonably often for maggot)
+
 &26ab: 20 60 27         JSR &2760 ; store_stack_pointer_and_pull_in_tertiary_object 
-&26ae: b0 18            BCS &26c8 ; no_emerging_objects                         # leave if we couldn't allocate an object
-&26b0: 99 a3 08         STA &08a3,Y ; object_stack_y_low
-&26b3: ad 91 08         LDA &0891 ; object_stack_x                              # for player
-&26b6: e5 95            SBC &95 ; square_x
-&26b8: 99 e6 08         STA &08e6,Y ; object_stack_vel_x                        # aim the new object at the player
-&26bb: ad b4 08         LDA &08b4 ; object_stack_y                              # for player
-&26be: e5 97            SBC &97 ; square_y
-&26c0: 99 f6 08         STA &08f6,Y ; object_stack_vel_y
-&26c3: a9 80            LDA #&80
-&26c5: 99 76 09         STA &0976,Y ; object_stack_extra
-; no_emerging_objects
-&26c8: a5 97            LDA &97 ; square_y
-&26ca: c9 4e            CMP #&4e				                # are we above y = &4e ?
-&26cc: b0 18            BCS &26e6 ; no_stars
-&26ce: 85 8d            STA &8d ; particle_y
-&26d0: a5 95            LDA &95 ; square_x
-&26d2: 85 8b            STA &8b ; particle_x
-&26d4: a9 00            LDA #&00
-&26d6: 85 89            STA &89 ; particle_y_low
-&26d8: 85 87            STA &87 ; particle_x_low
-&26da: ad b5 19         LDA &19b5 ; player_teleporting_flag                     # no stars while player teleporting
-&26dd: 05 00            ORA &00 ; square_is_mapped_data                         # no stars inside the spaceships
-&26df: 30 05            BMI &26e6 ; no_stars
-&26e1: a0 4d            LDY #&4d                                                # &4d = stars
-&26e3: 20 8c 21         JSR &218c ; add_particle		                # create star particle
-; no_stars
-&26e6: ac 1f 08         LDY &081f ; earthquake_triggered                       
-&26e9: 88               DEY                             
-&26ea: c0 c8            CPY #&c8                                                
-&26ec: 6a               ROR
-&26ed: 2d 1e 08         AND &081e ; endgame_value
-&26f0: 05 c2            ORA &c2 ; loop_counter_every_20                         # in the endgame / earthquake,
-&26f2: 10 20            BPL &2714 ; no_triax2                                   # triax is much more likely to appear
-&26f4: 20 87 25         JSR &2587 ; gen_random_num
-&26f7: d0 1b            BNE &2714 ; no_triax2                                   # random probability for triax to appear
-&26f9: ad b4 08         LDA &08b4 ; object_stack_y 		
+&26ae: b0 18            BCS &26c8 ; process_stars								# leave if we couldn't allocate a slot on the primary stack
+
+&26b0: 99 a3 08         STA &08a3,Y ; object_stack_y_low						# set low byte of y position to the same as the low byte of x position
+&26b3: ad 91 08         LDA &0891 ; object_stack_x                              # get x co-ordinate of player
+&26b6: e5 95            SBC &95 ; square_x										# subtract position of new worm/maggot on x
+&26b8: 99 e6 08         STA &08e6,Y ; object_stack_vel_x                        # aim the new object at the player on x
+&26bb: ad b4 08         LDA &08b4 ; object_stack_y                              # get y co-ordinate of player
+&26be: e5 97            SBC &97 ; square_y										# subtract position of new worm/maggot on y
+&26c0: 99 f6 08         STA &08f6,Y ; object_stack_vel_y						# aim the new object at the player on y
+&26c3: a9 80            LDA #&80												# initial value indicating ???
+&26c5: 99 76 09         STA &0976,Y ; object_stack_extra						# set object's extra value
+
+; process_stars
+&26c8: a5 97            LDA &97 ; square_y										# retrieve y co-ordinate of square chosen randomly earlier on
+&26ca: c9 4e            CMP #&4e												# is it above ground level?
+&26cc: b0 18            BCS &26e6 ; process_triax								# only if the square is less than 4e can stars be shown
+
+&26ce: 85 8d            STA &8d ; particle_y									# store the high byte for y co-ordinate
+&26d0: a5 95            LDA &95 ; square_x										# retrieve x co-ordinate of square chosen randomly earlier on
+&26d2: 85 8b            STA &8b ; particle_x									# store the high byte for x co-ordinate
+&26d4: a9 00            LDA #&00												# initial value for low byte of position
+&26d6: 85 89            STA &89 ; particle_y_low								# set low byte of x co-ordinate
+&26d8: 85 87            STA &87 ; particle_x_low								# set low byte of y co-ordinate
+&26da: ad b5 19         LDA &19b5 ; player_teleporting_flag                     # get player teleporting flag
+&26dd: 05 00            ORA &00 ; square_is_mapped_data                         # and apply flag that indicates background is explictly set (rather than procedurally generated)
+&26df: 30 05            BMI &26e6 ; process_triax								# branch over if teleporting or square mapped (this would be inside spaceship)
+&26e1: a0 4d            LDY #&4d                                                # &4d indicates stars
+&26e3: 20 8c 21         JSR &218c ; add_particle								# create star particle
+
+; process_triax
+&26e6: ac 1f 08         LDY &081f ; earthquake_triggered						# get earthquake timer (triax is much more likely to appear if quaking or in endgame)
+&26e9: 88               DEY														
+&26ea: c0 c8            CPY #&c8                                                # set carry if timer above c8
+&26ec: 6a               ROR														# move carry to bit 7 ()
+&26ed: 2d 1e 08         AND &081e ; endgame_value								# bit 7 only remains set if in endgame (which surely it would be if the earthquake is happening)
+&26f0: 05 c2            ORA &c2 ; loop_counter_every_20                         # set bit 7 every 1 in 32 times
+&26f2: 10 20            BPL &2714 ; process_clawed_robots2                      # branch out if not set
+&26f4: 20 87 25         JSR &2587 ; gen_random_num								# get random number
+&26f7: d0 1b            BNE &2714 ; process_clawed_robots2                      # branch out if not 0
+
+&26f9: ad b4 08         LDA &08b4 ; object_stack_y 								# get player's Y co-ordinate
 &26fc: e9 14            SBC #&14                                                # triax doesn't appear above y = &94
 &26fe: 0d 1e 08         ORA &081e ; endgame_value                               # unless we're in the end game
-&2701: 10 0e            BPL &2711 ; no_triax
-&2703: a9 26            LDA #&26				                # &26 = triax
+&2701: 10 0e            BPL &2711 ; process_clawed_robots						# branch out if not the case
+
+&2703: a9 26            LDA #&26												# object type &26 = triax
 &2705: 20 18 3c         JSR &3c18 ; count_objects_of_type_a_in_stack            # does triax already exist?
-&2708: d0 07            BNE &2711 ; no_triax                                    # if so, don't create him again
-&270a: a9 26            LDA #&26				                # &26 = triax
-&270c: 20 60 1e         JSR &1e60 ; reserve_object_low_priority		        # otherwise, find a slot for him
-&270f: 90 27            BCC &2738 ; setup_triax 		                # and if we find one, set him up
-; no_triax
-&2711: 20 4e 39         JSR &394e ; null_function		                # odd null function call?
-; no_triax2
-&2714: 24 c4            BIT &c4 ; loop_counter_every_08                         # every 8 cycles,
-&2716: 10 2a            BPL &2742				
-&2718: 20 87 25         JSR &2587 ; gen_random_num		
-&271b: 29 03            AND #&03				                # pick a random clawed robot
+&2708: d0 07            BNE &2711 ; process_clawed_robots                       # if not 0 then he's already present so no need to create him again
+
+&270a: a9 26            LDA #&26												# object type &26 = triax
+&270c: 20 60 1e         JSR &1e60 ; reserve_object_low_priority					# otherwise, find a slot for him
+&270f: 90 27            BCC &2738 ; setup_triax_or_clawed_robot 				# and if we find one, set him up
+
+; process_clawed_robots
+&2711: 20 4e 39         JSR &394e ; null_function								# does nothing in standard version of game
+
+; process_clawed_robots2
+&2714: 24 c4            BIT &c4 ; loop_counter_every_08                         
+&2716: 10 2a            BPL &2742 ; process_events_rts							# branch out every 7 out of 8 cycles
+&2718: 20 87 25         JSR &2587 ; gen_random_num								# get random number
+&271b: 29 03            AND #&03												# mask to pick one of the 4 clawed robots
 &271d: aa               TAX
-&271e: bd 3f 08         LDA &083f,X ; clawed_robot_availability                 
-&2721: 30 1f            BMI &2742 ; no_clawed_robots                            # has it been disturbed? if not, leave
-&2723: d0 1d            BNE &2742 ; no_clawed_robots                            # is it already in use? if so, leave
-&2725: fe 43 08         INC &0843,X ; clawed_robot_energy_when_last_used        # damaged robots take a while to come back
-&2728: 10 18            BPL &2742 ; no_clawed_robots
-&272a: 8a               TXA
+&271e: bd 3f 08         LDA &083f,X ; clawed_robot_availability                 # get the robot's availability
+&2721: 30 1f            BMI &2742 ; process_events_rts                          # has it been disturbed? if not, leave
+&2723: d0 1d            BNE &2742 ; process_events_rts                          # is it already in use? if so, leave
+
+&2725: fe 43 08         INC &0843,X ; clawed_robot_energy_when_last_used        # get robot energy
+&2728: 10 18            BPL &2742 ; process_events_rts							# branch if energy low - damaged robots take a while to come back
+
+&272a: 8a               TXA														
 &272b: 18               CLC
-&272c: 69 22            ADC #&22				                # &22 - &25 = clawed robots
-&272e: 20 60 1e         JSR &1e60 ; reserve_object_low_priority		        # find a slot for it
-&2731: b0 0f            BCS &2742				                # leave if there aren't enough free slots
+&272c: 69 22            ADC #&22												# adjust value to make object type &22 - &25 = clawed robots
+&272e: 20 60 1e         JSR &1e60 ; reserve_object_low_priority					# find a slot for it
+&2731: b0 0f            BCS &2742 ; process_events_rts							# leave if there aren't enough free slots
 &2733: a9 01            LDA #&01
 &2735: 9d 3f 08         STA &083f,X ; clawed_robot_availability                 # mark as being in use
-; setup_triax
+
+; setup_triax_or_clawed_robot
 &2738: a9 fe            LDA #&fe
 &273a: 99 b4 08         STA &08b4,Y ; object_stack_y                            # mark as way off screen - will teleport in
 &273d: a9 c0            LDA #&c0
 &273f: 99 06 09         STA &0906,Y ; object_stack_target                       # target = player | &c0
-; no_clawed_robots
+
+; process_events_rts
 &2742: 60               RTS
 
 ; get_random_square_near_player
-; A = diameter; returns &95, &97
-&2743: 85 9d            STA &9d ; diameter
-&2745: 4a               LSR
-&2746: 85 9c            STA &9c ; radius
-&2748: 20 87 25         JSR &2587 ; gen_random_num                            # get a random number
-&274b: 25 9d            AND &9d ; diameter                                      # modulus the diameter
-&274d: 6d 91 08         ADC &0891 ; object_stack_x                              # add the player's x position
+; on entry, A = diameter (best to use 3, 7, 15, 31, etc)
+; returns X in &95, and Y in &97
+&2743: 85 9d            STA &9d ; diameter										# store diameter
+&2745: 4a               LSR														# halve it
+&2746: 85 9c            STA &9c ; radius										# store radius
+&2748: 20 87 25         JSR &2587 ; gen_random_num								# get a random number
+&274b: 25 9d            AND &9d ; diameter                                      # mask to the diameter
+&274d: 6d 91 08         ADC &0891 ; object_stack_x                              # add the player's x high byte position
 &2750: e5 9c            SBC &9c ; radius                                        # subtract the radius
-&2752: 85 95            STA &95 ; square_x
-&2754: a5 d9            LDA &d9 ; timer_1                                       # do likewise for y
-&2756: 25 9d            AND &9d ; diameter
-&2758: 6d b4 08         ADC &08b4 ; object_stack_y
-&275b: e5 9c            SBC &9c ; radius
-&275d: 85 97            STA &97 ; square_y
+&2752: 85 95            STA &95 ; square_x										# store result for x
+&2754: a5 d9            LDA &d9 ; timer_1                                       # get another random number
+&2756: 25 9d            AND &9d ; diameter										# mask to the diameter
+&2758: 6d b4 08         ADC &08b4 ; object_stack_y								# add the player's y high byte position
+&275b: e5 9c            SBC &9c ; radius										# subtract the radius
+&275d: 85 97            STA &97 ; square_y										# store result for y
 &275f: 60               RTS
 
 ; store_stack_pointer_and_pull_in_tertiary_object
@@ -5940,6 +6098,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &27cf: a5 06            LDA &06 ; current_object_rotator
 &27d1: 29 3f            AND #&3f
 &27d3: d0 3b            BNE &2810 ; no_absorb_find                              # search for targets once every &40 cycles
+
 &27d5: bd 6b 31         LDA &316b,X ; npc_find_a
 &27d8: bc 75 31         LDY &3175,X ; npc_find_y
 &27db: 20 fe 3b         JSR &3bfe ; find_target
@@ -6147,7 +6306,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #29f8: 7f 3f 7f 07 3f 81 fd 3f ff 7d ; energy_by_range
 
 ; move_npc
-&2a02: a5 17		LDA &17 ; object_onscreen?				# is it offscreen?
+&2a02: a5 17			LDA &17 ; object_onscreen?				# is it offscreen?
 &2a04: 10 0b            BPL &2a11
 &2a06: 20 87 25         JSR &2587 ; gen_random_num
 &2a09: d0 13            BNE &2a1e
@@ -6178,9 +6337,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2a36: b5 43            LDA &43,X       # X = 2, &45 this_object_vel_x; X = 0, &43 this_object_vel_x
 ; move_object_in_one_direction_with_given_velocity
 ; A = velocity
-; X = direction
+; X = direction (if x = 2 then moves in y axis, if X = 0 then moves on x axis)
 &2a38: 10 02            BPL &2a3c
 &2a3a: d6 53            DEC &53,X       # X = 2, &55 this_object_y ; X = 0, &53 this_object_x
+
 &2a3c: 18               CLC
 &2a3d: 75 4f            ADC (&4f,X)     # X = 2, &51 this_object_y_low ; X = 0, &4f this_object_x_low
 &2a3f: 95 4f            STA &4f,X       # X = 2, &51 this_object_y_low ; X = 0, &4f this_object_x_low
@@ -6334,7 +6494,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2b55: b5 7b            LDA &7b,X	# X = 6, &81 support_overlap_y_low; X = 4, &7f support_overlap_x_low
 &2b57: 6a               ROR						        # and seven highest bits of support_overlap_xy_low
 &2b58: 28               PLP						
-&2b59: 20 56 32         JSR &3256 ; make_positive
+&2b59: 20 56 32         JSR &3256 ; reverse_sign
 &2b5c: c5 9c            CMP &9c ; biggest_overlap			
 &2b5e: b0 04            BCS &2b64 ; no_bigger				        # is this bigger than biggest_overlap?
 &2b60: 85 9c            STA &9c ; biggest_overlap			        # if so, store it
@@ -6541,26 +6701,28 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #2cb7: b0 24 b6 b3 ; sound data
 &2cbb: 60               RTS
 
-; get_water_level_for_x
-; on entry, A specifies the screen_start_square_x
-; on exit, water level is stored in &14d0 and &14d1
+; get_water_level
+; on entry, A specifies the top byte of the X co-ordinate to get the water level for
+; on exit, water level is stored in &14d0 (low byte) and &14d1 (high byte)
 &2cbc: a2 04            LDX #&04												# init loop counter (range is 3 to 0)
 
 &2cbe: ca               DEX														# decrement loop counter
 &2cbf: dd d2 14         CMP &14d2,X ; x_ranges									# check where range starts
 &2cc2: 90 fa            BCC &2cbe												# loop around until x_ranges value is equal or higher to screen_start_square_x
 
+; get_water_level_for_x
 &2cc4: bd 2e 08         LDA &082e,X ; water_level_low_by_x_range                # get low byte
 &2cc7: 8d d0 14         STA &14d0 ; water_level_low								# and store it
 
 &2cca: 18               CLC
-&2ccb: ed 2f 08         SBC &082f ; water_level_low_by_x_range[1]				# set carry if water_level_low_by_x_range - water_level_low_by_x_range[1] - 1 >= 0
+&2ccb: ed 2f 08         SBC &082f ; water_level_low_by_x_range[1]				# carry will be left clear if water_level_low_by_x_range - water_level_low_by_x_range[1] - 1 < 0
 
 &2cce: bd 32 08         LDA &0832,X ; water_level_by_x_range					# get high byte
 &2cd1: 8d d1 14         STA &14d1 ; water_level									# and store it
+
 &2cd4: ed 33 08         SBC &0833 ; water_level_by_x_range[1]					# compare against the endgame water level
 &2cd7: a2 01            LDX #&01                                                # prepare to use the level 1 range instead
-&2cd9: b0 e9            BCS &2cc4												# if level 1 range (the endgame water level) is above the standard range then branch to use it instead
+&2cd9: b0 e9            BCS &2cc4 ; get_water_level_for_x						# if level 1 range (the endgame water level) has risen above the standard range then branch to use it instead
 &2cdb: 60               RTS
 
 # bullet types
@@ -6568,53 +6730,64 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #2cdd: 18 pistol bullet
 #2cde: 13 icer bullet
 #2cdf: fb suit discharge
-#2ce0: 19 plasma
+#2ce0: 19 plasma ball
 #2ce1: 00 nothing
 
-; change_to_weapon
+; change_selected_equipment
 &2ce2: ca               DEX
-&2ce3: 2c 91 12         BIT &1291 ; shift_held_duration	                        # is SHIFT pressed?
-&2ce6: 30 1a            BMI &2d02 ; transfer_energy	                        # if so, transfer energy
-&2ce8: 8a               TXA
-&2ce9: f0 09            BEQ &2cf4			                        # no need to test if the jetpack is present
-&2ceb: c9 06            CMP #&06
-&2ced: b0 36            BCS &2d25			                        # leave if bad weapon (X >= 6)
-&2cef: bd 0e 08         LDA &080e,X; weapon_collected	                        # have we got the weapon?
-&2cf2: 10 32            BPL &2d26			                        # if not, then leave
-&2cf4: 8e 4d 08         STX &084d ; current_weapon
-&2cf7: bd 54 08         LDA &0854,X ; weapon_energy_h	                        # get energy for weapon
-&2cfa: 4a               LSR				                        # divide by 8
+&2ce3: 2c 91 12         BIT &1291 ; shift_held_duration							# is SHIFT pressed?
+&2ce6: 30 1a            BMI &2d02 ; transfer_energy								# if so, branch to transfer energy
+
+&2ce8: 8a               TXA														# A now indicates which piece of equipment to select
+&2ce9: f0 09            BEQ &2cf4												# no need to test if the jetpack is present
+&2ceb: c9 06            CMP #&06												# there are only 6 pieces of equipment selectable
+&2ced: b0 36            BCS &2d25												# leave if >= 6
+&2cef: bd 0e 08         LDA &080e,X; equipment_collected	                    # have we got that piece of equipment?
+&2cf2: 10 32            BPL &2d26												# if not, then leave
+
+&2cf4: 8e 4d 08         STX &084d ; current_selected_equipment								# select the equipment
+&2cf7: bd 54 08         LDA &0854,X ; equipment_energy_h	                    # get energy for equipment
+&2cfa: 4a               LSR														# divide by 8
 &2cfb: 4a               LSR
 &2cfc: 4a               LSR
 &2cfd: 85 25            STA &25 ; bells_to_sound
 &2cff: 4c a5 14         JMP &14a5 ; play_high_beep                              # sound bells to reflect energy levels
 
 ; transfer_energy
+# moves &800 energy from one piece of equipment to another
+# on entry, X indicates the equipment to take energy from
+#			&084d indicates the equipment to move the energy to
 &2d02: 8a               TXA                                                     # X = weapon to take from
-&2d03: f0 09            BEQ &2d0e                                               # we always have the jetpack
-&2d05: e0 06            CPX #&06                                
-&2d07: b0 1d            BCS &2d26                                               # if it's a bad weapon choice, leave
-&2d09: bd 0e 08         LDA &080e,X; weapon_collected	        
-&2d0c: 10 18            BPL &2d26			                        # if we've not got the weapon, leave
-&2d0e: 20 27 2d         JSR &2d27 ; reduce_weapon_energy_high
+&2d03: f0 09            BEQ &2d0e                                               # we always have the jetpack, so no need to check if collected
+&2d05: e0 06            CPX #&06												# only valid for 6 bits of equipment
+&2d07: b0 1d            BCS &2d26                                               # if not in the 6, leave
+&2d09: bd 0e 08         LDA &080e,X; equipment_collected							# get whether the specified piece of equipment has been collected
+&2d0c: 10 18            BPL &2d26												# branch out if not 
+&2d0e: 20 27 2d         JSR &2d27 ; reduce_equipment_energy_high					# reduce the source 
 &2d11: 90 13            BCC &2d26                                               # if it doesn't have enough energy, leave
-&2d13: ae 4d 08         LDX &084d ; current_weapon
-&2d16: bd 54 08         LDA &0854,X ; weapon_energy_h
+&2d13: ae 4d 08         LDX &084d ; current_selected_equipment
+
+; increase_equipment_energy
+# adds &800 to the specified piece of equipment
+# on entry, X indicates which equipment
+&2d16: bd 54 08         LDA &0854,X ; equipment_energy_h				# get current energy level (high byte)
 &2d19: 18               CLC
-&2d1a: 69 08            ADC #&08			                        # increase current weapon energy
-&2d1c: b0 03            BCS &2d21
-&2d1e: 9d 54 08         STA &0854,X ; weapon_energy_h
-&2d21: a9 01            LDA #&01
-&2d23: 85 25            STA &25 ; bells_to_sound
+&2d1a: 69 08            ADC #&08			                        # calculate new energy level
+&2d1c: b0 03            BCS &2d21									# branch over if overflow
+&2d1e: 9d 54 08         STA &0854,X ; equipment_energy_h				# store new energy level
+&2d21: a9 01            LDA #&01									# 1 bell to sound
+&2d23: 85 25            STA &25 ; bells_to_sound					# trigger bell
 &2d25: 60               RTS
 &2d26: 60               RTS
 
-; reduce_weapon_energy_high
-&2d27: bd 54 08         LDA &0854,X ; weapon_energy_h
+; reduce_equipment_energy_high
+# reduces energy of specified equipment by &800
+# on entry, X indicates which equipment
+&2d27: bd 54 08         LDA &0854,X ; equipment_energy_h				# get curreny energy level
 &2d2a: 38               SEC
-&2d2b: e9 08            SBC #&08
-&2d2d: 90 03            BCC &2d32			                        # have we got energy in the weapon?
-&2d2f: 9d 54 08         STA &0854,X ; weapon_energy_h
+&2d2b: e9 08            SBC #&08									# calculate new energy level
+&2d2d: 90 03            BCC &2d32			                        # branch over if underflow occurred
+&2d2f: 9d 54 08         STA &0854,X ; equipment_energy_h				# store new energy level
 &2d32: 60               RTS
 
 ; fire_weapon
@@ -6624,45 +6797,45 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &2d3b: 10 54            BPL &2d91			                        # are we carrying something? if so, leave
 &2d3d: a9 05            LDA #&05
 &2d3f: 8d d6 29         STA &29d6 ; autofire_timeout                            # if we hold fire down, fire again after 5 cycles
-&2d42: ae 4d 08         LDX &084d ; current_weapon
+&2d42: ae 4d 08         LDX &084d ; current_selected_equipment
 &2d45: 20 92 2d         JSR &2d92 ; make_firing_erratic_at_low_energy
 &2d48: 90 47            BCC &2d91                                               # carry clear if weapon doesn't work; leave
 &2d4a: bd dc 2c         LDA &2cdc,X 			                        # find the bullet type for this weapon
 &2d4d: f0 42            BEQ &2d91			                        # if there isn't one, leave
 &2d4f: 85 36            STA &36 ; player_bullet
-&2d51: 30 23            BMI &2d76 ; reduce_weapon_energy	                # the discharge device has no bullets
+&2d51: 30 23            BMI &2d76 ; reduce_equipment_energy	                # the discharge device has no bullets
 &2d53: 20 b8 33         JSR &33b8 ; create_child_object	                        # create the bullet
 &2d56: b0 39            BCS &2d91			                        # if we couldn't, leave
-&2d58: ae 4d 08         LDX &084d ; current_weapon
+&2d58: ae 4d 08         LDX &084d ; current_selected_equipment
 &2d5b: ca               DEX
 &2d5c: f0 11            BEQ &2d6f ; fire_pistol		                        # is it the pistol?
 &2d5e: ca               DEX
 &2d5f: f0 05            BEQ &2d66 ; fire_icer		                        # is it the icer?
 &2d61: 20 ad 14         JSR &14ad ; play_low_beep	                        # sound for plasma
-&2d64: b0 10            BCS &2d76 ; reduce_weapon_energy
+&2d64: b0 10            BCS &2d76 ; reduce_equipment_energy
 ; fire_icer
 &2d66: 20 fa 13         JSR &13fa ; play_sound		                        # sound for icer
 #2d69: 3d 04 2d d3 ; sound data
-&2d6d: b0 07            BCS &2d76 ; reduce_weapon_energy
+&2d6d: b0 07            BCS &2d76 ; reduce_equipment_energy
 ; fire_pistol
 &2d6f: 20 fa 13         JSR &13fa ; play_sound		                        # sound for pistol
 #2d72: 3d 04 3d 04 ; sound data
-; reduce_weapon_energy
-&2d76: ae 4d 08         LDX &084d ; current_weapon	                        # reduce energy in weapon by energy_per_shot
-; reduce_weapon_energy_for_x
-&2d79: bd 4e 08         LDA &084e,X ; weapon_energy
-&2d7c: fd 5a 08         SBC &085a,X ; energy_per_shot
-&2d7f: 9d 4e 08         STA &084e,X ; weapon_energy
-&2d82: bd 54 08         LDA &0854,X ; weapon_energy_h
+; reduce_equipment_energy
+&2d76: ae 4d 08         LDX &084d ; current_selected_equipment	                        # reduce energy in weapon by energy_per_use
+; reduce_equipment_energy_for_x
+&2d79: bd 4e 08         LDA &084e,X ; equipment_energy
+&2d7c: fd 5a 08         SBC &085a,X ; energy_per_use
+&2d7f: 9d 4e 08         STA &084e,X ; equipment_energy
+&2d82: bd 54 08         LDA &0854,X ; equipment_energy_h
 &2d85: e9 00            SBC #&00
 &2d87: b0 05            BCS &2d8e
 &2d89: a9 00            LDA #&00
-&2d8b: 9d 4e 08         STA &084e,X ; weapon_energy
-&2d8e: 9d 54 08         STA &0854,X ; weapon_energy_h
+&2d8b: 9d 4e 08         STA &084e,X ; equipment_energy
+&2d8e: 9d 54 08         STA &0854,X ; equipment_energy_h
 &2d91: 60               RTS
 
 ; make_firing_erratic_at_low_energy
-&2d92: bd 54 08         LDA &0854,X ; weapon_energy_h
+&2d92: bd 54 08         LDA &0854,X ; equipment_energy_h
 &2d95: c9 04            CMP #&04                                                # does the weapon have &400 of energy?
 &2d97: b0 09            BCS &2da2                                               # if so, leave
 &2d99: ca               DEX
@@ -6706,8 +6879,9 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #2e49: 01 f1 83 10 f0 87 04 20 02 fd 02 c0 80 0b 14 83
 #2e59: 03 f0 03 10 80 03 bc 07 06 82 02 fe 04 02 80 11
 #2e69: ff 0b 14 01 02 02 83 0a 03 04 09 88 01 0b 01 e0
-#2e79: 01 15 ac 01 14 01 ec 80 10 ff 14 f8 28 02 01 00
-; &2e88 = chatter_pitch
+#2e79: 01 15 ac 01 14 01 ec 80 10 ff 14 f8 28 02 01 
+
+&2e88: 00 ; chatter_pitch
 
 &2e89: ff ; can_we_scroll_screen
 
@@ -7031,7 +7205,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &30bc: 85 b5            STA &b5 ; angle
 &30be: 10 12            BPL &30d2
 &30c0: e9 c0            SBC #&c0
-&30c2: 20 56 32         JSR &3256 ; make_positive
+&30c2: 20 56 32         JSR &3256 ; reverse_sign
 &30c5: c9 2a            CMP #&2a
 &30c7: b0 32            BCS &30fb
 &30c9: a5 b7            LDA &b7 ; some_kind_of_velocity
@@ -7095,7 +7269,9 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &312e: 20 36 31         JSR &3136 ; invert_angle
 &3131: a0 42            LDY #&42                                                # &42 = gun aim particles
 &3133: 20 8c 21         JSR &218c ; add_particle	                        # create gun aim particles
+
 ; invert_angle
+# changes the angle of the current object by 180 degrees
 &3136: a5 37            LDA &37 ; this_object_angle
 &3138: 49 80            EOR #&80
 &313a: 85 37            STA &37 ; this_object_angle
@@ -7120,7 +7296,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #
 #   NPCs
 #   ====
-#   no npc                           absorbs                 fires                   gives                      bit_flags
+#   no npc                           absorbs                 fires (weapon)          gives (gift)               bit_flags
 #   0: &29     red/magenta imp       &11 wasp                &34 blue mushroom ball  &4b energy capsule x 4     &cc
 #   1: &2a     red/yellow imp        &2f white/yellow bird   &17 red bullet          &12 active grenade x 10    &f6
 #   2: &2b     blue/cyan imp         &10 pirahna             &58 coronium crystal    &47 mysterious weapon x 1  &8c
@@ -7190,7 +7366,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; store_teleport_status
 &31ce: 85 bc            STA &bc ; this_object_data
 &31d0: 20 fa 13         JSR &13fa ; play_sound
-#31d3: 94 64 ba c6 ; sound_data
+#31d3: 94 64 ba c6 ; sound data
 &31d7: 60		RTS
 
 ; move_towards_target
@@ -7224,7 +7400,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; speed_limit
 &3201: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &3204: 08               PHP
-&3205: 20 56 32         JSR &3256 ; make_positive
+&3205: 20 56 32         JSR &3256 ; reverse_sign
 &3208: 4a               LSR
 &3209: 88               DEY
 &320a: 10 fc            BPL &3208
@@ -7233,7 +7409,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &320f: 90 02            BCC &3213
 &3211: a5 9c            LDA &9c ; maximum_speed
 &3213: 28               PLP
-&3214: 20 56 32         JSR &3256 ; make_positive
+&3214: 20 56 32         JSR &3256 ; reverse_sign
 &3217: 18               CLC
 &3218: 60               RTS
 
@@ -7256,13 +7432,13 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 ; seven_eights
 &3235: 85 9c            STA &9c ; velocity
-&3237: 20 54 32         JSR &3254 ; make_positive_cmp_0
+&3237: 20 54 32         JSR &3254 ; make_positive
 &323a: 69 07            ADC #&07
 &323c: 4a               LSR
 &323d: 4a               LSR
 &323e: 4a               LSR							# velocity / 8, rounded up
 &323f: 24 9c            BIT &9c ; velocity					# keep the sign
-&3241: 20 56 32         JSR &3256 ; make_positive
+&3241: 20 56 32         JSR &3256 ; reverse_sign
 &3244: 85 9b            STA &9b ; velocity/8
 &3246: a5 9c            LDA &9c ; velocity
 &3248: 38               SEC
@@ -7276,29 +7452,41 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &3251: 69 01            ADC #&01
 &3253: 60               RTS
 
-; make_positive_cmp_0
-&3254: c9 00            CMP #&00
 ; make_positive
-&3256: 18               CLC ; make_positive
-&3257: 10 04            BPL &325d
+# takes a signed value and returns its absolute value
+# on entry, A contains the signed value
+# on exit, A contains the unsigned result
+# if bit 7 was not set then A is returned unchanged. Otherwise the value of A will be negated to make it positive.
+&3254: c9 00            CMP #&00								# set N if A has bit 7 set
+; reverse_sign
+# takes a signed value and returns its negated value
+# on entry, A contains the signed value
+#			N flag set indicates that the value should be negated, if clear then A is returned unchanged
+# on exit, A contains the result
+&3256: 18               CLC
+&3257: 10 04            BPL &325d								# RTS if N flag not set
 &3259: 49 ff            EOR #&ff
 &325b: 69 01            ADC #&01
 &325d: 60               RTS
 
 ; keep_within_range
-# A = value
-# Y = range
-# returns A limited to +/- Y
-&325e: 84 9c            STY &9c
-&3260: 85 9d            STA &9d
-&3262: 20 54 32         JSR &3254 ; make_positive_cmp_0
-&3265: c5 9c            CMP &9c
-&3267: 90 06            BCC &326f
-&3269: 98               TYA
-&326a: 24 9d            BIT &9d
-&326c: 4c 56 32         JMP &3256 ; make_positive
-&326f: a5 9d            LDA &9d
-&3271: 60               RTS
+# on entry, A = signed value
+#			Y = unsigned range
+# on exit, A has the signed result
+# if the abs(value) <= range then the value is returned
+# otherwise the range is returned with the sign matching the original value
+limited to +/- Y
+&325e: 84 9c            STY &9c									# store range
+&3260: 85 9d            STA &9d									# store value
+&3262: 20 54 32         JSR &3254 ; make_positive				# make the value positive
+&3265: c5 9c            CMP &9c									# compare to range
+&3267: 90 06            BCC &326f								# branch if value is less than or equal to range
+&3269: 98               TYA										# get the range
+&326a: 24 9d            BIT &9d									# set N flag if original value was negative
+&326c: 4c 56 32         JMP &3256 ; reverse_sign				# negate the range if neccessary and rts
+
+&326f: a5 9d            LDA &9d									# restore original value
+&3271: 60               RTS	
 
 ; shift_right_four_while_keeping_sign
 &3272: c9 80            CMP #&80
@@ -7334,6 +7522,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; change_sprite
 # takes A which we add to the base sprite for this object
 &3292: 18               CLC
+
 &3293: a4 41            LDY &41 ; this_object_type
 &3295: 79 8a 02         ADC &028a,Y ; object_sprite_lookup
 ; convert_object_keeping_palette
@@ -7412,18 +7601,18 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &331f: 65 b4            ADC &b4 ; velocity_x                                    # the new x velocity is relative
 &3321: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number                            
 &3324: 08               PHP
-&3325: 20 56 32         JSR &3256 ; make_positive
+&3325: 20 56 32         JSR &3256 ; reverse_sign
 &3328: c9 50            CMP #&50                                                # use this_object_vel_x + velocity_x
 &332a: 90 10            BCC &333c                                               # unless > &50
 &332c: a5 43            LDA &43 ; this_object_vel_x
-&332e: 20 56 32         JSR &3256 ; make_positive
+&332e: 20 56 32         JSR &3256 ; reverse_sign
 &3331: 69 20            ADC #&20
 &3333: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &3336: c9 50            CMP #&50                                                # else, use this_object_vel_x + &20
 &3338: b0 02            BCS &333c                                               # unless > &50
 &333a: a9 50            LDA #&50                                                # in which case, use &50
 &333c: 28               PLP
-&333d: 20 56 32         JSR &3256 ; make_positive
+&333d: 20 56 32         JSR &3256 ; reverse_sign
 &3340: 85 b4            STA &b4 ; velocity_x                                    # (curiously, the y velocity isn't relative)
 &3342: 60               RTS
 
@@ -7479,13 +7668,13 @@ e336d: 90 02            BCC &3371
 &3389: 38               SEC
 &338a: 70 18            BVS &33a4
 &338c: 85 b6            STA &b6 ; velocity_y
-&338e: 20 56 32         JSR &3256 ; make_positive
+&338e: 20 56 32         JSR &3256 ; reverse_sign
 &3391: a8               TAY
 &3392: bd e6 08         LDA &08e6,X ; object_stack_vel_x
 &3395: 65 b4            ADC &b4 ; velocity_x
 &3397: 20 7f 32         JSR &327f ; prevent_overflow_of_signed_number
 &339a: 85 b4            STA &b4 ; velocity_x
-&339c: 20 56 32         JSR &3256 ; make_positive
+&339c: 20 56 32         JSR &3256 ; reverse_sign
 &339f: 20 c1 3b         JSR &3bc1 ; get_biggest_of_a_and_y
 &33a2: c5 a3            CMP &a3
 &33a4: 60               RTS
@@ -7500,7 +7689,7 @@ e336d: 90 02            BCC &3371
 ; add_weapon_discharge_y_velocity
 # Y = y velocity
 &33ab: 24 37            BIT &37 ; this_object_angle                             # alter x velocity to match orientation
-&33ad: 20 56 32         JSR &3256 ; make_positive
+&33ad: 20 56 32         JSR &3256 ; reverse_sign
 &33b0: 85 b4            STA &b4 ; velocity_x
 &33b2: 84 b6            STY &b6 ; velocity_y
 &33b4: 20 1d 33         JSR &331d ; setup_bullet_velocities_with_velocities     # make the velocities relative to the firer
@@ -7650,27 +7839,28 @@ e336d: 90 02            BCC &3371
 
 ; store_object
 &34b1: a9 04            LDA #&04
-&34b3: 2c a9 05         BIT &05a9
+&34b3: 2c a9 05				(BIT ...)
 ; store_object_five_pockets
-#34b4:    a9 05
-&34b6: 8d db 34         STA &34db			                        # change number of pockets
-&34b9: a4 dd            LDY &dd ; object_held
+#34b4:    a9 05				LDA #&05
+&34b6: 8d db 34         STA &34db			                        # modify code to change number of pockets
+&34b9: a4 dd            LDY &dd ; object_held						# get object being held
 &34bb: 18               CLC
-&34bc: 30 6f            BMI &352d			                        # are we holding something? if not, leave
-&34be: be 70 08         LDX &0870,Y  ; object_stack_sprite
-&34c1: bd 89 5e         LDA &5e89,X ; sprite_height_lookup
-&34c4: c9 38            CMP #&38
+&34bc: 30 6f            BMI &352d			                        # branch out if nothing being held
+&34be: be 70 08         LDX &0870,Y  ; object_stack_sprite			# get sprite for held object
+&34c1: bd 89 5e         LDA &5e89,X ; sprite_height_lookup			# get sprite's height
+&34c4: c9 38            CMP #&38									# cannot store anything bigger than &38
 &34c6: b0 65            BCS &352d			                        # if object too big, leave
-&34c8: b9 60 08         LDA &0860,Y ; object_stack_type	                        # what kind of object is it? 
+
+&34c8: b9 60 08         LDA &0860,Y ; object_stack_type	            # get the type of the object being held 
 &34cb: c9 4b            CMP #&4b 			                        # &4b = energy capsule
-&34cd: d0 08            BNE &34d7 ; pocket_object	                        # if not an energy capsule, pocket it
-&34cf: a2 00            LDX #&00
-&34d1: 20 16 2d         JSR &2d16			                        # otherwise increase energy in jetpack
-&34d4: 4c f4 34         JMP &34f4                                               # and remove object
+&34cd: d0 08            BNE &34d7 ; pocket_object	                # branch over if not an energy capsule
+&34cf: a2 00            LDX #&00									# indicates jetpack
+&34d1: 20 16 2d         JSR &2d16 ; increase_equipment_energy       # increase energy in jetpack
+&34d4: 4c f4 34         JMP &34f4                                   # and remove object
 
 ; pocket_object 
 &34d7: ae 47 08         LDX &0847 ; pockets_used
-&34da: e0 05            CPX #&05 # modified by &34b6, actually CPX #A           # are we using all our pockets already?
+&34da: e0 05            CPX #xx ; modified at entry to be 4 or 5    # are we using all our pockets already?
 &34dc: b0 4f            BCS &352d			                        # if so, leave
 &34de: a2 05            LDX #&05			
 &34e0: 48               PHA
@@ -7750,12 +7940,12 @@ e336d: 90 02            BCC &3371
 &355c: b9 91 08         LDA &0891,Y ; object_stack_x
 &355f: e9 04            SBC #&04
 &3561: e5 c8            SBC &c8 ; screen_start_square_x                         # object_x - 4 - screen_x
-&3563: 20 56 32         JSR &3256 ; make_positive
+&3563: 20 56 32         JSR &3256 ; reverse_sign
 &3566: 85 9d            STA &9d ; tmp
 &3568: b9 b4 08         LDA &08b4,Y ; object_stack_y
 &356b: e9 01            SBC #&01
 &356d: e5 ca            SBC &ca ; screen_start_square_y                         # object_y - 1 - screen_y
-&356f: 20 56 32         JSR &3256 ; make_positive
+&356f: 20 56 32         JSR &3256 ; reverse_sign
 &3572: 65 9d            ADC &9d ; tmp
 &3574: 6a               ROR                                                     # average the two
 &3575: 60               RTS
@@ -7881,7 +8071,7 @@ e336d: 90 02            BCC &3371
 
 	# compare centre point of object to water level
 &3609: a5 95            LDA &95 ; square_x
-&360b: 20 bc 2c         JSR &2cbc ; get_water_level_for_x						# result (a y co-ordinate) placed in &14d0 and &14d1
+&360b: 20 bc 2c         JSR &2cbc ; get_water_level								# result (a y co-ordinate) placed in &14d0 and &14d1
 &360e: a5 82            LDA &82 ; square_y_low
 &3610: cd d0 14         CMP &14d0 ; water_level_low								# set or clear carry flag
 &3613: a5 97            LDA &97 ; square_y
@@ -7979,7 +8169,7 @@ e336d: 90 02            BCC &3371
 &369f: 85 97            STA &97 ; square_y
 &36a1: a5 cb            LDA &cb ; scroll_square_x_velocity_low
 &36a3: 24 cc            BIT &cc ; scroll_square_x_velocity_high
-&36a5: 20 56 32         JSR &3256 ; make_positive
+&36a5: 20 56 32         JSR &3256 ; reverse_sign
 &36a8: 4a               LSR
 &36a9: 4a               LSR
 &36aa: 85 9c            STA &9c ; scroll_width                                  # get the width of the scrolled area
@@ -8044,7 +8234,7 @@ e336d: 90 02            BCC &3371
 &370e: 09 60            ORA #&60
 &3710: 85 94            STA &94 ; screen_address_two_h
 &3712: a5 d1            LDA &d1 ; scroll_y_direction
-&3714: 20 56 32         JSR &3256 ; make_positive
+&3714: 20 56 32         JSR &3256 ; reverse_sign
 &3717: 85 a0            STA &a0 ; scroll_height                                 # get the height of the scrolled area
 &3719: a5 94            LDA &94 ; screen_address_two_h
 &371b: 85 90            STA &90; screen_address_h
@@ -8171,7 +8361,8 @@ e336d: 90 02            BCC &3371
 &3807: 25 c6            AND &c6 ; loop_counter_every_02
 &3809: 10 05            BPL &3810
 &380b: a2 00            LDX #&00
-&380d: 20 79 2d         JSR &2d79 ; reduce_weapon_energy_for_x
+&380d: 20 79 2d         JSR &2d79 ; reduce_equipment_energy_for_x
+
 &3810: a5 ba            LDA &ba ; player_immobility_daze
 &3812: f0 45            BEQ &3859
 &3814: c6 ba            DEC &ba ; player_immobility_daze
@@ -8195,7 +8386,7 @@ e336d: 90 02            BCC &3371
 &3832: 4a               LSR
 &3833: 09 01            ORA #&01
 &3835: 28               PLP
-&3836: 20 56 32         JSR &3256 ; make_positive
+&3836: 20 56 32         JSR &3256 ; reverse_sign
 &3839: 65 b9            ADC &b9 ; something_player_collision_value
 &383b: a0 20            LDY #&20
 &383d: 20 5e 32         JSR &325e ; keep_within_range
@@ -8324,7 +8515,7 @@ e336d: 90 02            BCC &3371
 &3924: c9 02            CMP #&02
 &3926: d0 23            BNE &394b
 &3928: a5 43            LDA &43 ; this_object_vel_x
-&392a: 20 56 32         JSR &3256 ; make_positive
+&392a: 20 56 32         JSR &3256 ; reverse_sign
 &392d: 4a               LSR
 &392e: f0 18            BEQ &3948
 &3930: 20 8c 3b         JSR &3b8c ; compare_extra_with_a_and_f
@@ -8592,7 +8783,7 @@ maggot x = &06 a = &08
 &3b21: a5 04            LDA &04 ; npc_speed
 &3b23: 90 36            BCC &3b5b
 &3b25: 24 d2            BIT &d2 ; something_x_acc
-&3b27: 20 56 32         JSR &3256 ; make_positive
+&3b27: 20 56 32         JSR &3256 ; reverse_sign
 &3b2a: 38               SEC
 &3b2b: e5 43            SBC &43 ; this_object_vel_x
 &3b2d: 20 01 32         JSR &3201
@@ -8610,7 +8801,7 @@ maggot x = &06 a = &08
 &3b44: 65 1c            ADC &1c ; wall_collision_angle
 &3b46: 85 b5            STA &b5 ; angle
 &3b48: 98               TYA
-&3b49: 20 56 32         JSR &3256 ; make_positive
+&3b49: 20 56 32         JSR &3256 ; reverse_sign
 &3b4c: 20 57 23         JSR &2357 ; build_vector_from_angle	        # A = velocity_y
 &3b4f: 85 42            STA &42 ; acceleration_y
 &3b51: a5 b4            LDA &b4 ; velocity_x
@@ -8618,7 +8809,7 @@ maggot x = &06 a = &08
 &3b55: 20 25 32         JSR &3225 ; dampen_this_object_vel_y
 &3b58: 4c 25 32         JMP &3225 ; dampen_this_object_vel_y
 &3b5b: 24 d4            BIT &d4 ; something_y_acc
-&3b5d: 20 56 32         JSR &3256 ; make_positive
+&3b5d: 20 56 32         JSR &3256 ; reverse_sign
 &3b60: a2 02            LDX #&02
 &3b62: 20 f6 31         JSR &31f6
 &3b65: a9 08            LDA #&08
@@ -8666,16 +8857,18 @@ maggot x = &06 a = &08
 
 ; compare_wall_collision_angle_with_3962
 &3bad: a5 1c            LDA &1c ; wall_collision_angle
-&3baf: 20 56 32         JSR &3256 ; make_positive
+&3baf: 20 56 32         JSR &3256 ; reverse_sign
 &3bb2: dd 62 39         CMP &3962,X ; unknown_lookup_3962
 &3bb5: 60               RTS
 
 ; get_biggest_velocity
+# gets the bigger of the x and y velocities for the current object, ignoring sign
+# the largest value is returned in &9d (positive only)
 &3bb6: a5 45            LDA &45 ; this_object_vel_y
-&3bb8: 20 56 32         JSR &3256 ; make_positive
+&3bb8: 20 56 32         JSR &3256 ; reverse_sign
 &3bbb: a8               TAY
 &3bbc: a5 43            LDA &43 ; this_object_vel_x
-&3bbe: 20 56 32         JSR &3256 ; make_positive
+&3bbe: 20 56 32         JSR &3256 ; reverse_sign
 ; get_biggest_of_a_and_y
 &3bc1: 84 9d            STY &9d
 &3bc3: c5 9d            CMP &9d
@@ -8693,6 +8886,7 @@ maggot x = &06 a = &08
 &3bd4: 60               RTS
 
 ; can_we_pick_up_object
+# on exit, N is clear if there is an object being touched that is at an angle that means it can be picked up
 &3bd5: a6 3b            LDX &3b ; this_object_supporting		        # are we touching anything?
 &3bd7: 30 07            BMI &3be0										# if not, leave
 &3bd9: 20 a0 22         JSR &22a0 ; get_angle_between_objects                   # get the angle between us and it
@@ -8737,11 +8931,11 @@ maggot x = &06 a = &08
 &3c15: 85 3e            STA &3e ; this_object_target
 &3c17: 60               RTS
 
-# A = object type
 ; count_objects_of_type_a_in_stack
+# A = object type
 # leaves with Y = count
-&3c18: a0 7f            LDY #&7f
-&3c1a: 38               SEC
+&3c18: a0 7f            LDY #&7f								# dummy value, can never be matched
+&3c1a: 38               SEC										# action will be to count matching objects
 &3c1b: 20 30 3c         JSR &3c30 ; count_matching_objects
 &3c1e: a4 9f            LDY &9f ; count
 &3c20: 60               RTS
@@ -9439,10 +9633,10 @@ maggot x = &06 a = &08
 &400a: b0 03            BCS &400f
 &400c: 9d 1a 08         STA &081a,X ; red_mushroom_daze                         # but don't overflow - limit to &ff
 &400f: 2c 15 08         BIT &0815 ; mushroom_pill_collected                     # do we have immunity?
-&4012: 30 2d            BMI &4041				                # if so, leave
-&4014: d5 ba            CMP &ba,X ; player_immobility_daze
+&4012: 30 2d            BMI &4041												# if so, leave
+&4014: d5 ba            CMP &ba,X ; player_immobility_daze player_nothrust_daze
 &4016: 90 29            BCC &4041
-&4018: 95 ba            STA &ba,X ; player_immobility_daze                      # extend the player's daze to match
+&4018: 95 ba            STA &ba,X ; player_immobility_daze player_nothrust_daze	# extend the player's daze to match
 &401a: 60               RTS
 
 ; reserve_object_for_background
@@ -9545,7 +9739,7 @@ maggot x = &06 a = &08
 &409f: 10 0b            BPL &40ac drop_object_from_pocket                       
 &40a1: 20 c8 32         JSR &32c8 ; drop_object                                 # drop held object and teleport
 &40a4: a2 04            LDX #&04
-&40a6: 20 94 12         JSR &1294 ; increment_game_time_X                       # increment player deaths
+&40a6: 20 94 12         JSR &1294 ; increment_game_time_X                       # increment player_deaths
 &40a9: 4c c1 0c         JMP &0cc1 ; teleport_player
 ; drop_object_from_pocket                                                       # or:
 &40ac: a5 da            LDA &da ; timer_2                                       
@@ -9561,7 +9755,7 @@ maggot x = &06 a = &08
 
 ; handle_explosion_type_40
 &40be: 20 fa 13         JSR &13fa ; play_sound                                  # something that squeals and explodes
-#40c1 57 07 43 f6 ; sound data
+#40c1: 57 07 43 f6 ; sound data
 ; handle_explosion_type_c0
 &40c5: 20 b5 14         JSR &14b5 ; play_squeal
 &40c8: a5 41            LDA &41 ; this_object_type
@@ -9578,12 +9772,12 @@ maggot x = &06 a = &08
 
 ; explode_object
 ; A = damage
-&40db: 20 f8 13         JSR &13f8 ; play_sound2
+&40db: 20 f8 13         JSR &13f8 ; play_whitenoise
 #40de: 17 03 11 04 ; sound data
 ; explode_without_sound
 &40e2: 85 3d            STA &3d	; this_object_supporting	                # store damage in this_object_supporting
-&40e4: a9 44            LDA #&44			                        # &44 = explosion
-&40e6: 85 41            STA &41 ; this_object_type                              # change to an explosion
+&40e4: a9 44            LDA #&44											# &44 = explosion
+&40e6: 85 41            STA &41 ; this_object_type                          # change to an explosion
 ; explode_without_sound_or_damage
 &40e8: a9 ce            LDA #&ce
 &40ea: 8d 1d 08         STA &081d ; explosion_timer
@@ -9634,7 +9828,7 @@ maggot x = &06 a = &08
 &4133: a0 04            LDY #&04
 &4135: 20 5e 32         JSR &325e ; keep_within_range
 &4138: 85 11            STA &11 ; this_object_extra
-&413a: 20 54 32         JSR &3254 ; make_positive_cmp_0
+&413a: 20 54 32         JSR &3254 ; make_positive
 &413d: 69 6c            ADC #&6c
 &413f: 20 98 32         JSR &3298 ; convert_object_keeping_palette
 &4142: a5 06            LDA &06 ; current_object_rotator
@@ -9689,7 +9883,7 @@ maggot x = &06 a = &08
 #418b: 0f 07 07 07 03 ; gargoyle_frequency_lookup
 #4190: 11 7f 7f 7f 01 ; gargoyle_x_velocity_lookup		
 #4195: c0 0c 04 f9 9a ; gargoyle_y_velocity_lookup
-#419a: 32 19 19 19 32 ; gargoyle_bullet_lookup			                # &32 = plasma, &19 = lightning
+#419a: 32 19 19 19 32 ; gargoyle_bullet_lookup			                # &32 = lightning, &19 = plasma ball
 
 ; handle_maggot_machine
 # called with:
@@ -9697,19 +9891,24 @@ maggot x = &06 a = &08
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
 &419f: a5 c0            LDA &c0 ; loop_counter
-&41a1: 29 3f            AND #&3f
-&41a3: aa               TAX
-&41a4: d0 17            BNE &41bd
-&41a6: a5 55            LDA &55 ; this_object_y
-&41a8: cd d1 14         CMP &14d1 ; water_level			                # is the maggot machine above the water level?
-&41ab: 90 0a            BCC &41b7				
-&41ad: a9 80            LDA #&80
-&41af: 8d 1f 08         STA &081f ; earthquake_triggered	                # trigger earthquake!
-&41b2: 8d 1e 08         STA &081e ; endgame_value                               # start endgame
-&41b5: 30 2e            BMI &41e5                                               # and explode!
+&41a1: 29 3f            AND #&3f										# look at bottom 6 bits
+&41a3: aa               TAX												# save result to X
+&41a4: d0 17            BNE &41bd										# branch 63 out of 64 times
+
+&41a6: a5 55            LDA &55 ; this_object_y							# get the top byte of the y co-ordinate of the maggot machine
+&41a8: cd d1 14         CMP &14d1 ; water_level			                # compare to the water level - carry will be clear if water level below machine
+&41ab: 90 0a            BCC &41b7 ; animate_maggot_machine				# branch if the maggot machine is above the water
+
+&41ad: a9 80            LDA #&80										# bit 7 set to indicate flag settings
+&41af: 8d 1f 08         STA &081f ; earthquake_triggered	            # trigger earthquake!
+&41b2: 8d 1e 08         STA &081e ; endgame_value                       # start endgame
+&41b5: 30 2e            BMI &41e5                                       # jump to flash screen and explode!
+
+; animate_maggot_machine
 &41b7: 20 b5 14         JSR &14b5 ; play_squeal
-&41ba: 20 36 31         JSR &3136 ; invert_angle
-&41bd: e0 08            CPX #&08
+&41ba: 20 36 31         JSR &3136 ; invert_angle						# flip the maggot machine around
+
+&41bd: e0 08            CPX #&08										# flash the machine's palette every 8 times
 &41bf: 4c df 4d         JMP &4ddf ; flash_palette
 
 ; handle_coronium_crystal
@@ -9801,7 +10000,7 @@ maggot x = &06 a = &08
 &423a: 90 0c            BCC &4248 ; unfed_slime	                                # if so, convert it into
 &423c: a9 0b            LDA #&0b 				                # &0b = yellow ball
 &423e: 20 fa 13         JSR &13fa ; play_sound
-#4241: b0 24 b6 e2	; sound data
+#4241: b0 24 b6 e2 ; sound data
 &4245: 4c 86 32         JMP &3286 ; convert_object_to_another
 ; unfed_slime
 &4248: a2 03            LDX #&03				                # type
@@ -9814,7 +10013,7 @@ maggot x = &06 a = &08
 &4258: a9 11            LDA #&11                                                # modulus
 &425a: 20 55 25         JSR &2555 ; get_sprite_from_velocity                    # use velocity
 &425d: e9 08            SBC #&08                                                # to calculate sprite for slime
-&425f: 20 56 32         JSR &3256 ; make_positive
+&425f: 20 56 32         JSR &3256 ; reverse_sign
 &4262: 4a               LSR                                                     # (&00 - &03)
 &4263: 4c 92 32         JMP &3292 ; change_sprite                               # set the sprite based on result
 
@@ -9849,7 +10048,7 @@ maggot x = &06 a = &08
 # Y = this_object_supporting ; CPY #&00
 &4288: a0 29            LDY #&29                                                # fluffy minimum energy = &29
 &428a: 20 2e 35         JSR &352e ; give_minimum_energy
-&428d: a2 06            LDX #&06
+&428d: a2 06            LDX #&06												# npc 6 is fluffy
 &428f: 20 c9 27         JSR &27c9 ; npc_targetting
 &4292: 20 26 3d         JSR &3d26 ; target_processing
 &4295: 20 3c 25         JSR &253c ; is_this_object_damaged
@@ -9872,6 +10071,7 @@ maggot x = &06 a = &08
 &42b7: ad 28 3c         LDA &3c28 ; nearest_distance
 &42ba: c5 da            CMP &da ; timer_2
 &42bc: b0 0b            BCS &42c9
+
 &42be: 20 fa 13         JSR &13fa ; play_sound
 #42c1: b0 24 b6 e2 ; sound data
 &42c5: 66 12            ROR &12 ; this_object_timer
@@ -9904,27 +10104,33 @@ maggot x = &06 a = &08
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&42f7: 20 bf 0b         JSR &0bbf ; has_object_been_fired		        # has the grenade just been fired?
-&42fa: d0 09            BNE &4305 ; grenade_still_active
+&42f7: 20 bf 0b         JSR &0bbf ; has_object_been_fired	# check if grenade has just been deactivated
+&42fa: d0 09            BNE &4305 ; grenade_still_active	# branch over if it hasn't
+
 &42fc: a9 00            LDA #&00					        # if so, reset the timer
 &42fe: 85 12            STA &12 ; this_object_timer			
 &4300: a9 50            LDA #&50					        # &50 = inactive grenade
 &4302: 4c 86 32         JMP &3286 ; convert_object_to_another                   # and make it inactive
+
 ; grenade_still_active
-&4305: a9 0a            LDA #&0a
-&4307: a6 15            LDX &15 ; this_object_energy			        # otherwise, has it run out of energy?
-&4309: f0 08            BEQ &4313					        # if so, explode it, damage = &0a
-&430b: a5 12            LDA &12 ; this_object_timer
+&4305: a9 0a            LDA #&0a							# set explosion damage
+&4307: a6 15            LDX &15 ; this_object_energy		# get grenade energy
+&4309: f0 08            BEQ &4313					        # if zero, branch to explode it
+
+&430b: a5 12            LDA &12 ; this_object_timer			# get timer
 &430d: c9 60            CMP #&60					        # has it run out of time? (&60 ticks)
-&430f: 90 05            BCC &4316 ; grenade_still_ticking
+&430f: 90 05            BCC &4316 ; grenade_still_ticking	# timer < 60 so branch to still ticking
+
 &4311: a9 10            LDA #&10					        # explode it, damage = &10
+
 &4313: 4c db 40         JMP &40db ; explode_object			        
+
 ; grenade_still_ticking
-&4316: e6 12            INC &12 ; this_object_timer			
-&4318: 20 d4 4d         JSR &4dd4 ; set_object_colour                               # cycle its colour
-&431b: 8a               TXA
-&431c: d0 07            BNE &4325                                               # once every four ticks
-&431e: 20 fa 13         JSR &13fa ; play_sound				        # sound the grenade claxon
+&4316: e6 12            INC &12 ; this_object_timer			# increment timer
+&4318: 20 d4 4d         JSR &4dd4 ; set_object_colour       # cycle its colour (passing in this_object_timer in A)
+&431b: 8a               TXA									# X relates to palette chosen, 0 to 3
+&431c: d0 07            BNE &4325                           # once every four ticks
+&431e: 20 fa 13         JSR &13fa ; play_sound				# sound the grenade claxon
 #4321: 57 07 cb 82 ; sound data
 &4325: 60               RTS
 
@@ -9938,6 +10144,7 @@ maggot x = &06 a = &08
 &432b: 30 05            BMI &4332                                               # has the cannonball hit anything?
 &432d: a9 aa            LDA #&aa
 &432f: 20 a6 24         JSR &24a6 ; take_damage				        # cannonball damage = &aa - lots!
+
 ; handle_death_ball_blue
 # called with:
 # X = this_object_data
@@ -10037,10 +10244,11 @@ maggot x = &06 a = &08
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&43ae: 30 07            BMI &43b7				                # are we supporting something?
+&43ae: 30 07            BMI &43b7												# branch if not touching something
 &43b0: 20 b6 3b         JSR &3bb6 ; get_biggest_velocity                        # if not, consider velocities
 &43b3: c9 0a            CMP #&0a                                                # are we moving too fast?
 &43b5: b0 06            BCS &43bd                                               # if so, disturb flask
+
 &43b7: a5 1d            LDA &1d ; some_kind_of_velocity                        
 &43b9: c9 14            CMP #&14                                                # have we collided violently?
 &43bb: 90 04            BCC &43c1                                               # if not, leave flask undisturbed
@@ -10050,17 +10258,21 @@ maggot x = &06 a = &08
 
 &43c1: a5 12            LDA &12 ; this_object_timer                             # has the flask been disturbed?
 &43c3: f0 e8            BEQ &43ad                                               # if not, leave
+
 &43c5: a4 3b            LDY &3b ; this_object_supporting
-&43c7: 30 0a            BMI &43d3                                               # are we supporting something?
+&43c7: 30 0a            BMI &43d3                                               # are we touching something?
+
 &43c9: b9 60 08         LDA &0860,Y ; object_stack_type
 &43cc: c9 37            CMP #&37				                # &37 = fireball
 &43ce: d0 03            BNE &43d3                                               # if so, is it a stationary fireball?
 &43d0: 20 16 25         JSR &2516 ; mark_stack_object_for_removal               # if so, kill it
+
 &43d3: a9 c0            LDA #&c0
 &43d5: 85 b5            STA &b5 ; angle                                         # set angle to point straight up
 &43d7: a0 58            LDY #&58                                                # &58 = flask particles
 &43d9: a9 08            LDA #&08                                        
 &43db: 20 8e 21         JSR &218e ; add_particles                               # create eight particles per tick
+
 &43de: c6 12            DEC &12 ; this_object_timer
 &43e0: d0 cb            BNE &43ad				                # when time runs out, convert to an empty flask
 &43e2: a9 4c            LDA #&4c				                # &4c = empty flask
@@ -10107,9 +10319,9 @@ maggot x = &06 a = &08
 &441b: 20 af 1f         JSR &1faf ; is_it_supporting_anything_collidable
 &441e: 30 14            BMI &4434 ; move_bullet                                 # has the bullet hit anything?
 &4420: a9 0a            LDA #&0a                                                # if so, damage it
-&4422: 20 a6 24         JSR &24a6 ; take_damage				        # pistol bullet damage = &0a
-&4425: 20 f8 13         JSR &13f8 ; play_sound2
-#4428: 17 03 1b 02 ; sound_data
+&4422: 20 a6 24         JSR &24a6 ; take_damage									# pistol bullet damage = &0a
+&4425: 20 f8 13         JSR &13f8 ; play_whitenoise
+#4428: 17 03 1b 02 ; sound data
 &442f: a9 02            LDA #&02                                                # then explode
 &4431: 4c e2 40         JMP &40e2 ; explode_without_sound                       # explosion damage = &02
 ; move_bullet
@@ -10213,6 +10425,7 @@ maggot x = &06 a = &08
 &44d7: 0a               ASL
 &44d8: 0a               ASL
 &44d9: 20 5b 3a         JSR &3a5b
+
 &44dc: a5 12            LDA &12 ; this_object_timer
 &44de: 18               CLC
 &44df: f0 0b            BEQ &44ec
@@ -10256,7 +10469,7 @@ maggot x = &06 a = &08
 &4519: 46 04            LSR &04 ; npc_speed
 &451b: 20 88 22         JSR &2288 ; get_object_centre
 &451e: a5 87            LDA &87 ; this_object_centre_x_low
-&4520: 20 56 32         JSR &3256 ; make_positive
+&4520: 20 56 32         JSR &3256 ; reverse_sign
 &4523: c9 68            CMP #&68
 &4525: 90 1b            BCC &4542 ; not_in_flowerpot                            # is the imp near the centre of it?
 &4527: 24 18            BIT &18 ; wall_collision_bottom_minus_top
@@ -10394,6 +10607,7 @@ maggot x = &06 a = &08
 &4623: d0 1a            BNE &463f ; no_sound_from_bird
 &4625: 20 9e 2c         JSR &2c9e ; whistle_sound                               # does this also attract chatter?
 &4628: 4c 3f 46         JMP &463f ; no_sound_from_bird
+
 ; handle_bird_invisible
 # called with:
 # X = this_object_data
@@ -10401,11 +10615,8 @@ maggot x = &06 a = &08
 # Y = this_object_supporting ; CPY #&00
 &462b: a5 11            LDA &11 ; this_object_extra
 &462d: d0 02            BNE &4631 ; handle_bird
-# called with:
-# X = this_object_data
-# A = this_object_data
-# Y = this_object_supporting ; CPY #&00
 &462f: 46 2b            LSR &2b ; object_is_invisible                           # invisible bird is invisible
+
 ; handle_bird
 # called with:
 # X = this_object_data
@@ -10416,8 +10627,9 @@ maggot x = &06 a = &08
 &4636: d0 07            BNE &463f ; no_sound_from_bird
 &4638: 20 fa 13         JSR &13fa ; play_sound
 #463b: 57 07 43 f6 ; sound data
+
 ; no_sound_from_bird
-&463f: a6 41		LDX &41 ; this_object_type
+&463f: a6 41			LDX &41 ; this_object_type
 &4641: 98            	TYA
 &4642: d0 06            BNE &464a
 &4644: bd 62 46         LDA &4662,X # actually bird_damage_lookup
@@ -10568,6 +10780,7 @@ maggot x = &06 a = &08
 &4749: a5 dc            LDA &dc ; timer_4                                       
 &474b: 29 03            AND #&03                                                # then, with a 1 in 4 chance
 &474d: f0 0d            BEQ &475c                                               # cause triax to teleport away # ?
+
 &474f: 20 87 25         JSR &2587 ; gen_random_num
 &4752: f0 08            BEQ &475c                                               # otherwise a 1 in 256 chance to teleport
 &4754: 20 f0 46         JSR &46f0 ; handle_crew_member                          # scream if damage, deal with sprite
@@ -10633,7 +10846,7 @@ maggot x = &06 a = &08
 &47a4: f0 1d            BEQ &47c3 ; convert_to_coronium_boulder                 # convert yellow balls to coronium boulders
 &47a6: c9 10            CMP #&10			                        # &10 = pirahna
 &47a8: f0 0c            BEQ &47b6                                               # explode on contact with pirahna, no damage
-&47aa: 20 f8 13         JSR &13f8 ; play_sound2
+&47aa: 20 f8 13         JSR &13f8 ; play_whitenoise
 #47ad: 17 03 1b 02 ; sound data
 &47b1: a9 64            LDA #&64                                                # red drop damage = &64
 &47b3: 20 a6 24         JSR &24a6 ; take_damage                                 # otherwise damage object
@@ -11053,56 +11266,66 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 # X = this_object_data
 # A = this_object_data
 # Y = this_object_supporting ; CPY #&00
-&4a11: 30 09            BMI &4a1c                                               # is the player touching something?
-&4a13: b9 60 08         LDA &0860,Y ; object_stack_type
-&4a16: 49 03            EOR #&03                                                # &03 = fluffy
-&4a18: d0 02            BNE &4a1c ; not_supporting_fluffy                       # is it fluffy?
-&4a1a: 84 dd            STY &dd ; object_held                                   # if so, it jumps into the player's hands
-; not_supporting_fluffy
+&4a11: 30 09            BMI &4a1c ; not_touching_fluffy                         # branch if the player is not touching something
+&4a13: b9 60 08         LDA &0860,Y ; object_stack_type							# get the type of object being touched
+&4a16: 49 03            EOR #&03                                                # &03 = fluffy 
+&4a18: d0 02            BNE &4a1c ; not_touching_fluffy							# branch over if not fluffy
+&4a1a: 84 dd            STY &dd ; object_held                                   # player now holding fluffy
+
+; not_touching_fluffy
 &4a1c: 6e d7 29         ROR &29d7 ; object_being_fired                          # clear object_being_fired
-&4a1f: a5 53            LDA &53 ; this_object_x
+
+&4a1f: a5 53            LDA &53 ; this_object_x									# get player's x square
 &4a21: c9 76            CMP #&76                                                # if player_x >= &76
-&4a23: 6e aa 19         ROR &19aa ; player_east_of_76                           # then set player_east_of_76
-&4a26: 20 ff 34         JSR &34ff ; retrieve_object_if_marked
-&4a29: a5 dd            LDA &dd ; object_held
-&4a2b: 48               PHA
-&4a2c: 20 a8 01         JSR &01a8 ; process_keys
-&4a2f: a9 10            LDA #&10
-&4a31: 24 6f            BIT &6f ; this_object_flags
-&4a33: d0 03            BNE &4a38
+&4a23: 6e aa 19         ROR &19aa ; player_east_of_76                           # then set player_east_of_76, clear it otherwise
+
+&4a26: 20 ff 34         JSR &34ff ; retrieve_object_if_marked					# try get object from pockets if requested
+&4a29: a5 dd            LDA &dd ; object_held									# get currently held object
+&4a2b: 48               PHA														# store value for later
+&4a2c: 20 a8 01         JSR &01a8 ; process_keys								# deal with user keypresses
+&4a2f: a9 10            LDA #&10	
+&4a31: 24 6f            BIT &6f ; this_object_flags								# test player object flags
+&4a33: d0 03            BNE &4a38												# branch over if not 0
 &4a35: 20 95 37         JSR &3795 ; do_player_stuff
+
 &4a38: 20 fc 30         JSR &30fc ; process_gun_aim
-&4a3b: 68               PLA                                                     # object_held
+&4a3b: 68               PLA                                                     # restore object_held
 &4a3c: a8               TAY                                                     # are we holding anything?
-&4a3d: 30 18            BMI &4a57 ; not_holding_anything
-&4a3f: a5 37            LDA &37 ; this_object_angle
-&4a41: 45 6f            EOR &6f ; this_object_flags
-&4a43: 10 12            BPL &4a57 ; not_holding_anything
-&4a45: be 70 08         LDX &0870,Y ; object_stack_sprite
-&4a48: bd 0c 5e         LDA &5e0c,X ; sprite_width_lookup
-&4a4b: 24 37            BIT &37 ; this_object_angle
-&4a4d: 20 4c 32         JSR &324c ; make_negative
-&4a50: a2 00            LDX #&00
-&4a52: 24 6f            BIT &6f ; this_object_flags
-&4a54: 20 38 2a         JSR &2a38 ; move_object_in_one_direction_with_given_velocity
+&4a3d: 30 18            BMI &4a57 ; not_holding_anything						# branch over if not
+
+&4a3f: a5 37            LDA &37 ; this_object_angle								# get player angle
+&4a41: 45 6f            EOR &6f ; this_object_flags								# toggle bit 7 if horizontally inverted
+&4a43: 10 12            BPL &4a57 ; not_holding_anything						# branch over if bit 7 clear
+
+&4a45: be 70 08         LDX &0870,Y ; object_stack_sprite						# get sprite for object being held
+&4a48: bd 0c 5e         LDA &5e0c,X ; sprite_width_lookup						# get the sprite's width
+&4a4b: 24 37            BIT &37 ; this_object_angle								# set N flag from bit 7
+&4a4d: 20 4c 32         JSR &324c ; make_negative								# make width negative if angle negative
+&4a50: a2 00            LDX #&00												# indicates move on x axis
+&4a52: 24 6f            BIT &6f ; this_object_flags								# set N flag
+&4a54: 20 38 2a         JSR &2a38 ; move_object_in_one_direction_with_given_velocity	# move player to the left or right
+
 ; not_holding_anything
-&4a57: 24 c5            BIT &c5 ; loop_counter_every_04
-&4a59: 10 0d            BPL &4a68
-&4a5b: a5 25            LDA &25 ; bells_to_sound
-&4a5d: f0 09            BEQ &4a68
-&4a5f: c6 25            DEC &25 ; bells_to_sound
-&4a61: 20 fa 13         JSR &13fa ; play_sound
+&4a57: 24 c5            BIT &c5 ; loop_counter_every_04							# set N every 4 cycles
+&4a59: 10 0d            BPL &4a68												# branch over if N not set
+&4a5b: a5 25            LDA &25 ; bells_to_sound								# get remaining count of bells to sound
+&4a5d: f0 09            BEQ &4a68												# branch over if none
+&4a5f: c6 25            DEC &25 ; bells_to_sound								# decrement count
+&4a61: 20 fa 13         JSR &13fa ; play_sound									# play bell
 #4a64: 17 e3 2f 82 ; sound data
-&4a68: ce d6 29         DEC &29d6 ; autofire_timeout
-&4a6b: d0 03            BNE &4a70
-&4a6d: 4e 78 12         LSR &1278 ; fire_pressed
-&4a70: a5 36            LDA &36 ; player_bullet				        # has the player fired the discharge device?
-&4a72: 10 13            BPL &4a87					        # if not, leave
-&4a74: e6 36            INC &36 ; player_bullet
-&4a76: 20 e8 40         JSR &40e8 ; explode_without_sound_or_damage	        # discharge device
+
+&4a68: ce d6 29         DEC &29d6 ; autofire_timeout							# decrement autofire counter
+&4a6b: d0 03            BNE &4a70												# branch over if not yet zero
+&4a6d: 4e 78 12         LSR &1278 ; keys_pressed + &d							# marks space as unpressed so that fire_weapon can be called again
+
+&4a70: a5 36            LDA &36 ; player_bullet									# has the player fired the blaster/discharge device?
+&4a72: 10 13            BPL &4a87												# if not, branch to leave
+
+&4a74: e6 36            INC &36 ; player_bullet									# increment (starts at &fb)
+&4a76: 20 e8 40         JSR &40e8 ; explode_without_sound_or_damage				# discharge device
 &4a79: a9 0a            LDA #&0a
 &4a7b: 85 3d            STA &3d ; this_object_data_pointer			# damage ?
-&4a7d: 20 f8 13         JSR &13f8 ; play_sound2				        # play sound for discharge device
+&4a7d: 20 f8 13         JSR &13f8 ; play_whitenoise				        # play sound for discharge device
 #4a80: 17 03 11 04 ; sound data
 &4a84: 20 9c 4f         JSR &4f9c ; handle_explosion			        # create particles for discharge device
 &4a87: 60               RTS
@@ -11275,6 +11498,7 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 &4ba3: 46 15            LSR &15 ; this_object_energy							# by clearing bit 7
 &4ba5: 24 15            BIT &15 ; this_object_energy                            # has it been disturbed? set N flag from bit 7
 &4ba7: 10 6b            BPL &4c14												# rts if bit 7 clear, otherwise keep stationary
+
 ; handle_bush
 # called with:
 # X = this_object_data
@@ -11382,7 +11606,7 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 &4c5a: 85 35            STA &35 ; sucking_distance
 &4c5c: a9 14            LDA #&14                                                # angle range
 &4c5e: 20 3c 34         JSR &343c ; suck_or_blow_all_objects_limited_angle
-&4c61: 20 f8 13         JSR &13f8 ; play_sound2
+&4c61: 20 f8 13         JSR &13f8 ; play_whitenoise
 #4c64: 70 c2 6e a3 ; sound data
 &4c68: a0 34            LDY &34 ; firing_angle
 &4c6a: a5 c0            LDA &c0 ; loop_counter
@@ -11634,6 +11858,7 @@ door	palette												speed	min_energy
 &4dcf: 20 ac 31         JSR &31ac ; toggle_door_locked_state                    # toggle its on/off state
 ; set_colour_via_rotator
 &4dd2: a5 06            LDA &06 ; current_object_rotator						# get current rotator value: 0 to ff
+
 ; set_object_colour
 &4dd4: 4a               LSR														# divide by 2: 0 to 7f
 &4dd5: 4a               LSR														# divide by 2 again: 0 to 3f
@@ -11644,6 +11869,8 @@ door	palette												speed	min_energy
 &4dde: 60               RTS
 
 ; flash_palette
+# sets the palette of the current object
+# on entry, if carry is set then the palette will be altered from its usual value
 &4ddf: a4 41            LDY &41 ; this_object_type
 &4de1: b9 ef 02         LDA &02ef,Y ; object_palette_lookup
 &4de4: 29 7f            AND #&7f                                                # use the object's default palette
@@ -11749,7 +11976,7 @@ type	trigger						effect_distance	action_and_palette	action		palette
 &4e7f: d0 09            BNE &4e8a
 &4e81: a9 0a            LDA #&0a
 &4e83: 85 12            STA &12 ; this_object_timer
-&4e85: a9 14            LDA #&14        # modified by &4e5e; actually LDA #X    # only maggots cause damage
+&4e85: a9 14            LDA #xx        # modified by &4e5e;						# only maggots cause damage
 &4e87: 20 a6 24         JSR &24a6 ; take_damage
 &4e8a: a6 20            LDX &20 ; this_object_water_level
 &4e8c: ca               DEX
@@ -12378,7 +12605,7 @@ type	trigger						effect_distance	action_and_palette	action		palette
 &60b2: 8d 40 fe         STA &fe40					        # system via Input/Output B - 0000 1 100 set latch bit 4 to 1 
 &60b5: a9 05            LDA #&05
 &60b7: 8d 40 fe         STA &fe40					        # system via Input/Output B - 0000 0 101 set latch bit 5 to 0
-
+															# combined, setting latch bit 4 to 1 and latch bit 5 to 0 sets start of screen memory to &6000 (page 419 of advanced user guide)
 &60ba: a9 00            LDA #&00
 &60bc: 8d 4b fe         STA &fe4b					        # system via ACR 
 															# bit 0 turns off latch enable port A

@@ -105,7 +105,12 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Resources\HollowPassage.bmp" />
+    <Content Include="Resources\BlowDown.png" />
+    <Content Include="Resources\BlowUp.png" />
     <Content Include="Resources\MainFormIcon.ico" />
+    <Content Include="Resources\SuckDown.png" />
+    <Content Include="Resources\SuckUp.png" />
     <Content Include="Resources\TeleportTarget.bmp" />
     <None Include="Resources\RandomWind.bmp" />
     <None Include="Resources\HiddenSwitch.bmp" />

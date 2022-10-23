@@ -24,7 +24,7 @@
         /// The id of the background object as determined by the index of its data byte
         /// </summary>
         /// <remarks>This value is used by switches to change the object's state. Range is 1 to ea</remarks>
-        public int? Id;
+        public byte? Id;
 
         /// <summary>
         /// Object specific data for the background object

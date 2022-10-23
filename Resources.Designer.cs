@@ -63,6 +63,26 @@ namespace ExileWorldGenerator {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap BlowDown {
+            get {
+                object obj = ResourceManager.GetObject("BlowDown", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap BlowUp {
+            get {
+                object obj = ResourceManager.GetObject("BlowUp", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap FixedWind {
             get {
                 object obj = ResourceManager.GetObject("FixedWind", resourceCulture);
@@ -83,9 +103,39 @@ namespace ExileWorldGenerator {
         /// <summary>
         ///   Looks up a localized resource of type System.Drawing.Bitmap.
         /// </summary>
+        internal static System.Drawing.Bitmap HollowPassage {
+            get {
+                object obj = ResourceManager.GetObject("HollowPassage", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
         internal static System.Drawing.Bitmap RandomWind {
             get {
                 object obj = ResourceManager.GetObject("RandomWind", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap SuckDown {
+            get {
+                object obj = ResourceManager.GetObject("SuckDown", resourceCulture);
+                return ((System.Drawing.Bitmap)(obj));
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized resource of type System.Drawing.Bitmap.
+        /// </summary>
+        internal static System.Drawing.Bitmap SuckUp {
+            get {
+                object obj = ResourceManager.GetObject("SuckUp", resourceCulture);
                 return ((System.Drawing.Bitmap)(obj));
             }
         }

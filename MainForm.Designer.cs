@@ -71,7 +71,7 @@
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
             this.Splitter = new System.Windows.Forms.SplitContainer();
             this.map = new System.Windows.Forms.DataGridView();
-            this.tabControl1 = new System.Windows.Forms.TabControl();
+            this.tabControls = new System.Windows.Forms.TabControl();
             this.tabProperties = new System.Windows.Forms.TabPage();
             this.panelProperties = new System.Windows.Forms.Panel();
             this.txtBackgroundObjectInfo = new System.Windows.Forms.TextBox();
@@ -86,22 +86,23 @@
             this.panel1 = new System.Windows.Forms.Panel();
             this.txtCoordinates = new System.Windows.Forms.TextBox();
             this.tabOptions = new System.Windows.Forms.TabPage();
-            this.cboHighlightBackground = new System.Windows.Forms.ComboBox();
+            this.cboBackgroundScenery = new System.Windows.Forms.ComboBox();
             this.BackgroundLabel = new System.Windows.Forms.Label();
-            this.chkHighlightDisplayElement = new System.Windows.Forms.CheckBox();
-            this.chkHighlightBackgroundObjects = new System.Windows.Forms.CheckBox();
+            this.chkHighlightBackgroundScenery = new System.Windows.Forms.CheckBox();
+            this.chkHighlightBackgroundEvents = new System.Windows.Forms.CheckBox();
             this.BackgroundObjectTree = new System.Windows.Forms.TreeView();
             this.chkHighlightMappedData = new System.Windows.Forms.CheckBox();
             this.ZoomLevelLabel = new System.Windows.Forms.Label();
             this.cboZoomLevel = new System.Windows.Forms.ComboBox();
             this.tabSearch = new System.Windows.Forms.TabPage();
             this.AnimationTimer = new System.Windows.Forms.Timer(this.components);
+            this.chkShowVisualOverlays = new System.Windows.Forms.CheckBox();
             ((System.ComponentModel.ISupportInitialize)(this.Splitter)).BeginInit();
             this.Splitter.Panel1.SuspendLayout();
             this.Splitter.Panel2.SuspendLayout();
             this.Splitter.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.map)).BeginInit();
-            this.tabControl1.SuspendLayout();
+            this.tabControls.SuspendLayout();
             this.tabProperties.SuspendLayout();
             this.panelProperties.SuspendLayout();
             this.tabOptions.SuspendLayout();
@@ -120,7 +121,7 @@
             // 
             // Splitter.Panel2
             // 
-            this.Splitter.Panel2.Controls.Add(this.tabControl1);
+            this.Splitter.Panel2.Controls.Add(this.tabControls);
             this.Splitter.Size = new System.Drawing.Size(1200, 852);
             this.Splitter.SplitterDistance = 822;
             this.Splitter.SplitterWidth = 6;
@@ -171,20 +172,20 @@
             this.map.MouseMove += new System.Windows.Forms.MouseEventHandler(this.map_MouseMove);
             this.map.MouseUp += new System.Windows.Forms.MouseEventHandler(this.map_MouseUp);
             // 
-            // tabControl1
+            // tabControls
             // 
-            this.tabControl1.Controls.Add(this.tabProperties);
-            this.tabControl1.Controls.Add(this.tabOptions);
-            this.tabControl1.Controls.Add(this.tabSearch);
-            this.tabControl1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.tabControl1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.tabControl1.Location = new System.Drawing.Point(0, 0);
-            this.tabControl1.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.tabControl1.Name = "tabControl1";
-            this.tabControl1.Padding = new System.Drawing.Point(6, 30);
-            this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(372, 852);
-            this.tabControl1.TabIndex = 7;
+            this.tabControls.Controls.Add(this.tabProperties);
+            this.tabControls.Controls.Add(this.tabOptions);
+            this.tabControls.Controls.Add(this.tabSearch);
+            this.tabControls.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.tabControls.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.tabControls.Location = new System.Drawing.Point(0, 0);
+            this.tabControls.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.tabControls.Name = "tabControls";
+            this.tabControls.Padding = new System.Drawing.Point(6, 30);
+            this.tabControls.SelectedIndex = 0;
+            this.tabControls.Size = new System.Drawing.Size(372, 852);
+            this.tabControls.TabIndex = 7;
             // 
             // tabProperties
             // 
@@ -343,10 +344,11 @@
             // 
             // tabOptions
             // 
-            this.tabOptions.Controls.Add(this.cboHighlightBackground);
+            this.tabOptions.Controls.Add(this.chkShowVisualOverlays);
+            this.tabOptions.Controls.Add(this.cboBackgroundScenery);
             this.tabOptions.Controls.Add(this.BackgroundLabel);
-            this.tabOptions.Controls.Add(this.chkHighlightDisplayElement);
-            this.tabOptions.Controls.Add(this.chkHighlightBackgroundObjects);
+            this.tabOptions.Controls.Add(this.chkHighlightBackgroundScenery);
+            this.tabOptions.Controls.Add(this.chkHighlightBackgroundEvents);
             this.tabOptions.Controls.Add(this.BackgroundObjectTree);
             this.tabOptions.Controls.Add(this.chkHighlightMappedData);
             this.tabOptions.Controls.Add(this.ZoomLevelLabel);
@@ -360,16 +362,19 @@
             this.tabOptions.Text = "Options";
             this.tabOptions.UseVisualStyleBackColor = true;
             // 
-            // cboHighlightBackground
+            // cboBackgroundScenery
             // 
-            this.cboHighlightBackground.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cboHighlightBackground.FormattingEnabled = true;
-            this.cboHighlightBackground.Location = new System.Drawing.Point(207, 658);
-            this.cboHighlightBackground.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.cboHighlightBackground.Name = "cboHighlightBackground";
-            this.cboHighlightBackground.Size = new System.Drawing.Size(133, 33);
-            this.cboHighlightBackground.TabIndex = 7;
-            this.cboHighlightBackground.SelectedIndexChanged += new System.EventHandler(this.cboHighlightBackground_SelectedIndexChanged);
+            this.cboBackgroundScenery.DrawMode = System.Windows.Forms.DrawMode.OwnerDrawFixed;
+            this.cboBackgroundScenery.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cboBackgroundScenery.FormattingEnabled = true;
+            this.cboBackgroundScenery.ItemHeight = 36;
+            this.cboBackgroundScenery.Location = new System.Drawing.Point(176, 658);
+            this.cboBackgroundScenery.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.cboBackgroundScenery.Name = "cboBackgroundScenery";
+            this.cboBackgroundScenery.Size = new System.Drawing.Size(164, 42);
+            this.cboBackgroundScenery.TabIndex = 7;
+            this.cboBackgroundScenery.DrawItem += new System.Windows.Forms.DrawItemEventHandler(this.cboBackgroundScenery_DrawItem);
+            this.cboBackgroundScenery.SelectedIndexChanged += new System.EventHandler(this.cboBackgroundScenery_SelectedIndexChanged);
             // 
             // BackgroundLabel
             // 
@@ -381,35 +386,35 @@
             this.BackgroundLabel.TabIndex = 6;
             this.BackgroundLabel.Text = "Background:";
             // 
-            // chkHighlightDisplayElement
+            // chkHighlightBackgroundScenery
             // 
-            this.chkHighlightDisplayElement.AutoSize = true;
-            this.chkHighlightDisplayElement.Location = new System.Drawing.Point(15, 623);
-            this.chkHighlightDisplayElement.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.chkHighlightDisplayElement.Name = "chkHighlightDisplayElement";
-            this.chkHighlightDisplayElement.Size = new System.Drawing.Size(253, 29);
-            this.chkHighlightDisplayElement.TabIndex = 5;
-            this.chkHighlightDisplayElement.Text = "Highlight display element";
-            this.chkHighlightDisplayElement.UseVisualStyleBackColor = true;
-            this.chkHighlightDisplayElement.CheckedChanged += new System.EventHandler(this.chkHighlightDisplayElement_CheckedChanged);
+            this.chkHighlightBackgroundScenery.AutoSize = true;
+            this.chkHighlightBackgroundScenery.Location = new System.Drawing.Point(15, 623);
+            this.chkHighlightBackgroundScenery.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.chkHighlightBackgroundScenery.Name = "chkHighlightBackgroundScenery";
+            this.chkHighlightBackgroundScenery.Size = new System.Drawing.Size(318, 29);
+            this.chkHighlightBackgroundScenery.TabIndex = 5;
+            this.chkHighlightBackgroundScenery.Text = "Highlight background scenery ♦";
+            this.chkHighlightBackgroundScenery.UseVisualStyleBackColor = true;
+            this.chkHighlightBackgroundScenery.CheckedChanged += new System.EventHandler(this.chkHighlightBackgroundScenery_CheckedChanged);
             // 
-            // chkHighlightBackgroundObjects
+            // chkHighlightBackgroundEvents
             // 
-            this.chkHighlightBackgroundObjects.AutoSize = true;
-            this.chkHighlightBackgroundObjects.Location = new System.Drawing.Point(15, 97);
-            this.chkHighlightBackgroundObjects.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
-            this.chkHighlightBackgroundObjects.Name = "chkHighlightBackgroundObjects";
-            this.chkHighlightBackgroundObjects.Size = new System.Drawing.Size(288, 29);
-            this.chkHighlightBackgroundObjects.TabIndex = 3;
-            this.chkHighlightBackgroundObjects.Text = "Highlight background objects";
-            this.chkHighlightBackgroundObjects.UseVisualStyleBackColor = true;
-            this.chkHighlightBackgroundObjects.CheckedChanged += new System.EventHandler(this.chkHighlightBackgroundObjects_CheckedChanged);
+            this.chkHighlightBackgroundEvents.AutoSize = true;
+            this.chkHighlightBackgroundEvents.Location = new System.Drawing.Point(15, 161);
+            this.chkHighlightBackgroundEvents.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
+            this.chkHighlightBackgroundEvents.Name = "chkHighlightBackgroundEvents";
+            this.chkHighlightBackgroundEvents.Size = new System.Drawing.Size(308, 29);
+            this.chkHighlightBackgroundEvents.TabIndex = 3;
+            this.chkHighlightBackgroundEvents.Text = "Highlight background events: ○";
+            this.chkHighlightBackgroundEvents.UseVisualStyleBackColor = true;
+            this.chkHighlightBackgroundEvents.CheckedChanged += new System.EventHandler(this.chkHighlightBackgroundEvents_CheckedChanged);
             // 
             // BackgroundObjectTree
             // 
             this.BackgroundObjectTree.CheckBoxes = true;
             this.BackgroundObjectTree.HideSelection = false;
-            this.BackgroundObjectTree.Location = new System.Drawing.Point(34, 135);
+            this.BackgroundObjectTree.Location = new System.Drawing.Point(34, 200);
             this.BackgroundObjectTree.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.BackgroundObjectTree.Name = "BackgroundObjectTree";
             treeNode1.Name = "InvisibleSwitch";
@@ -469,26 +474,26 @@
             this.BackgroundObjectTree.Nodes.AddRange(new System.Windows.Forms.TreeNode[] {
             treeNode19});
             this.BackgroundObjectTree.ShowRootLines = false;
-            this.BackgroundObjectTree.Size = new System.Drawing.Size(304, 462);
+            this.BackgroundObjectTree.Size = new System.Drawing.Size(304, 397);
             this.BackgroundObjectTree.TabIndex = 4;
             this.BackgroundObjectTree.AfterCheck += new System.Windows.Forms.TreeViewEventHandler(this.BackgroundObjectTree_AfterCheck);
             // 
             // chkHighlightMappedData
             // 
             this.chkHighlightMappedData.AutoSize = true;
-            this.chkHighlightMappedData.Location = new System.Drawing.Point(15, 57);
+            this.chkHighlightMappedData.Location = new System.Drawing.Point(15, 115);
             this.chkHighlightMappedData.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.chkHighlightMappedData.Name = "chkHighlightMappedData";
-            this.chkHighlightMappedData.Size = new System.Drawing.Size(232, 29);
+            this.chkHighlightMappedData.Size = new System.Drawing.Size(249, 29);
             this.chkHighlightMappedData.TabIndex = 2;
-            this.chkHighlightMappedData.Text = "Highlight mapped data";
+            this.chkHighlightMappedData.Text = "Highlight mapped data □";
             this.chkHighlightMappedData.UseVisualStyleBackColor = true;
             this.chkHighlightMappedData.CheckedChanged += new System.EventHandler(this.chkHighlightMappedData_CheckedChanged);
             // 
             // ZoomLevelLabel
             // 
             this.ZoomLevelLabel.AutoSize = true;
-            this.ZoomLevelLabel.Location = new System.Drawing.Point(10, 11);
+            this.ZoomLevelLabel.Location = new System.Drawing.Point(10, 72);
             this.ZoomLevelLabel.Margin = new System.Windows.Forms.Padding(4, 0, 4, 0);
             this.ZoomLevelLabel.Name = "ZoomLevelLabel";
             this.ZoomLevelLabel.Size = new System.Drawing.Size(113, 25);
@@ -499,7 +504,7 @@
             // 
             this.cboZoomLevel.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cboZoomLevel.FormattingEnabled = true;
-            this.cboZoomLevel.Location = new System.Drawing.Point(136, 11);
+            this.cboZoomLevel.Location = new System.Drawing.Point(136, 72);
             this.cboZoomLevel.Margin = new System.Windows.Forms.Padding(4, 5, 4, 5);
             this.cboZoomLevel.Name = "cboZoomLevel";
             this.cboZoomLevel.Size = new System.Drawing.Size(160, 33);
@@ -522,6 +527,19 @@
             this.AnimationTimer.Enabled = true;
             this.AnimationTimer.Tick += new System.EventHandler(this.AnimationTimer_Tick);
             // 
+            // chkShowVisualOverlays
+            // 
+            this.chkShowVisualOverlays.AutoSize = true;
+            this.chkShowVisualOverlays.Checked = true;
+            this.chkShowVisualOverlays.CheckState = System.Windows.Forms.CheckState.Checked;
+            this.chkShowVisualOverlays.Location = new System.Drawing.Point(15, 25);
+            this.chkShowVisualOverlays.Name = "chkShowVisualOverlays";
+            this.chkShowVisualOverlays.Size = new System.Drawing.Size(221, 29);
+            this.chkShowVisualOverlays.TabIndex = 8;
+            this.chkShowVisualOverlays.Text = "Show visual overlays";
+            this.chkShowVisualOverlays.UseVisualStyleBackColor = true;
+            this.chkShowVisualOverlays.CheckedChanged += new System.EventHandler(this.chkShowVisualOverlays_CheckedChanged);
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(9F, 20F);
@@ -533,13 +551,13 @@
             this.Name = "MainForm";
             this.SizeGripStyle = System.Windows.Forms.SizeGripStyle.Show;
             this.Text = "The Land of the Exile";
-            this.Shown += new System.EventHandler(this.Form1_Shown);
+            this.Shown += new System.EventHandler(this.MainForm_Shown);
             this.Splitter.Panel1.ResumeLayout(false);
             this.Splitter.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.Splitter)).EndInit();
             this.Splitter.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.map)).EndInit();
-            this.tabControl1.ResumeLayout(false);
+            this.tabControls.ResumeLayout(false);
             this.tabProperties.ResumeLayout(false);
             this.panelProperties.ResumeLayout(false);
             this.panelProperties.PerformLayout();
@@ -553,7 +571,7 @@
         private System.Windows.Forms.SplitContainer Splitter;
         private System.Windows.Forms.DataGridView map;
         private System.Windows.Forms.Timer AnimationTimer;
-        private System.Windows.Forms.TabControl tabControl1;
+        private System.Windows.Forms.TabControl tabControls;
         private System.Windows.Forms.TabPage tabProperties;
         private System.Windows.Forms.Panel panelProperties;
         private System.Windows.Forms.TextBox txtBackgroundObjectInfo;
@@ -568,15 +586,16 @@
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.TextBox txtCoordinates;
         private System.Windows.Forms.TabPage tabOptions;
-        private System.Windows.Forms.ComboBox cboHighlightBackground;
+        private System.Windows.Forms.ComboBox cboBackgroundScenery;
         private System.Windows.Forms.Label BackgroundLabel;
-        private System.Windows.Forms.CheckBox chkHighlightDisplayElement;
-        private System.Windows.Forms.CheckBox chkHighlightBackgroundObjects;
+        private System.Windows.Forms.CheckBox chkHighlightBackgroundScenery;
+        private System.Windows.Forms.CheckBox chkHighlightBackgroundEvents;
         private System.Windows.Forms.TreeView BackgroundObjectTree;
         private System.Windows.Forms.CheckBox chkHighlightMappedData;
         private System.Windows.Forms.Label ZoomLevelLabel;
         private System.Windows.Forms.ComboBox cboZoomLevel;
         private System.Windows.Forms.TabPage tabSearch;
+        private System.Windows.Forms.CheckBox chkShowVisualOverlays;
         }
     }
 

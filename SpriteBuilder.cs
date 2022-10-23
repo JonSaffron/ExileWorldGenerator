@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Diagnostics.Contracts;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
@@ -10,6 +11,7 @@ namespace ExileWorldGenerator
     internal class SpriteBuilder
         {
         private static readonly byte[] SpriteData = BuildSpriteSheet();
+        private static readonly byte[] SpriteWidthLookup = BuildSpriteWidthLookup();
         private static readonly byte[] SpriteHeightLookup = BuildSpriteHeightLookup();
         private static readonly Dictionary<byte, Rectangle> SpritePositions = BuildSpritePositions();
         public static readonly byte[] BackgroundSpriteLookup = BuildBackgroundSpriteLookup();
@@ -18,16 +20,37 @@ namespace ExileWorldGenerator
         public static readonly bool[] FlipSpriteVertically = BuildFlipSpriteVertically();
         public static readonly byte[] ObjectSpriteLookup = BuildObjectSpriteLookups();
         public static readonly byte[] ObjectPaletteLookup = BuildObjectPaletteLookups();
-        private static readonly byte[] DoorPalettes = BuildDoorPalettes();
+        private static readonly Palette[] DoorPalettes = BuildDoorPalettes();
         private static readonly Palette[] SuckerPalettes = BuildSuckerPalettes();
 
         private static readonly Size SquareSize = new Size(16, 32);
 
-        public Bitmap Sprite { get; } = new Bitmap(SquareSize.Width, SquareSize.Height);
+        private readonly Bitmap _sprite;
 
-        public void Clear(WaterLevelType waterLevelType)
+        private SpriteBuilder(Bitmap sprite)
             {
-            using (Graphics g = Graphics.FromImage(this.Sprite))
+            if (sprite == null)
+                throw new ArgumentNullException(nameof(sprite));
+            if (sprite.Size != SquareSize)
+                throw new ArgumentOutOfRangeException(nameof(sprite));
+            this._sprite = sprite;
+            }
+
+        /// <summary>
+        /// Returns the bitmap created by the sprite building process
+        /// </summary>
+        public Bitmap Result => this._sprite;
+
+        /// <summary>
+        /// Starts a new sprite building process
+        /// </summary>
+        /// <param name="waterLevelType">Specifies where the water level is within the sprite</param>
+        /// <returns>A SpriteBuilder object to which more changes can be made</returns>
+        public static SpriteBuilder Start(WaterLevelType waterLevelType)
+            {
+            Bitmap sprite = new Bitmap(SquareSize.Width, SquareSize.Height);
+
+            using (Graphics g = Graphics.FromImage(sprite))
                 {
                 using (SolidBrush b = new SolidBrush(Color.Black))
                     {
@@ -51,20 +74,29 @@ namespace ExileWorldGenerator
                         }
                     }
                 }
+
+            return new SpriteBuilder(sprite);
             }
 
-        public void BuildBackgroundSprite(byte backgroundAndOrientation, Palette palette)
+        /// <summary>
+        /// Adds a background sprite
+        /// </summary>
+        /// <param name="backgroundAndOrientation">Specifies the background type in the bottom 6 bits, the vertical flip and alignment in bit 6, and the horizontal flip and alignment in bit 7</param>
+        /// <param name="palette">Specifies the palette to use when drawing the sprite</param>
+        /// <returns>A SpriteBuilder object containing the added background sprite</returns>
+        [Pure]
+        public SpriteBuilder AddBackgroundSprite(byte backgroundAndOrientation, Palette palette)
             {
             byte background = (byte) (backgroundAndOrientation & 0x3f);
             bool flipHorizontallyAndRightAlign = (backgroundAndOrientation & 0x80) != 0;
             bool flipVerticallyAndBottomAlign = (backgroundAndOrientation & 0x40) != 0;
 
-            byte sprite = BackgroundSpriteLookup[background];
+            byte spriteIndex = BackgroundSpriteLookup[background];
             byte offsetAlongY = (byte) (BackgroundYOffsetLookup[background] & 0xf0);
 
-            var sourceRectangle = SpritePositions[sprite];
-            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
-            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
+            var sourceRectangle = SpritePositions[spriteIndex];
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[spriteIndex];
+            bool isSourceFlippedVertically = FlipSpriteVertically[spriteIndex];
             
             Func<int, int> toX;
             if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
@@ -89,7 +121,7 @@ namespace ExileWorldGenerator
 
             if (flipVerticallyAndBottomAlign)
                 {
-                offsetAlongY += SpriteHeightLookup[sprite];
+                offsetAlongY += SpriteHeightLookup[spriteIndex];
                 offsetAlongY |= 7;
                 offsetAlongY ^= 0xff;
                 }
@@ -106,6 +138,7 @@ namespace ExileWorldGenerator
                 toY = y => y + offsetAlongY;
                 }
 
+            var sprite = new Bitmap(this._sprite);
             for (int y = 0; y < sourceRectangle.Height; y++)
                 {
                 for (int x = 0; x < sourceRectangle.Width; x++)
@@ -119,19 +152,30 @@ namespace ExileWorldGenerator
                         }
                     int x2 = toX(x);
                     int y2 = toY(y);
-                    this.Sprite.SetPixel(x2, y2, pixelColour);
+                    sprite.SetPixel(x2, y2, pixelColour);
                     }
                 }
+
+            return new SpriteBuilder(sprite);
             }
 
-        public void BuildObjectFromDataSprite(byte objectType, byte orientation, byte objectData = 0x0)
+        /// <summary>
+        /// Adds a sprite for a foreground object
+        /// </summary>
+        /// <param name="objectType">Specifies the type of object</param>
+        /// <param name="orientation">Specifies the vertical flip and alignment in bit 6, and the horizontal flip and alignment in bit 7</param>
+        /// <param name="objectData">Specifies any additional data needed to correctly render the sprite. This is dependent on the object type.</param>
+        /// <returns>A SpriteBuilder object containing the added foreground sprite</returns>
+        [Pure]
+        public SpriteBuilder AddObjectFromDataSprite(byte objectType, byte orientation, byte? objectData = null)
             {
             objectType = (byte) (objectType & 0x7f);
-            byte sprite = ObjectSpriteLookup[objectType];
+            byte spriteIndex = ObjectSpriteLookup[objectType];
             Palette palette;
             if (objectType == 0xd)
                 {
-                palette = SuckerPalettes[objectData & 0x7f];
+                Debug.Assert(objectData.HasValue);
+                palette = SuckerPalettes[objectData.Value & 0x7f];
                 }
             else
                 {
@@ -139,11 +183,11 @@ namespace ExileWorldGenerator
                 palette = Palette.FromByte(objectPalette);
                 }
 
-            var sourceRectangle = SpritePositions[sprite];
+            var sourceRectangle = SpritePositions[spriteIndex];
             bool flipHorizontallyAndRightAlign = (orientation & 0x80) != 0;
             bool flipVerticallyAndTopAlign = (orientation & 0x40) != 0;
-            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
-            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[spriteIndex];
+            bool isSourceFlippedVertically = FlipSpriteVertically[spriteIndex];
             
             Func<int, int> toX;
             if (!flipHorizontallyAndRightAlign && !isSourceFlippedHorizontally)
@@ -187,6 +231,7 @@ namespace ExileWorldGenerator
                 toY = y => y;
                 }
 
+            var sprite = new Bitmap(this._sprite);
             for (int y = 0; y < sourceRectangle.Height; y++)
                 {
                 for (int x = 0; x < sourceRectangle.Width; x++)
@@ -200,23 +245,33 @@ namespace ExileWorldGenerator
                         }
                     int x2 = toX(x);
                     int y2 = toY(y);
-                    this.Sprite.SetPixel(x2, y2, pixelColour);
+                    sprite.SetPixel(x2, y2, pixelColour);
                     }
                 }
+
+            return new SpriteBuilder(sprite);
             }
 
-        public void BuildObjectSprite(byte data, byte orientation, (byte x, byte y) offset)
+        /// <summary>
+        /// Adds a foreground sprite
+        /// </summary>
+        /// <param name="objectType">Specifies the type of object</param>
+        /// <param name="orientation">Specifies the vertical flip in bit 6, and the horizontal flip in bit 7</param>
+        /// <param name="offset">Specifies where to position the sprite within the square</param>
+        /// <returns>A SpriteBuilder object containing the added foreground sprite</returns>
+        [Pure]
+        public SpriteBuilder AddObjectSprite(byte objectType, byte orientation, (byte x, byte y) offset)
             {
-            data = (byte) (data & 0x7f);
-            byte sprite = ObjectSpriteLookup[data];
-            byte objectPalette = ObjectPaletteLookup[data];
+            objectType = (byte) (objectType & 0x7f);
+            byte spriteIndex = ObjectSpriteLookup[objectType];
+            byte objectPalette = ObjectPaletteLookup[objectType];
             var palette = Palette.FromByte(objectPalette);
 
-            var sourceRectangle = SpritePositions[sprite];
+            var sourceRectangle = SpritePositions[spriteIndex];
             bool flipHorizontally = (orientation & 0x80) != 0;
             bool flipVertically = (orientation & 0x40) != 0;
-            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
-            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[spriteIndex];
+            bool isSourceFlippedVertically = FlipSpriteVertically[spriteIndex];
             
             Func<int, int> toX;
             if (flipHorizontally == isSourceFlippedHorizontally)
@@ -243,6 +298,7 @@ namespace ExileWorldGenerator
             offset.x >>= 4;
             offset.y >>= 3;
 
+            var sprite = new Bitmap(this._sprite);
             for (int y = 0; y < sourceRectangle.Height; y++)
                 {
                 for (int x = 0; x < sourceRectangle.Width; x++)
@@ -256,12 +312,50 @@ namespace ExileWorldGenerator
                         }
                     int x2 = toX(x) + offset.x;
                     int y2 = toY(y) + offset.y;
-                    this.Sprite.SetPixel(x2, y2, pixelColour);
+                    if (x2 < sprite.Width && y2 < sprite.Height)
+                        {
+                        sprite.SetPixel(x2, y2, pixelColour);
+                        }
                     }
                 }
+
+            return new SpriteBuilder(sprite);
             }
-        
-        public void BuildDoor(byte backgroundAndOrientation, byte data)
+
+        [Pure]
+        public SpriteBuilder AddEmergingObjectSprite(byte objectType, bool hasTree, byte orientation)
+            {
+            objectType = (byte) (objectType & 0x7f);
+            byte spriteIndex = ObjectSpriteLookup[objectType];
+            var width = SpriteWidthLookup[spriteIndex];
+            byte offsetX = (byte) ((width ^ 255) >> 1);
+            bool alignAtTop = (orientation & 0x40) != 0;
+            var height = SpriteHeightLookup[spriteIndex];
+            byte offSetY;
+            if (objectType == 0x37)     // flames
+                {
+                Debug.Assert(!alignAtTop);
+                offSetY = (byte) (255 - height);
+                }
+            else if (hasTree)
+                {
+                offSetY = alignAtTop ? (byte)(255 - height) : (byte) 0;
+                }
+            else
+                {
+                offSetY = (byte)((height ^ 255) >> 1);
+                }
+            return AddObjectSprite(objectType, 0, (offsetX, offSetY));
+            }
+
+        /// <summary>
+        /// Adds a sprite for a door
+        /// </summary>
+        /// <param name="backgroundAndOrientation">Specifies the type of door in the bottom 6 bits, the vertical alignment in bit 6, and the horizontal alignment in bit 7</param>
+        /// <param name="data">Specifies the data associated with the door which indicates the palette to use</param>
+        /// <returns>A SpriteBuilder object containing the added door sprite</returns>
+        [Pure]
+        public SpriteBuilder BuildDoor(byte backgroundAndOrientation, byte data)
             {
             var backgroundObjectType = backgroundAndOrientation & 0x3f;
             Debug.Assert(backgroundObjectType == 3 || backgroundObjectType == 4);
@@ -269,25 +363,25 @@ namespace ExileWorldGenerator
             bool rightAlign = (backgroundAndOrientation & 0x80) != 0;
             bool bottomAlign = (backgroundAndOrientation & 0x40) == 0;
             var doorIsHorizontal = rightAlign ^ bottomAlign;
-            byte sprite;
+            byte spriteIndex;
             switch (backgroundObjectType)
                 {
                 case 3:
-                    sprite = (byte) (doorIsHorizontal ? 0x4a : 0x4b);
+                    spriteIndex = (byte) (doorIsHorizontal ? 0x4a : 0x4b);
                     break;
                 case 4:
-                    sprite = (byte) (doorIsHorizontal ? 0x3c : 0x41);
+                    spriteIndex = (byte) (doorIsHorizontal ? 0x3c : 0x41);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(backgroundAndOrientation));
                 }
 
             byte key = (byte) ((data >> 4) & 0b111);
-            Palette palette = Palette.FromByte(DoorPalettes[key]);
+            Palette palette = DoorPalettes[key];
 
-            var sourceRectangle = SpritePositions[sprite];
-            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[sprite];
-            bool isSourceFlippedVertically = FlipSpriteVertically[sprite];
+            var sourceRectangle = SpritePositions[spriteIndex];
+            bool isSourceFlippedHorizontally = FlipSpriteHorizontally[spriteIndex];
+            bool isSourceFlippedVertically = FlipSpriteVertically[spriteIndex];
             
             Func<int, int> toX;
             if (!rightAlign && !isSourceFlippedHorizontally)
@@ -331,6 +425,7 @@ namespace ExileWorldGenerator
                 toY = y => height - y;
                 }
 
+            var sprite = new Bitmap(this._sprite);
             for (int y = 0; y < sourceRectangle.Height; y++)
                 {
                 for (int x = 0; x < sourceRectangle.Width; x++)
@@ -344,19 +439,30 @@ namespace ExileWorldGenerator
                         }
                     int x2 = toX(x);
                     int y2 = toY(y);
-                    this.Sprite.SetPixel(x2, y2, pixelColour);
+                    sprite.SetPixel(x2, y2, pixelColour);
                     }
                 }
+
+            return new SpriteBuilder(sprite);
             }
 
-        public void AddBitmap(Bitmap bitmap)
+        /// <summary>
+        /// Adds an overlay image to the sprite
+        /// </summary>
+        /// <param name="bitmap">Specifies the image to add</param>
+        /// <returns>A SpriteBuilder object containing the added image</returns>
+        [Pure]
+        public SpriteBuilder AddBitmap(Bitmap bitmap)
             {
-            using (Graphics g = Graphics.FromImage(this.Sprite))
+            var sprite = new Bitmap(this._sprite);
+            using (Graphics g = Graphics.FromImage(sprite))
                 {
                 g.CompositingMode = CompositingMode.SourceOver;
                 bitmap.MakeTransparent(Color.Black);
-                g.DrawImage(bitmap, new Point(0, 0));
+                g.DrawImage(bitmap, Point.Empty);
                 }
+
+            return new SpriteBuilder(sprite);
             }
 
         private static int GetPixelColour(int x, int y)
@@ -643,6 +749,20 @@ namespace ExileWorldGenerator
                 0x21, 0x4d, 0x4d, 0x4d, 0x4d, 0x20, 0x4d, 0x4d, 0x22, 0x6b, 0x6c, 0x6c, 0x79, 0x6c, 0x04, 0x7a, 
                 0x63, 0x7c, 0x7c, 0x79, 0x77
                 };
+
+            // overrides for improved display
+            result[0x13] = 0x0a;    // icer bullet
+            result[0x14] = 0x0a;    // tracer bullet
+            result[0x17] = 0x0a;    // red bullet
+            result[0x18] = 0x0a;    // pistol bullet
+
+            result[0x2e] = 0x5b;    // green/yellow bird
+            result[0x2f] = 0x5b;    // white/yellow bird
+            result[0x30] = 0x5b;    // red/magenta bird
+            result[0x31] = 0x5b;    // invisible bird
+
+            result[0x32] = 0x6f;    // lightning
+
             return result;
             }
 
@@ -662,13 +782,13 @@ namespace ExileWorldGenerator
             return data.Select(p => (byte) (p & 0x7f)).ToArray();
             }
 
-        private static byte[] BuildDoorPalettes()
+        private static Palette[] BuildDoorPalettes()
             {
             var data = new byte[]
                 {
                 0x2b, 0x2d, 0x15, 0x1c, 0x42, 0x12, 0x26, 0x4e
                 };
-            return data;
+            return data.Select(Palette.FromByte).ToArray();
             }
 
         public static byte[] BuildSuckerPalettesAndAction()

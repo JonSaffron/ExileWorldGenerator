@@ -31,24 +31,24 @@ namespace ExileWorldGenerator
 
             var handlerList = BackgroundObjectsHandlerLookup[spriteOrHash];
             byte backgroundObjectHandler = handlerList[positionInHash];
-            int backgroundObjectId = positionInHash;
+            byte backgroundObjectId = (byte) positionInHash;
             for (int i = 0; i < spriteOrHash; i++)
                 {
                 var countOfItemsInHash = BackgroundObjectsXLookup[i].Length;
-                backgroundObjectId += countOfItemsInHash;
+                backgroundObjectId += (byte) countOfItemsInHash;
                 }
 
             var dataList = BackgroundDataLookup[spriteOrHash];
             byte? data = positionInHash < dataList.Length ? dataList[positionInHash] : new byte?();
 
-            int? id = null;
+            byte? id = null;
             if (data.HasValue)
                 {
-                id = positionInHash;
+                id = (byte) positionInHash;
                 for (int i = 0; i < spriteOrHash; i++)
                     {
                     var countOfItemsInList = BackgroundDataLookup[i].Length;
-                    id += countOfItemsInList;
+                    id += (byte) countOfItemsInList;
                     }
                 id += 1;
                 }

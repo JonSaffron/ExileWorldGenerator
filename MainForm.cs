@@ -16,22 +16,24 @@ namespace ExileWorldGenerator
     {
     public partial class MainForm : Form
         {
-        private readonly SpriteBuilder _spriteBuilder = new SpriteBuilder();
         private readonly SquareProperties[,] _squareProperties = new SquareProperties[256, 256];
         private static readonly string[] BackgroundHandlerTypeList = BuildBackgroundHandlerTypeList();
         private static readonly string[] ObjectTypeList = BuildObjectTypeList();
         private static readonly IReadOnlyList<WaterLevelFromX> WaterLevelList = BuildWaterLevelsList();
         private static readonly List<Point> TeleportDestinations = BuildTeleportDestinations();
         private static readonly string[] SuckerTriggers = BuildSuckerTriggers();
-        private static readonly string[] SuckerActions = BuildSuckerActions();
+        private static readonly SuckerAction[] SuckerActions = BuildSuckerActions();
+        private static readonly byte[] GargoyleBulletList = BuildGargoyleBulletList();
+        private static readonly List<GameObject> GameObjects = BuildGameObjectList();
+        private static readonly List<byte[]> SwitchEffectsList = BuildSwitchEffectsList();
         private decimal _zoom;
-        private byte lookFor = 0xff;
+        private byte _lookFor = 0xff;
         private bool _highlightMappedDataSquares;
         private bool _highlightBackgroundObjects;
         private bool _highlightDisplayElement;
+        private byte _backgroundElementToHighlight;
         private readonly Stopwatch _stopwatch = new Stopwatch();
         private List<byte> _selectedBackgroundObjectTypes = new List<byte>();
-        private int _displayElementToHighlight;
 
         private Point _draggingStartPoint;
         private Point _draggingTopLeftCell;
@@ -39,6 +41,8 @@ namespace ExileWorldGenerator
 
         [DllImport("user32.dll", CharSet=CharSet.Auto)]
         private static extern IntPtr SendMessage(HandleRef hWnd, int msg, int wParam, ref TV_ITEM lParam);
+        [DllImport("user32.dll", CharSet=CharSet.Auto)]
+        private static extern IntPtr SendMessage(HandleRef hWnd, int msg, IntPtr wParam, int lParam);
 
         public MainForm()
             {
@@ -68,21 +72,19 @@ namespace ExileWorldGenerator
             cboZoomLevel.SelectedIndex = 1;
             this._zoom = 1m;
 
-            var backgroundItems = new Dictionary<int, string>();
-            for (int i = 0x10; i <= 0x3f; i++)
-                {
-                backgroundItems.Add(i, "0x" + i.ToString("X"));
-                }
-            cboHighlightBackground.DisplayMember = "Value";
-            cboHighlightBackground.ValueMember = "Key";
-            cboHighlightBackground.DataSource = new BindingSource(backgroundItems, null);
-            cboHighlightBackground.SelectedIndex = 1;
+            var backgroundItems = Enumerable.Range(0x10, 0x30).ToDictionary(item => (byte)item, item => $"0x{item:X}");
+            cboBackgroundScenery.DisplayMember = "Value";
+            cboBackgroundScenery.ValueMember = "Key";
+            cboBackgroundScenery.DataSource = new BindingSource(backgroundItems, null);
+            chkHighlightBackgroundScenery.Checked = false;
 
             // turn on double-buffering for the data grid view to reduce flickering
             var type = map.GetType();
             var prop = type.GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
             if (prop != null)
+                {
                 prop.SetValue(this.map, true);
+                }
 
             this._stopwatch.Start();
 
@@ -109,7 +111,7 @@ namespace ExileWorldGenerator
             //Trace.WriteLine(findResults);
             }
 
-        private void Form1_Shown(object sender, EventArgs e)
+        private void MainForm_Shown(object sender, EventArgs e)
             {
             ResetGrid();
             map.FirstDisplayedCell = map.Rows[0x39].Cells[0x97];
@@ -119,9 +121,18 @@ namespace ExileWorldGenerator
 
         private void ResetGrid()
             {
+            // ReSharper disable InconsistentNaming
+            // ReSharper disable IdentifierTypo
+            const int WM_SETCURSOR = 0x20;
+            const int HTCLIENT = 1;
+            // ReSharper restore IdentifierTypo
+            // ReSharper restore InconsistentNaming
+            this.UseWaitCursor = true;
+            Control ctrl = this.ActiveControl;
+            SendMessage(new HandleRef(ctrl, ctrl.Handle), WM_SETCURSOR, ctrl.Handle, HTCLIENT);
             this.map.SuspendLayout();
 
-            for (int i = 0; i < 256; i++)
+            for (int i = 255; i >= 0; i--)
                 {
                 var value = i.ToString("X2");
                 this.map.Rows[i].HeaderCell.Value = value;
@@ -131,6 +142,7 @@ namespace ExileWorldGenerator
                 }
             
             this.map.ResumeLayout();
+            this.UseWaitCursor = false;
             }
 
         private void CalculateSquareContents(int squareCoordinates, ConcurrentBag<int> hashOfPositions)
@@ -228,7 +240,10 @@ namespace ExileWorldGenerator
                                 break;
                             }
                         }
-                    return $"Triggered by {triggeredBy}, switch effects index 0x{switchEffectsIndex}, effect is to {effect}";
+
+                    byte[] objectsAffected = SwitchEffectsList[switchEffectsIndex];
+                    string switchEffectsList = string.Join(", ", objectsAffected.Select(item => item.ToString("X2")));
+                    return $"Triggered by {triggeredBy}, switch effects index 0x{switchEffectsIndex}, affecting {objectsAffected.Length} object(s) {switchEffectsList}, effect is to {effect}";
                     }
                 
                 case BackgroundObjectType.Teleport:
@@ -287,7 +302,26 @@ namespace ExileWorldGenerator
                         Debug.Assert(data.HasValue);
                         result += $" to {SuckerActions[data.Value & 0x7f]}, {SuckerTriggers[data.Value & 0x7f]}";
                         }
-
+                    else if (type.Value == 0x4 || type.Value == 0x5)
+                        {
+                        Debug.Assert(data.HasValue);
+                        bool isActive = (data.Value & 0b11) == 0;
+                        byte nestOccupants = (byte) ((data.Value & 0b1111100) >> 2);
+                        result += $" containing {ObjectTypeList[nestOccupants]} ({(isActive ? "active" : "inactive")})";
+                        }
+                    else if (type.Value == 0x1f || type.Value == 0x20)
+                        {
+                        Debug.Assert(data.HasValue);
+                        bool isActive = (data.Value & 0b1) == 0;
+                        byte fires = (byte) ((data.Value & 0b111110) >> 1);
+                        result += $" fires {ObjectTypeList[fires]} ({(isActive ? "active" : "inactive")})";
+                        }
+                    else if (type.Value == 0x28)
+                        {
+                        Debug.Assert(data.HasValue);
+                        byte fires = GargoyleBulletList[data.Value & 0x7f];
+                        result += $" fires {ObjectTypeList[fires]}";
+                        }
                     return result;
                     }
 
@@ -310,7 +344,9 @@ namespace ExileWorldGenerator
                             effect = "toggle bits 0 and 1 (e.g. lock/unlock and open/close doors)";
                             break;
                         }
-                    return $"Switch effects index 0x{switchEffectsIndex}, effect is to {effect}";
+                    byte[] objectsAffected = SwitchEffectsList[switchEffectsIndex];
+                    string switchEffectsList = string.Join(", ", objectsAffected.Select(item => item.ToString("X2")));
+                    return $"Switch effects index 0x{switchEffectsIndex}, affecting {objectsAffected.Length} object(s) {switchEffectsList}, effect is to {effect}";
                     }
 
                 case BackgroundObjectType.ObjectEmergingFromBush:
@@ -397,20 +433,30 @@ namespace ExileWorldGenerator
             var squareProperties = this._squareProperties[e.ColumnIndex, e.RowIndex];
 
             var waterLevelType = GetWaterLevelType(squareProperties.X, squareProperties.Y);
-            this._spriteBuilder.Clear(waterLevelType);
+            var spriteBuilder = SpriteBuilder.Start(waterLevelType);
 
-            switch ((BackgroundObjectType) (squareProperties.Background & 0x3f))
+            var isTeleportDestination = TeleportDestinations.Contains(new Point(squareProperties.X, squareProperties.Y));
+            if (isTeleportDestination && this.chkShowVisualOverlays.Checked)
+                {
+                spriteBuilder = spriteBuilder.AddBitmap(Resources.TeleportTarget);
+                }
+
+            var backgroundObjectType = (BackgroundObjectType)(squareProperties.Background & 0x3f);
+            switch (backgroundObjectType)
                 {
                 case BackgroundObjectType.InvisibleSwitch:
                     {
-                    this._spriteBuilder.AddBitmap(Resources.HiddenSwitch);
+                    if (this.chkShowVisualOverlays.Checked)
+                        {
+                        spriteBuilder = spriteBuilder.AddBitmap(Resources.HiddenSwitch);
+                        }
                     break;
                     }
 
                 case BackgroundObjectType.ObjectFromData:
                     {
                     Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Data.Value, squareProperties.Background);
+                    spriteBuilder = spriteBuilder.AddObjectFromDataSprite(squareProperties.BackgroundObjectData.Data.Value, squareProperties.Background);
                     break;
                     }
                 
@@ -418,80 +464,139 @@ namespace ExileWorldGenerator
                 case BackgroundObjectType.StoneDoor:
                     {
                     Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
-                    this._spriteBuilder.BuildDoor(squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
+                    spriteBuilder = spriteBuilder.BuildDoor(squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
                     break;
                     }
 
                 case BackgroundObjectType.ObjectFromTypeWithWall:
+                case BackgroundObjectType.ObjectFromType:
                 case BackgroundObjectType.ObjectFromTypeWithFoliage:
                     {
                     Debug.Assert(squareProperties.BackgroundObjectData.Type.HasValue);
                     Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
+                    var objectData = squareProperties.BackgroundObjectData.Data.Value;
+                    var objectType = squareProperties.BackgroundObjectData.Type.Value;
+                    spriteBuilder = spriteBuilder.AddObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
+                    if (backgroundObjectType != BackgroundObjectType.ObjectFromType)
+                        {
+                        spriteBuilder = spriteBuilder.AddBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
+                        }
+                    if (objectType == 0x4 || objectType == 0x5)
+                        {
+                        byte nestOccupants = (byte) ((objectData & 0b1111100) >> 2);
+                        var orientation = (byte) (squareProperties.Background & 0b0100_0000);
+                        if (backgroundObjectType == BackgroundObjectType.ObjectFromTypeWithWall)
+                            {
+                            orientation ^= 0b0100_0000;
+                            }
+                        spriteBuilder = spriteBuilder.AddEmergingObjectSprite(nestOccupants, true, orientation);
+                        }
+                    else if (objectType == 0x1f || objectType == 0x20)
+                        {
+                        byte fires = (byte) ((objectData & 0b111110) >> 1);
+                        spriteBuilder = spriteBuilder.AddEmergingObjectSprite(fires, false, 0);
+                        }
+                    else if (objectType == 0x28)
+                        {
+                        byte fires = GargoyleBulletList[objectData & 0x7f];
+                        var orientation = (byte) (squareProperties.Background & 0b0100_0000);
+                        orientation ^= 0b0100_0000;
+                        spriteBuilder = spriteBuilder.AddEmergingObjectSprite(fires, false, orientation);
+                        }
+                    else if (objectType == 0xd && this.chkShowVisualOverlays.Checked)
+                        {
+                        var suckerAction = SuckerActions[objectData & 0x7f];
+                        var orientation = (squareProperties.Background & 0x40);
+                        if (suckerAction == SuckerAction.Blow && orientation == 0)
+                            {
+                            spriteBuilder = spriteBuilder.AddBitmap(Resources.BlowUp);
+                            }
+                        else if (suckerAction == SuckerAction.Blow)
+                            {
+                            spriteBuilder = spriteBuilder.AddBitmap(Resources.BlowDown);
+                            }
+                        else if (orientation == 0)
+                            {
+                            spriteBuilder = spriteBuilder.AddBitmap(Resources.SuckDown);
+                            }
+                        else
+                            {
+                            spriteBuilder = spriteBuilder.AddBitmap(Resources.SuckUp);
+                            }
+                        }
                     break;
                     }
 
-                case BackgroundObjectType.ObjectFromType:
-                    {
-                    Debug.Assert(squareProperties.BackgroundObjectData.Type.HasValue);
-                    Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
-                    this._spriteBuilder.BuildObjectFromDataSprite(squareProperties.BackgroundObjectData.Type.Value, squareProperties.Background, squareProperties.BackgroundObjectData.Data.Value);
-                    break;
-                    }
-            
                 case BackgroundObjectType.Switch:
                     {
-                    this._spriteBuilder.BuildObjectFromDataSprite(0x42, squareProperties.Background);
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
+                    spriteBuilder = spriteBuilder.AddObjectFromDataSprite(0x42, squareProperties.Background);
+                    spriteBuilder = spriteBuilder.AddBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     break;
                     }
 
                 case BackgroundObjectType.ObjectEmergingFromBush:
                 case BackgroundObjectType.ObjectEmergingFromPipe:
                     {
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     if (squareProperties.BackgroundObjectData.Number.HasValue)
                         {
                         Debug.Assert(squareProperties.BackgroundObjectData.Data.HasValue);
                         bool hasTree = (squareProperties.BackgroundObjectData.Data.Value & 0x80) != 0;
                         if (hasTree)
                             {
-                            this._spriteBuilder.BuildObjectSprite(0x40, squareProperties.Background, (0x40, 0x40));
+                            spriteBuilder = spriteBuilder.AddObjectSprite(0x40, squareProperties.Background, (0x40, 0x40));
                             }
+
+                        Debug.Assert(squareProperties.BackgroundObjectData.Type.HasValue);
+                        spriteBuilder = spriteBuilder.AddEmergingObjectSprite(squareProperties.BackgroundObjectData.Type.Value, hasTree, squareProperties.Background);
                         }
+                    spriteBuilder = spriteBuilder.AddBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     break;
                     }
 
                 case BackgroundObjectType.FixedWind:
                     {
-                    this._spriteBuilder.AddBitmap(Resources.FixedWind);
+                    if (this.chkShowVisualOverlays.Checked)
+                        {
+                        spriteBuilder = spriteBuilder.AddBitmap(Resources.FixedWind);
+                        }
                     break;
                     }
 
                 case BackgroundObjectType.RandomWind:
                     {
-                    this._spriteBuilder.AddBitmap(Resources.RandomWind);
+                    if (this.chkShowVisualOverlays.Checked)
+                        {
+                        spriteBuilder = spriteBuilder.AddBitmap(Resources.RandomWind);
+                        }
+                    break;
+                    }
+
+                case (BackgroundObjectType) 0x12:
+                    {
+                    spriteBuilder = spriteBuilder.AddBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
+                    if (this.chkShowVisualOverlays.Checked)
+                        {
+                        spriteBuilder = spriteBuilder.AddBitmap(Resources.HollowPassage);
+                        }
                     break;
                     }
 
                 default:
                     {
-                    this._spriteBuilder.BuildBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
+                    spriteBuilder = spriteBuilder.AddBackgroundSprite(squareProperties.Background, squareProperties.PaletteData.Palette);
                     break;
                     }
                 }
 
-            var isTeleportDestination = TeleportDestinations.Contains(new Point(squareProperties.X, squareProperties.Y));
-            if (isTeleportDestination)
+            foreach (GameObject item in GameObjects.Where(go => go.X == e.ColumnIndex && go.Y == e.RowIndex))
                 {
-                this._spriteBuilder.AddBitmap(Resources.TeleportTarget);
+                spriteBuilder = spriteBuilder.AddObjectSprite(item.ObjectType, 0, (item.LowX, item.LowY));
                 }
 
             Rectangle destinationRectangle = new Rectangle(e.CellBounds.Left, e.CellBounds.Top - 1, (int) (32 * _zoom), (int) (32 * _zoom));
             e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
             e.Graphics.PixelOffsetMode = PixelOffsetMode.None; 
-            e.Graphics.DrawImage(this._spriteBuilder.Sprite, destinationRectangle);
+            e.Graphics.DrawImage(spriteBuilder.Result, destinationRectangle);
 
             if (DoesSquareRequireAnimating(squareProperties))
                 {
@@ -523,7 +628,7 @@ namespace ExileWorldGenerator
                         }
                     }
 
-                if (this._highlightDisplayElement && (squareProperties.Background & 0x3f) == this._displayElementToHighlight)
+                if (this._highlightDisplayElement && (squareProperties.Background & 0x3f) == this._backgroundElementToHighlight)
                     {
                     using (Brush brush = new SolidBrush(Color.FromArgb(0x80, Color.White)))
                         {
@@ -540,6 +645,16 @@ namespace ExileWorldGenerator
                             }
                         }
                     }
+
+                if (this.chkShowVisualOverlays.Checked && OnSquareAffectedBySelectedSwitch(squareProperties))
+                    {
+                    Debug.WriteLine($"Animation frame {squareProperties.AnimationFrame}");
+                    var a = 0x30 * squareProperties.AnimationFrame;
+                    using (Brush brush = new SolidBrush(Color.FromArgb(a, Color.LightGray)))
+                        {
+                        e.Graphics.FillRectangle(brush, e.CellBounds);
+                        }
+                    }
                 }
 
             if (this.map.SelectedCells.Count != 0)
@@ -553,7 +668,7 @@ namespace ExileWorldGenerator
                     }
                 }
 
-            if ((squareProperties.Background & 0x3f) == lookFor)
+            if ((squareProperties.Background & 0x3f) == _lookFor)
                 {
                 }
 
@@ -587,7 +702,7 @@ namespace ExileWorldGenerator
                 TimeSpan elapsed = timeElapsed - squareProperties.NextAnimationFrame.Value;
                 int framesMoved = (int) elapsed.TotalMilliseconds / (int) frameLength.TotalMilliseconds;
                 squareProperties.AnimationFrame = (squareProperties.AnimationFrame + framesMoved) % 5;
-                if (this._highlightMappedDataSquares || this._highlightBackgroundObjects || this._highlightDisplayElement)
+                if (IsCurrentlyAnimating(squareProperties))
                     {
                     TimeSpan timeToNextFrame = TimeSpan.FromMilliseconds(framesMoved * frameLength.TotalMilliseconds);
                     squareProperties.NextAnimationFrame = squareProperties.NextAnimationFrame.Value + timeToNextFrame;
@@ -604,6 +719,19 @@ namespace ExileWorldGenerator
                 }
             }
 
+        private bool IsCurrentlyAnimating(SquareProperties squareProperties)
+            {
+            if (this._highlightMappedDataSquares)
+                return true;
+            if (this._highlightBackgroundObjects && this._selectedBackgroundObjectTypes.Any())
+                return true;
+            if (this._highlightDisplayElement)
+                return true;
+            if (this.chkShowVisualOverlays.Checked && this.OnSquareAffectedBySelectedSwitch(squareProperties))
+                return true;
+            return false;
+            }
+
         private bool DoesSquareRequireAnimating(SquareProperties squareProperties)
             {
             if (squareProperties.NextAnimationFrame.HasValue)
@@ -612,9 +740,53 @@ namespace ExileWorldGenerator
                 return true;
             if (this._highlightBackgroundObjects && DoesSquareMatchBackgroundObjectCriteria(squareProperties))
                 return true;
-            if (this._highlightDisplayElement && (squareProperties.Background & 0x3f) == this._displayElementToHighlight)
+            if (this._highlightDisplayElement && (squareProperties.Background & 0x3f) == this._backgroundElementToHighlight)
                 return true;
+            if (OnSquareAffectedBySelectedSwitch(squareProperties))
+                {
+                Debug.WriteLine($"Animating {squareProperties.X:X2},{squareProperties.Y:X2}");
+                return true;
+                }
+
             return false;
+            }
+
+        private bool OnSquareAffectedBySelectedSwitch(SquareProperties squareProperties)
+            {
+            var switchEffects = GetSwitchEffectsForSelectedSquare();
+            if (!switchEffects.Any())
+                return false;
+
+            if ((squareProperties.Background & 0x3f) >= 0x10)
+                return false;
+            if (!squareProperties.BackgroundObjectData.Id.HasValue)
+                return false;
+
+            var result = switchEffects.Contains(squareProperties.BackgroundObjectData.Id.Value);
+            return result;
+            }
+
+        private byte[] GetSwitchEffectsForSelectedSquare()
+            {
+            byte[] emptyList = { };
+            if (this.map.SelectedCells.Count == 0)
+                return emptyList;
+
+            var rowIndex = this.map.SelectedCells[0].RowIndex;
+            var columnIndex = this.map.SelectedCells[0].ColumnIndex;
+            var selectedSquareProperties = this._squareProperties[columnIndex, rowIndex];
+            var selectedBackground = selectedSquareProperties.Background & 0x3f;
+            if (selectedBackground != 0x0 && selectedBackground != 0x8)
+                return emptyList;
+            if (!selectedSquareProperties.BackgroundObjectData.Id.HasValue)
+                return emptyList;
+            Debug.Assert(selectedSquareProperties.BackgroundObjectData.Data != null, "selectedSquareProperties.BackgroundObjectData.Data != null");
+            var switchEffectsIndex = selectedSquareProperties.BackgroundObjectData.Data.Value >> 3;
+            if (selectedBackground == 0x08)
+                {
+                switchEffectsIndex &= 0xf;
+                }
+            return SwitchEffectsList[switchEffectsIndex];
             }
 
         private bool DoesSquareMatchBackgroundObjectCriteria(SquareProperties squareProperties)
@@ -631,24 +803,28 @@ namespace ExileWorldGenerator
 
         private List<byte> BuildSelectedBackgroundTypes()
             {
-            var result = new List<byte>();
-            AddSelectedNodes(result, this.BackgroundObjectTree.Nodes[0]);
+            var result = GetSelectedNodes(this.BackgroundObjectTree.Nodes[0]).ToList();
             return result;
             }
 
-        private void AddSelectedNodes(List<byte> result, TreeNode node)
+        private static IEnumerable<byte> GetSelectedNodes(TreeNode node)
             {
-            if (node.Nodes.Count != 0)
-                {
-                foreach (TreeNode child in node.Nodes)
-                    {
-                    AddSelectedNodes(result, child);
-                    }
-                }
-            else
+            if (node.Nodes.Count == 0)
                 {
                 if (node.Checked)
-                    result.Add(byte.Parse((string) node.Tag, NumberStyles.HexNumber));
+                    {
+                    var result = byte.Parse((string)node.Tag, NumberStyles.HexNumber);
+                    yield return result;
+                    }
+                yield break;
+                }
+
+            foreach (TreeNode child in node.Nodes)
+                {
+                foreach (byte result in GetSelectedNodes(child))
+                    {
+                    yield return result;
+                    }
                 }
             }
 
@@ -668,13 +844,20 @@ namespace ExileWorldGenerator
             SetSpriteInfo(squareValue);
 
             SetBackgroundObjectInfo(squareValue);
+
+            if (this.chkShowVisualOverlays.Checked && GetSwitchEffectsForSelectedSquare().Any())
+                AnimationTimer.Enabled = true;
             }
 
         private void SetBackgroundObjectInfo(SquareProperties squareValue)
             {
             string backgroundObjectInfo;
             byte background = (byte) (squareValue.Background & 0x3f);
-            if (!squareValue.BackgroundObjectData.Id.HasValue)
+            if (background >= 0xd && background <= 0x0f)
+                {
+                backgroundObjectInfo = $"Background event: {squareValue.BackgroundHandlerType}";
+                }
+            else if (!squareValue.BackgroundObjectData.Id.HasValue)
                 {
                 backgroundObjectInfo = background < 0x10 
                     ? $"Background event used as scenery: {squareValue.BackgroundHandlerType}" 
@@ -823,7 +1006,7 @@ namespace ExileWorldGenerator
             byte calculatedBackground = squareValue.GeneratedBackground.Result;
             mappedGeneratedInfo +=
                 $"{(squareValue.GeneratedBackground.IsMappedData ? "Explicit" : "Generated")} background {calculatedBackground:X2}\r\n";
-            if (!squareValue.GeneratedBackground.IsMappedData || (squareValue.GeneratedBackground.Result & 0x3f) >= 0x9))
+            if ((calculatedBackground & 0x3f) >= 0x9)
                 {
                 mappedGeneratedInfo +=
                     $"Appearance: {calculatedBackground & 0x3f:X2}, " +
@@ -834,7 +1017,7 @@ namespace ExileWorldGenerator
             SetTextBoxHeight(this.txtMappedOrGeneratedInfo);
             }
 
-        private string DescribeOrientation(byte background)
+        private static string DescribeOrientation(byte background)
             {
             var orientation = background & 0xc0;
             switch (orientation)
@@ -1038,7 +1221,11 @@ namespace ExileWorldGenerator
             {
             var timeElapsed = this._stopwatch.Elapsed;
 
-            bool isAnimationBeingDisabled = !this._highlightMappedDataSquares && !this._highlightBackgroundObjects && !this._highlightDisplayElement;
+            bool isAnimationBeingDisabled = 
+                    !this._highlightMappedDataSquares 
+                && (!this._highlightBackgroundObjects || !this._selectedBackgroundObjectTypes.Any()) 
+                && !this._highlightDisplayElement
+                && (!this.chkShowVisualOverlays.Checked || !GetSwitchEffectsForSelectedSquare().Any());
 
             Parallel.ForEach(this._squareProperties.Cast<SquareProperties>(), item => 
                 {
@@ -1073,9 +1260,9 @@ namespace ExileWorldGenerator
                 this.AnimationTimer.Enabled = true;
             }
 
-        private void chkHighlightBackgroundObjects_CheckedChanged(object sender, EventArgs e)
+        private void chkHighlightBackgroundEvents_CheckedChanged(object sender, EventArgs e)
             {
-            this._highlightBackgroundObjects = this.chkHighlightBackgroundObjects.Checked;
+            this._highlightBackgroundObjects = this.chkHighlightBackgroundEvents.Checked;
             if (this._highlightBackgroundObjects)
                 this.AnimationTimer.Enabled = true;
             }
@@ -1087,6 +1274,10 @@ namespace ExileWorldGenerator
             CheckOrUncheckChildren(e.Node, e.Node.Checked);
             UpdateParentNodeState(e.Node);
             this._selectedBackgroundObjectTypes = BuildSelectedBackgroundTypes();
+            if (!this._highlightBackgroundObjects)
+                {
+                this.chkHighlightBackgroundEvents.Checked = true;
+                }
             }
 
         private void UpdateParentNodeState(TreeNode node)
@@ -1125,7 +1316,7 @@ namespace ExileWorldGenerator
             SendMessage(new HandleRef(this.BackgroundObjectTree, this.BackgroundObjectTree.Handle), TVM_SETITEM, 0, ref lParam);
             }
 
-        private void CheckOrUncheckChildren(TreeNode node, bool checkNode)
+        private static void CheckOrUncheckChildren(TreeNode node, bool checkNode)
             {
             foreach (TreeNode child in node.Nodes)
                 {
@@ -1135,7 +1326,7 @@ namespace ExileWorldGenerator
             }
 
         [SuppressMessage("ReSharper", "PossibleNullReferenceException")]
-        private bool? GetSiblingNodeState(TreeNodeCollection nodes)
+        private static bool? GetSiblingNodeState(TreeNodeCollection nodes)
             {
             var enumerator = nodes.GetEnumerator();
             enumerator.MoveNext();
@@ -1167,7 +1358,7 @@ namespace ExileWorldGenerator
             public IntPtr lParam;
             }
 
-        private ImageList BuildStateImageList()
+        private static ImageList BuildStateImageList()
             {
             var stateImageList = new ImageList();
 
@@ -1188,16 +1379,20 @@ namespace ExileWorldGenerator
             return stateImageList;
             }
 
-        private void chkHighlightDisplayElement_CheckedChanged(object sender, EventArgs e)
+        private void chkHighlightBackgroundScenery_CheckedChanged(object sender, EventArgs e)
             {
-            this._highlightDisplayElement = this.chkHighlightDisplayElement.Checked;
+            this._highlightDisplayElement = this.chkHighlightBackgroundScenery.Checked;
             if (this._highlightDisplayElement)
                 this.AnimationTimer.Enabled = true;
             }
 
-        private void cboHighlightBackground_SelectedIndexChanged(object sender, EventArgs e)
+        private void cboBackgroundScenery_SelectedIndexChanged(object sender, EventArgs e)
             {
-            this._displayElementToHighlight = (int) this.cboHighlightBackground.SelectedValue;
+            this._backgroundElementToHighlight = (byte) this.cboBackgroundScenery.SelectedValue;
+            if (!this._highlightDisplayElement)
+                {
+                this.chkHighlightBackgroundScenery.Checked = true;
+                }
             }
 
         private void map_MouseDown(object sender, MouseEventArgs e)
@@ -1283,10 +1478,117 @@ namespace ExileWorldGenerator
                 };
             }
 
-        private static string[] BuildSuckerActions()
+        private enum SuckerAction
+            {
+            Blow = 0,
+            Suck = 1
+            }
+
+        private static SuckerAction[] BuildSuckerActions()
             {
             var palettesAndActions = SpriteBuilder.BuildSuckerPalettesAndAction();
-            return palettesAndActions.Select(p => (p & 1) == 1 ? "suck" : "blow").ToArray();
+            return palettesAndActions.Select(p => (p & 1) == 1 ? SuckerAction.Suck : SuckerAction.Blow).ToArray();
+            }
+
+        private static byte[] BuildGargoyleBulletList()
+            {
+            return new byte[] { 0x32, 0x19, 0x19, 0x19, 0x32 };
+            }
+
+        private void cboBackgroundScenery_DrawItem(object sender, DrawItemEventArgs e)
+            {
+            e.DrawBackground();
+
+            var item = (KeyValuePair<byte, string>) cboBackgroundScenery.Items[e.Index];
+            byte background = item.Key;
+            e.Graphics.DrawString($"{item.Value}", e.Font, new SolidBrush(e.ForeColor), e.Bounds.Left, e.Bounds.Top);
+
+            var spriteBuilder = SpriteBuilder.Start(WaterLevelType.AboveWater);
+            byte orientation = 0;
+            var palette = CalculatePalette.GetPalette(ref background, ref orientation, 0xa0, 0x50);
+            spriteBuilder = spriteBuilder.AddBackgroundSprite(item.Key, palette.Palette);
+
+            Rectangle destinationRectangle = new Rectangle(e.Bounds.Left + 40, e.Bounds.Top, 32, 32);
+            e.Graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+            e.Graphics.PixelOffsetMode = PixelOffsetMode.None; 
+            e.Graphics.DrawImage(spriteBuilder.Result, destinationRectangle);
+
+            e.DrawFocusRectangle();
+            }
+
+        private void chkShowVisualOverlays_CheckedChanged(object sender, EventArgs e)
+            {
+            this.map.Invalidate();
+            }
+
+        private class GameObject
+            {
+            public byte ObjectType;
+            public byte X;
+            public byte Y;
+            public byte LowX;
+            public byte LowY;
+            }
+
+        private static List<GameObject> BuildGameObjectList()
+            {
+            var objects = new List<GameObject>(new [] 
+                {
+                new GameObject { ObjectType = 0x00, X = 0x9b, Y = 0x3b, LowX = 0xc0, LowY = 0x20 },       // player
+                new GameObject { ObjectType = 0x26, X = 0x99, Y = 0x3b, LowX = 0x64, LowY = 0x20 },       // triax
+
+                new GameObject { ObjectType = 0x43, X = 0xa3, Y = 0x5d, LowX = 0x00, LowY = 0xc0 },       // chest
+                new GameObject { ObjectType = 0x50, X = 0x98, Y = 0x4d, LowX = 0x00, LowY = 0x40 },       // grenade
+                new GameObject { ObjectType = 0x50, X = 0x98, Y = 0x4d, LowX = 0x80, LowY = 0x40 },       // grenade
+                new GameObject { ObjectType = 0x59, X = 0xa4, Y = 0x67, LowX = 0x80, LowY = 0xc0 },       // jetpack booster
+                new GameObject { ObjectType = 0x50, X = 0x9f, Y = 0x49, LowX = 0x00, LowY = 0x80 },       // grenade
+                new GameObject { ObjectType = 0x46, X = 0xa0, Y = 0x49, LowX = 0x40, LowY = 0x40 },       // cannon
+                new GameObject { ObjectType = 0x50, X = 0xc0, Y = 0x4e, LowX = 0x40, LowY = 0xc0 },       // grenade
+                new GameObject { ObjectType = 0x50, X = 0x48, Y = 0x56, LowX = 0x00, LowY = 0xc0 },       // grenade
+                new GameObject { ObjectType = 0x4e, X = 0x83, Y = 0x78, LowX = 0x00, LowY = 0x80 },       // remote control device
+                new GameObject { ObjectType = 0x45, X = 0xc5, Y = 0x60, LowX = 0x00, LowY = 0xc0 },       // rock
+                new GameObject { ObjectType = 0x53, X = 0x87, Y = 0x59, LowX = 0x00, LowY = 0x40 },       // green/yellow/red key
+                new GameObject { ObjectType = 0x1d, X = 0x97, Y = 0x5e, LowX = 0x00, LowY = 0x00 },       // red robot
+                new GameObject { ObjectType = 0x03, X = 0xe1, Y = 0x61, LowX = 0x80, LowY = 0xc0 },       // fluffy
+                new GameObject { ObjectType = 0x50, X = 0x84, Y = 0x5b, LowX = 0x00, LowY = 0x80 },       // grenade
+                new GameObject { ObjectType = 0x50, X = 0x98, Y = 0x80, LowX = 0x00, LowY = 0x00 },       // grenade
+                new GameObject { ObjectType = 0x4a, X = 0x99, Y = 0x3c, LowX = 0x80, LowY = 0xc0 },       // destinator
+                new GameObject { ObjectType = 0x3a, X = 0xe7, Y = 0x80, LowX = 0x00, LowY = 0x00 },       // giant wall
+                new GameObject { ObjectType = 0x4c, X = 0x7c, Y = 0x77, LowX = 0x00, LowY = 0x40 }        // empty flask
+                });
+            return objects;
+            }
+
+        private static List<byte[]> BuildSwitchEffectsList()
+            {
+            var result = new List<byte[]>
+                { 
+                new byte[] { 0xb0, 0xbb, 0x84 },
+                new byte[] { 0x0f, 0x29 },
+                new byte[] { 0xc5 },
+                new byte[] { 0xe7, 0x8f },
+                new byte[] { 0x8a },
+                new byte[] { 0x13 },
+                new byte[] { 0x8e, 0x32 },
+                new byte[] { 0xc2 },
+                new byte[] { 0x11, 0xaa, 0xbd },
+                new byte[] { 0x58, 0xcc, 0x55, 0xbc },
+                new byte[] { 0x55 },
+                new byte[] { 0x46, 0xa9 },
+                new byte[] { 0x6a, 0x8b },
+                new byte[] { 0xe6, 0x85, 0xd8 },
+                new byte[] { 0xc7, 0x88 },
+                new byte[] { 0x68 },
+                new byte[] { 0x14 },
+                new byte[] { 0x28, 0x4c },
+                new byte[] { 0x65 },
+                new byte[] { 0x89 },
+                new byte[] { 0x8d },
+                new byte[] { 0x64, 0x2a },
+                new byte[] { 0x6b },
+                new byte[] { 0xa7, 0xb9, 0x10 }
+                };
+            return result;
             }
         }
     }
