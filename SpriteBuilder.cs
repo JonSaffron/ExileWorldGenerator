@@ -8,6 +8,9 @@ using System.Linq;
 
 namespace ExileWorldGenerator
     {
+    /// <summary>
+    /// Immutable class for building a sprite to display
+    /// </summary>
     internal class SpriteBuilder
         {
         private static readonly byte[] SpriteData = BuildSpriteSheet();
@@ -322,6 +325,13 @@ namespace ExileWorldGenerator
             return new SpriteBuilder(sprite);
             }
 
+        /// <summary>
+        /// Adds an object that is emerging or is fired from another object
+        /// </summary>
+        /// <param name="objectType">The type of object to draw</param>
+        /// <param name="hasTree">If set, the object will be placed in clear space above or below the tree</param>
+        /// <param name="orientation">Specifies the vertical alignment in bit 6 (other bits will be ignored)</param>
+        /// <returns>A SpriteBuilder object containing the added emerging object</returns>
         [Pure]
         public SpriteBuilder AddEmergingObjectSprite(byte objectType, bool hasTree, byte orientation)
             {

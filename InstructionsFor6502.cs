@@ -159,7 +159,7 @@ namespace ExileWorldGenerator
             {
             bool currentCarryValue = flags.Carry;
             flags.Carry = (accumulator & 0x80) != 0;
-            accumulator <<= 1;
+            accumulator = (byte) ((accumulator & 0x7f) << 1) ;
             if (currentCarryValue)
                 accumulator |= 1;
             flags.Zero = (accumulator == 0);

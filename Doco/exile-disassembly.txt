@@ -1058,8 +1058,9 @@ These are a list of square_x values in sections delimited by background_objects_
 #083f: 80 80 80 80 ; clawed_robot_availability					# bit 7 set if never been disturbed, set to 1 if in use, 0 otherwise
 #0843: 00 00 00 00 ; clawed_robot_energy_when_last_used
 
-#0847: 00 ; pockets_used
-#0848: 50 50 50 50 50 ; contents of pockets
+#0847: 00 ; pockets_used						# 0 to 4 (and very briefly 5 during retreival)
+#0848: 50 50 50 50 50 ; contents of pockets		# objects are stored at the lower memory address with everything moving higher, and objects are retrieved from the highest in-use address
+												# the 5th pocket is only temporary storage during retrieval - there are only 4 pockets
 
 #084d: 00 current_selected_equipment							# 0 to 5
 
@@ -7290,7 +7291,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #314a: 62 ad 2a 0b 9d af 9e 45 89 9d b5 a2 72 a7 9f b0 ; teleport_destinations_x
 #315a: c7 62 cd 0b 58 62 69 57 71 3c 66 63 54 80 49 80 ; teleport_destinations_y
 
-#316a: ff ; retrieve_object_marker
+#316a: ff ; retrieve_object_marker			# bit 7 cleared when object should be retrieved from pockets
 
 ###############################################################################
 #
@@ -7837,69 +7838,77 @@ e336d: 90 02            BCC &3371
 &34ae: 86 29            STX &29 ; sucking_angle_modifier                        # reset sucking_angle_modifier
 &34b0: 60               RTS
 
-; store_object
+; store_object														# called by player's key press
+# on exit, carry is set if object being held is too big to be stored or all pockets are full
+# otherwise, carry will be clear if the object was stored or nothing was being held
 &34b1: a9 04            LDA #&04
 &34b3: 2c a9 05				(BIT ...)
-; store_object_five_pockets
+; store_object_five_pockets											# called by retrieve_object
 #34b4:    a9 05				LDA #&05
 &34b6: 8d db 34         STA &34db			                        # modify code to change number of pockets
 &34b9: a4 dd            LDY &dd ; object_held						# get object being held
 &34bb: 18               CLC
-&34bc: 30 6f            BMI &352d			                        # branch out if nothing being held
-&34be: be 70 08         LDX &0870,Y  ; object_stack_sprite			# get sprite for held object
-&34c1: bd 89 5e         LDA &5e89,X ; sprite_height_lookup			# get sprite's height
+&34bc: 30 6f            BMI &352d			                        # rts out if nothing being held
+
+&34be: be 70 08         LDX &0870,Y  ; object_stack_sprite			# get sprite for the held object
+&34c1: bd 89 5e         LDA &5e89,X ; sprite_height_lookup			# get the sprite's height
 &34c4: c9 38            CMP #&38									# cannot store anything bigger than &38
-&34c6: b0 65            BCS &352d			                        # if object too big, leave
+&34c6: b0 65            BCS &352d			                        # rts with carry set if object too big
 
 &34c8: b9 60 08         LDA &0860,Y ; object_stack_type	            # get the type of the object being held 
 &34cb: c9 4b            CMP #&4b 			                        # &4b = energy capsule
 &34cd: d0 08            BNE &34d7 ; pocket_object	                # branch over if not an energy capsule
 &34cf: a2 00            LDX #&00									# indicates jetpack
-&34d1: 20 16 2d         JSR &2d16 ; increase_equipment_energy       # increase energy in jetpack
-&34d4: 4c f4 34         JMP &34f4                                   # and remove object
+&34d1: 20 16 2d         JSR &2d16 ; increase_equipment_energy       # increase energy of jetpack
+&34d4: 4c f4 34         JMP &34f4 ; remove_object_and_exit_with_carry_clear	# and remove object from primary stack
 
 ; pocket_object 
 &34d7: ae 47 08         LDX &0847 ; pockets_used
 &34da: e0 05            CPX #xx ; modified at entry to be 4 or 5    # are we using all our pockets already?
-&34dc: b0 4f            BCS &352d			                        # if so, leave
-&34de: a2 05            LDX #&05			
-&34e0: 48               PHA
-&34e1: bd 46 08         LDA &0846,X                                             # push the contents of the pockets one deeper
-&34e4: 9d 47 08         STA &0847,X ; pockets_used
-&34e7: ca               DEX
-&34e8: d0 f7            BNE &34e1
-&34ea: 68               PLA
-&34eb: 8d 48 08         STA &0848			                        # store object in pocket
-&34ee: ee 47 08         INC &0847 ; pockets_used
-&34f1: 20 c8 32         JSR &32c8 ; drop_object                                 # mark the object as no longer being held
-&34f4: 18               CLC
-&34f5: 4c 16 25         JMP &2516 ; mark_stack_object_for_removal               # and remove it
+&34dc: b0 4f            BCS &352d			                        # rts if so
+&34de: a2 05            LDX #&05									# initialise loop counter for each pocket
+&34e0: 48               PHA											# push object type
+
+; pocket_object_loop												# pushes the contents of the pockets one deeper
+&34e1: bd 46 08         LDA &0846,X                                 # get contents of the pocket
+&34e4: 9d 47 08         STA &0847,X ; pockets_used					# store contents in the next pocket
+&34e7: ca               DEX											# decrement loop counter
+&34e8: d0 f7            BNE &34e1 ; pocket_object_loop				# loop around
+
+&34ea: 68               PLA											# retrieve object type to store
+&34eb: 8d 48 08         STA &0848			                        # store object type in first pocket
+&34ee: ee 47 08         INC &0847 ; pockets_used					# and increment the number of pockets in use
+&34f1: 20 c8 32         JSR &32c8 ; drop_object                     # mark the object as no longer being held
+
+; remove_object_and_exit_with_carry_clear
+&34f4: 18               CLC											
+&34f5: 4c 16 25         JMP &2516 ; mark_stack_object_for_removal	# remove the object from primary stack and RTS
 
 ; retrieve_object
-&34f8: 20 b4 34         JSR &34b4 ; store_object_five_pockets
-&34fb: 6e 6a 31         ROR &316a ; retrieve_object_marker                      # mark us as due to retrieve an object
+&34f8: 20 b4 34         JSR &34b4 ; store_object_five_pockets		# store any held object, carry will be clear if ok
+&34fb: 6e 6a 31         ROR &316a ; retrieve_object_marker          # clearing bit 7 will indicate due to retrieve an object
 &34fe: 60               RTS
 
 ; retrieve_object_if_marked
-&34ff: 2c 6a 31         BIT &316a ; retrieve_object_marker                      # are we due to retrieve an object?
-&3502: 30 29            BMI &352d                                               # if not, leave
+&34ff: 2c 6a 31         BIT &316a ; retrieve_object_marker                  # are we due to retrieve an object?
+&3502: 30 29            BMI &352d                                           # rts if bit 7 set
 ; actually_retrieve_object
-&3504: a5 37            LDA &37 ; this_object_angle                             # get our angle, but reduce it to either
-&3506: 29 80            AND #&80                                                # &00 = straight left, &80 = straight right
+&3504: a5 37            LDA &37 ; this_object_angle                         # get our angle, but reduce it to either
+&3506: 29 80            AND #&80                                            # &00 = straight left, &80 = straight right
 &3508: 20 11 33         JSR &3311 ; setup_bullet_velocities_from_A
-&350b: ae 47 08         LDX &0847 ; pockets_used	                        # are our pockets empty?
-&350e: f0 19            BEQ &3529			                        # if so, clear the mark and leave
-&3510: bd 47 08         LDA &0847,X ; pockets_used	                        # get the content of the pocket
-&3513: 20 b8 33         JSR &33b8 ; create_child_object	                        # create it as an object; X = new object
-&3516: b0 15            BCS &352d			                        # if not possible, keep the mark and leave
+&350b: ae 47 08         LDX &0847 ; pockets_used	                        # get count of pockets in use
+&350e: f0 19            BEQ &3529											# if zero, clear the retrieval mark and leave
+&3510: bd 47 08         LDA &0847,X ; pockets_used	                        # get the content of the last pocket
+&3513: 20 b8 33         JSR &33b8 ; create_child_object	                    # create it as an object; X = new object
+&3516: b0 15            BCS &352d											# if not possible, keep the mark and leave
 &3518: 86 dd            STX &dd	; object_held		                        # mark the new object as being held
 &351a: 20 fa 13         JSR &13fa ; play_sound
 #351d: 17 82 13 c3 ; sound data
 &3521: a4 dd            LDY &dd ; object_held
-&3523: 20 a9 0b         JSR &0ba9 ; set_object_velocities                       # set its velocities to match ours
-&3526: ce 47 08         DEC &0847 ; pockets_used                                # one fewer full pockets now
+&3523: 20 a9 0b         JSR &0ba9 ; set_object_velocities                   # set its velocities to match ours
+&3526: ce 47 08         DEC &0847 ; pockets_used                            # one fewer full pockets now
 &3529: 38               SEC
-&352a: 6e 6a 31         ROR &316a ; retrieve_object_marker                      # clear the mark
+&352a: 6e 6a 31         ROR &316a ; retrieve_object_marker                  # clear the mark
 &352d: 60               RTS
 
 ; give_minimum_energy

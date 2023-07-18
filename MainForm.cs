@@ -169,21 +169,6 @@ namespace ExileWorldGenerator
                     {
                     var backgroundObjectType = (BackgroundObjectType) background;
                     data.BackgroundDescription = DescribeBackground(backgroundObjectType, backgroundProperties.Type, backgroundProperties.Data, orientation);
-                    //if (backgroundObjectType == BackgroundObjectType.InvisibleSwitch || backgroundObjectType == BackgroundObjectType.Switch)
-                    //    {
-                    //    var objectData = data.BackgroundObjectData.Data.Value;
-                    //    string action;
-                    //    if (backgroundObjectType == BackgroundObjectType.InvisibleSwitch)
-                    //        {
-                    //        action = (objectData & 1) == 0 ? "clear" : "set";
-                    //        }
-                    //    else
-                    //        {
-                    //        objectData = (byte) (objectData & 0x7f);
-                    //        action = "toggle";
-                    //        }
-                    //    Debug.WriteLine($"{backgroundObjectType}\t{data.X:X},{data.Y:X}\t{data.BackgroundObjectData.Id:X}\t{objectData >> 3:X}\t{Convert.ToString(objectData >> 1 & 3, 2)}\t{action}");
-                    //    }
                     }
                 }
 
