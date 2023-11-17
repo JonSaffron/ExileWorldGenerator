@@ -6,14 +6,7 @@
     <Company>J Saffron Consulting Ltd</Company>
     <Product>Exile World Generator</Product>
     <Copyright>Copyright © J Saffron Consulting 2019-2023</Copyright>
-    <OutputPath>bin\$(Configuration)\</OutputPath>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <DebugType>full</DebugType>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
-  </PropertyGroup>
-  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <DebugType>pdbonly</DebugType>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>ExileWorldGenerator.Program</StartupObject>

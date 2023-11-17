@@ -201,9 +201,9 @@ namespace ExileWorldGenerator
         internal static void Compare(byte registerValue, byte data, ref Flags flags)
             {
             int result = registerValue - data;
-            flags.Carry = registerValue >= data;
-            flags.Zero = registerValue == data;
-            flags.Negative = (result & 0x80) != 0;
+            flags.Carry = result >= 0;
+            flags.Zero = result == 0;
+            flags.Negative = (result < 0);
             }
 
         /// <summary>

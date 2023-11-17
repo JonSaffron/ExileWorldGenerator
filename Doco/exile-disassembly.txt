@@ -50,7 +50,7 @@ The window shows 8 squares horizontally, and 4 squares vertically. This equates 
 Areas of particular interest:
 
 &0d4d - &10cf : sprite plotting routines
-All the sprites used in the game are generated from a 128x128 four colour
+All the sprites used in the game are generated from a 128x81 four colour
 bitmap (stored at &53ec). The sprite plotting routines allow an arbitrary
 portion of this bitmap to be translated into a choice of colour schemes and
 flipped horizontally and vertically. The sixteen colours provided by the system
@@ -165,9 +165,9 @@ Disassembly
 ; FF1200 FF7200 006080
 ;
 ; Addresses used in zero-page:
-;     &00 square_is_mapped_data
-;     &01 intro_one
-;     &02 intro_two
+;     &00 square_is_mapped_data			# also used for black/transparent colour during plotting
+;     &01 intro_one						# also used to set right pixel from right pixel of palette_value_to_pixel_lookup during plotting
+;     &02 intro_two						# also used to set left pixel from right pixel of palette_value_to_pixel_lookup during plotting
 ;     &03 intro_three
 ;     &04 npc_speed
 ;     &05 something_about_player_angle
@@ -181,8 +181,8 @@ Disassembly
 ;     &0d held_object_y
 ;     &0e this_object_target_object
 ;     &0f f3_xy
-;     &10 f2_xy
-;     &11 this_object_extra
+;     &10 f2_xy							# also used to set right pixel from left pixel of palette_value_to_pixel_lookup during plotting
+;     &11 this_object_extra				# also used to set right pixel to primary colour of palette during plotting
 ;     &12 this_object_timer
 ;     &13 this_object_timer_old
 ;     &14 this_object_tx
@@ -197,8 +197,8 @@ Disassembly
 ;     &1d wall_collision_frict_y_vel
 ;     &1e wall_collision_post_angle
 ;     &1f underwater
-;     &20 this_object_water_level
-;     &21 npc_fed
+;     &20 this_object_water_level		# also used to set left pixel from left pixel of palette_value_to_pixel_lookup during plotting
+;     &21 npc_fed						# also used to set left pixel to primary colour of palette during plotting
 ;     &22 npc_type
 ;     &23 used_in_sound
 ;     &24 object_static
@@ -208,8 +208,8 @@ Disassembly
 ;     &28 sucking_damage
 ;     &29 sucking_angle_modifier
 ;     &2a screen_background_flash_counter
-;     &2b object_is_invisible
-;     &2c object_affected_by_gravity
+;     &2b object_is_invisible						# bit 7 set if object is invisible
+;     &2c object_unaffected_by_gravity				# bit 7 set if object is immovable
 ;     &2d background_processing_flag				# set to &10 at 265e (in process_events), 
 													#		 &20 at 2eea (in do_object_wall_collisions),
 													#		 &40 at 3607 (in line_of_sight_without_obstructions) and 39d5 (in find_wall_underneath_y),
@@ -273,11 +273,11 @@ Disassembly
 ;     &64 this_sprite_flipping_flags_old
 ;     &65 this_sprite_partflip
 ;     &66 this_sprite_vertflip_old
-;     &67 something_plot_var
-;     &68 some_other_plot_var
+;     &67 screen_address_overflow
+;     &68 copy_of_screen_address
 ;     &69 bytes_per_line_in_sprite
 ;     &6a copy_of_stack_pointer_6a
-;     &6b bytes_per_line_on_screen
+;     &6b ptr_to_unpacked_sprite_data
 ;     &6c lines_in_sprite
 ;     &6d (unused)
 ;     &6e skip_sprite_calculation_flags
@@ -299,7 +299,7 @@ Disassembly
 ;     &7e support_delta_y			wall_y_start_base
 ;     &7f support_overlap_x_low		wall_sprite
 ;     &80 support_overlap_x			wall_y_start_lookup_pointer_4
-;     &81 support_overlap_y_low		wall_y_start_lookup_pointer_h_4
+;     &81 support_overlap_y_low		wall_y_start_lookup_pointer_h_4		
 ;     &82 support_overlap_y			wall_y_start_base_4
 ;     &83 distance					wall_sprite_4
 ;     &84 this_object_y_low_bumped some_kind_of_velocity_copy distance_left
@@ -314,7 +314,7 @@ Disassembly
 ;     &8d this_object_y_centre particle_y
 ;     &8e stack_object_y_centre
 ;     &8f screen_address
-;     &90 other_object_weight support_weight_delta
+;     &90 screen_address_h / other_object_weight support_weight_delta
 ;     &91 pixel_x_low
 ;     &92 pixel_x
 ;     &93 pixel_y_low screen_address_two
@@ -326,12 +326,12 @@ Disassembly
 ;     &99 velocity_signs pixel_colour
 ;     &9a (various)
 ;     &9b sound_data_l (also various) points to lsb-1 of the 4 byte sound data block
-;     &9c sound_data_h (also various) points to msb of the 4 byte sound data block
+;     &9c sprite_byte_offset_within_row / sound_data_h (also various) points to msb of the 4 byte sound data block
 ;     &9d (various)
 ;     &9e (various)
 ;     &9f number_particles this_object_gravity_flags
-;     &a0 (various)
-;     &a1 find_carry
+;     &a0 (various) / screen_address_reset
+;     &a1 find_carry / screen_address_offset
 ;     &a2 (various)
 ;     &a3 (various)
 ;     &a4 map_address
@@ -346,8 +346,8 @@ Disassembly
 ;     &ad (unused)
 ;     &ae plotter_x
 ;     &af strip_length
-;     &b0 screen_offset						; used to set where the 6845 begins displaying the screen for hardware scrolling
-;     &b1 screen_offset_h					; only indicates within the 8k where to start - doesn't take into account &6000 where screen memory starts
+;     &b0 screen_start						; used to set where the 6845 begins displaying the screen for hardware scrolling
+;     &b1 screen_start_h					; range is 0 to 1f as this only indicates where within the 8k of screen memory to start
 ;     &b2 screen_start_square_x_low_copy
 ;     &b3 some_screen_address_offset
 ;     &b4 velocity_x
@@ -454,6 +454,7 @@ Disassembly
 &01cf: 60               RTS
 
 ; intro2
+# this can be safely overwritten by the stack
 &01d0: 58               CLI 
 &01d1: a9 60            LDA #&60	                                        # wipe &6000 - &8000 (screen memory)
 &01d3: 85 90            STA &90; screen_address_h
@@ -595,10 +596,11 @@ the data byte is simply passed to the new object so is specific to the type
 #   the object types are categorised into ranges by object_type_ranges which have default energy determined by energy_by_range
 #   the sprites used for each object_type are given in object_sprite_lookup and the palette used in object_palette_lookup
 #
+todo: interpret values like grav
 # r no   l   h    addr  name						  object					energy	explo	sprte	pallt	grav
 # 0:player and allies
-#   &00  &f6 &0b  &4a11 handle_player_object          player					7f		0		04		3e		03
-#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			7f		0		14		1b		23
+#   &00  &f6 &0b  &4a11 handle_player_object          player					7f		0		04		3e		03 (weight 3/6)
+#   &01  &bc &0a  &48d7 handle_chatter_active         active chatter			7f		0		14		1b		23 ()
 #   &02  &d5 &88  &46f0 handle_crew_member            pericles crew member		7f		80		04		2e		23
 #   &03  &6d &84  &4288 handle_fluffy                 fluffy					7f		80		75		f2		22
 #
@@ -741,10 +743,11 @@ the data byte is simply passed to the new object so is specific to the type
 #033f: ef ab ad 95 9c 91 92 a6 91 b1 8e e0 a2 b5 b3 e3 ; 50
 #034f: d5 e3 d7 f0 f1                                  ; 60
 
+todo: what are unknown flags
 ; object_gravity_flags   i???nwww
 # i = intangible - doesn't collide with other objects
 # n = nest dweller
-# www = weight; 01 = light, 06 = heavy, 07 = cannot be picked up
+# www = weight; 01 = light, 06 = heavy, 07 = immovable/not affected by gravity
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 #0354: 03 23 23 22 77 77 26 6d 6e f7 6e 25 f7 f7 25 69 ; 00
 #0364: 6b 68 04 63 66 66 65 66 62 64 69 69 24 25 26 77 ; 10
@@ -1104,6 +1107,7 @@ These are a list of square_x values in sections delimited by background_objects_
 #08c5: dc		; waterfall
 
 ; object_stack_flags
+; initialised to 5 in reserve_object and create_child_object and into_tertiary_pull_in
 ; 80 set = horizontal invert (facing left)
 ; 40 set = vertical invert (upside down)
 ; 20 set = remove from display
@@ -1650,8 +1654,9 @@ f $FE                        ; white bg, cyan bg
 ; plot_sprite_when_to_flags_and
 #0ba5: 05
 #0ba6: 0a
-#0ba7: 00
-#0ba8: 00
+
+#0ba7: 00		; unused?
+#0ba8: 00		; unused?
 
 ; set_object_velocities
 ; on enter Y is the index on the primary stack of the object who's velocity is to be changed
@@ -1806,7 +1811,7 @@ f $FE                        ; white bg, cyan bg
 &0ca7: 8d 78 0b         STA &0b78 ; sprite_and
 &0caa: 20 4d 0d         JSR &0d4d ; plot_sprite
 &0cad: a6 aa            LDX &aa ; current_object
-&0caf: 5e c6 08         LSR &08c6,X ; object_stack_flags
+&0caf: 5e c6 08         LSR &08c6,X ; object_stack_flags						# move bit 0 to carry
 &0cb2: a5 6e            LDA &6e ; skip_sprite_calculation_flags 
 &0cb4: 29 05            AND #&05
 &0cb6: c9 01            CMP #&01
@@ -2036,6 +2041,7 @@ f $FE                        ; white bg, cyan bg
 &0e50: a5 4c            LDA &4c ; this_sprite_width_old		                # sprite width?
 &0e52: c5 4b            CMP &4b ; this_sprite_width
 &0e54: b0 30            BCS &0e86 ; redraw_object_resized_sprite
+
 &0e56: a5 63            LDA &63 ; this_sprite_b
 &0e58: 45 cc            EOR &cc ; scroll_square_x_velocity_high
 &0e5a: 30 0a            BMI &0e66
@@ -2044,6 +2050,7 @@ f $FE                        ; white bg, cyan bg
 &0e60: 69 10            ADC #&10
 &0e62: 69 00            ADC #&00
 &0e64: 85 5f            STA &5f ; this_sprite_a
+
 &0e66: a5 4b            LDA &4b ; this_sprite_width
 &0e68: 38               SEC
 &0e69: e5 4c            SBC &4c ; this_sprite_width_old
@@ -2051,12 +2058,14 @@ f $FE                        ; white bg, cyan bg
 &0e6d: 85 4b            STA &4b ; this_sprite_width
 &0e6f: a5 cc            LDA &cc ; scroll_square_x_velocity_high
 &0e71: 30 43            BMI &0eb6
+
 &0e73: a5 4c            LDA &4c ; this_sprite_width_old
 &0e75: 18               CLC
 &0e76: 69 10            ADC #&10
 &0e78: 65 57            ADC &57 ; this_object_screen_x_low_old
 &0e7a: 85 57            STA &57 ; this_object_screen_x_low_old
 &0e7c: 90 38            BCC &0eb6
+
 &0e7e: e6 5b            INC &5b ; this_object_screen_x_old
 &0e80: 4c b6 0e         JMP &0eb6
 
@@ -2064,9 +2073,9 @@ f $FE                        ; white bg, cyan bg
 &0e83: 4c ba 0e         JMP &0eba ; object_needs_redrawing_in
 
 ; redraw_object_resized_sprite
-&0e86: a5 4e            LDA &4e ; this_sprite_height_old		        # is the new sprite taller than the old one?
+&0e86: a5 4e            LDA &4e ; this_sprite_height_old		# is the new sprite taller than the old one?
 &0e88: c5 4d            CMP &4d ; this_sprite_height
-&0e8a: b0 3f            BCS &0ecb					        # if so, leave
+&0e8a: b0 3f            BCS &0ecb								# if so, leave
 &0e8c: a5 65            LDA &65 ; this_sprite_vertflip_old
 &0e8e: 45 ce            EOR &ce ; scroll_square_y_velocity_high
 &0e90: 30 0a            BMI &0e9c
@@ -2075,6 +2084,7 @@ f $FE                        ; white bg, cyan bg
 &0e96: 69 08            ADC #&08
 &0e98: 69 00            ADC #&00
 &0e9a: 85 61            STA &61 ; this_sprite_a
+
 &0e9c: a5 4d            LDA &4d ; this_sprite_height
 &0e9e: 38               SEC
 &0e9f: e5 4e            SBC &4e ; this_sprite_height_old
@@ -2082,42 +2092,50 @@ f $FE                        ; white bg, cyan bg
 &0ea3: 85 4d            STA &4d ; this_sprite_height
 &0ea5: a5 ce            LDA &ce ; scroll_square_y_velocity_high
 &0ea7: 30 0d            BMI &0eb6
+
 &0ea9: a5 4e            LDA &4e ; this_sprite_height_old
 &0eab: 18               CLC
 &0eac: 69 08            ADC #&08
 &0eae: 65 59            ADC &59 ; this_object_screen_y_low
 &0eb0: 85 59            STA &59 ; this_object_screen_y_low
 &0eb2: 90 02            BCC &0eb6
+
 &0eb4: e6 5d            INC &5d ; this_object_screen_y
+
 &0eb6: a9 0a            LDA #&0a
 &0eb8: 85 6e            STA &6e ; skip_sprite_calculation_flags
+
 ; object_needs_redrawing_in
-&0eba: a9 02            LDA #&02
-&0ebc: 85 ae            STA &ae ; plotter_x
-&0ebe: a9 00            LDA #&00
-&0ec0: 85 00            STA &00 ; square_is_mapped_data
-&0ec2: 48               PHA
+&0eba: a9 02            LDA #&02								# init loop counter
+&0ebc: 85 ae            STA &ae ; plotter_x						# store loop counter
+&0ebe: a9 00            LDA #&00								# set pixel pattern for black/transparent
+&0ec0: 85 00            STA &00 ; square_is_mapped_data			# store in zero page
+&0ec2: 48               PHA										# possible buffer?
 &0ec3: ba               TSX
-&0ec4: 86 6a            STX &6a ; copy_of_stack_pointer_6a
+&0ec4: 86 6a            STX &6a ; copy_of_stack_pointer_6a		# store stack position
 ; object_redrawing_loop
-&0ec6: c6 ae            DEC &ae ; plotter_x
-&0ec8: 10 02            BPL &0ecc ; do_the_plotting
-&0eca: 68               PLA
+&0ec6: c6 ae            DEC &ae ; plotter_x						# decrement loop counter
+&0ec8: 10 02            BPL &0ecc ; do_the_plotting				# call plotting routine with loop counter with 1 and then 0
+
+&0eca: 68               PLA										# A = 0, and remove buffer from stack
 &0ecb: 60               RTS
 
 # Plot an object or the background
+# On entry, &ae will be 1 to plot the old state of the object, or 0 to plot the current state
 ; do_the_plotting
 &0ecc: a6 ae            LDX &ae ; plotter_x     # first X = 1, previous ; then X = 0, current
 &0ece: a5 6e            LDA &6e ; skip_sprite_calculation_flags
 &0ed0: 3d a5 0b         AND &0ba5,X ; plot_sprite_when_to_flags_and             # should we actually plot it?
 &0ed3: d0 f1            BNE &0ec6 ; object_redrawing_loop                       # if not, continue
-&0ed5: b5 5f            LDA &5f,X # X = 1, &60 this_sprite_a_old ; X = 0, &5f this_sprite_a
-&0ed7: 0a               ASL
-&0ed8: 69 00            ADC #&00
+
+# calculates the byte offset from the start of the row on the sprite sheet for the indicated sprite
+&0ed5: b5 5f            LDA &5f,X ; this_sprite_a_old / &5f this_sprite_a	# b1 b0 p1 p0 0 b4 b3 b2
+&0ed7: 0a               ASL			
+&0ed8: 69 00            ADC #&00								# b0 p1 p0 0 b4 b3 b2 b1
 &0eda: 0a               ASL
-&0edb: 69 00            ADC #&00
-&0edd: 29 1f            AND #&1f
-&0edf: 85 9c            STA &9c
+&0edb: 69 00            ADC #&00								# p1 p0 0 b4 b3 b2 b1 b0
+&0edd: 29 1f            AND #&1f								#  0  0 0 b4 b3 b2 b1 b0
+&0edf: 85 9c            STA &9c	; sprite_byte_offset_within_row	# store the result (range is 0 to 31) 
 
 ;;  Use the palette value to set up zero page &00 &01 &10 &11 &02 &20 &22 
 ;;  with pixel values representing the four colours in the palette
@@ -2125,37 +2143,36 @@ f $FE                        ; white bg, cyan bg
 ; Each sprite is 2bpp and therefore has at most 4 colours. The sprite
 ; sheet uses mode 5 screen format so each byte defines 4 pixels in
 ; the format abcdabcd. Each pixel will have a value between 0 and 3.
+; This needs to be converted to the mode 2 screen format used for display
+; which is in the format abababab.
 
-; Each sprite pixel is mapped to the required palette in this way:
-;
-; 0 = background (black)
-; 1 = right pixel of palette_value_to_pixel_lookup pair
-; 2 = left pixel of palette_value_to_pixel_lookup pair
-; 3 = primary colour from top nibble of &73 or &74
+; Each sprite pixel value is mapped to the required palette in this way:
+;		0 = always black/transparent
+;		1 = right pixel of palette_value_to_pixel_lookup pair
+;		2 = left pixel of palette_value_to_pixel_lookup pair
+;		3 = primary colour from top nibble of the palette byte
 
-; A sprite pixel value of 0 is always rendered using colour 0 (black).
-; The 8 bit palette value defines the other 3 colours (as per &73 or &74)
+; A sprite pixel value of 0 is always black (colour 0) which is effectively transparent.
+; The 8 bit palette value defines the other 3 colours (as per the palette stored in &73 or &74)
 
-; The primary colour is chosen directly - it's the top four bits of
-; the sprite's palette.
-;
+; Sprite value 3 is taken from the top four bits of the sprite's palette.
 ; The pair colours come from the `palette_value_to_pixel_lookup'
 ; table, indexed by the bottom four bits of the sprite's palette. Each
-; entry is a Mode 2 pixel value; its left pixel defines the colour of index 2,
-; and its right pixel defines the colour of index 1.
+; entry in the table is stored in Mode 2 format abababab; the left pixel 
+; (described with a) defines the colour of sprite pixel value 2, and its right pixel 
+; (described with b) defines the colour of sprite pixel value 1.
 
 ; Zero page locations are set up with the bit patterns corresponding to those colours so that 
 ; mode 2 style display memory can be quickly produced.
 
-; Location		Value
-;	00			Background colour - constant 0
-;	01			Index 1 (right pixel from palette_value_to_pixel_lookup) to set right pixel (bits -x-x-x-x)
-;	02			Index 1 (right pixel from palette_value_to_pixel_lookup) to set left pixel (bits x-x-x-x-)
-;	10			Index 2 (left pixel from palette_value_to_pixel_lookup) to set left pixel (bits x-x-x-x-)
-;	20			Index 2 (left pixel from palette_value_to_pixel_lookup) to set right pixel (bits -x-x-x-x)
-;	11			Index 3 (primary colour) for right pixel (bits 0x0x0x0x)
-;	22			Index 3 (primary colour) for left pixel (bits x0x0x0x0)
-
+; Location		Sprite Pixel Value		Pixel Destination Position		Comment
+;	00					0						Either					Used to set a Black or Transparent pixel in either position
+;	01					1						Right					Used to set right pixel (bits -x-x-x-x) from right pixel of palette_value_to_pixel_lookup
+;	10					2						Right					Used to set right pixel (bits x-x-x-x-) from left pixel of palette_value_to_pixel_lookup
+;	11					3						Right					Used to set right pixel (bits -x-x-x-x) to primary colour of palette
+;	02					1						Left					Used to set left pixel (bits x-x-x-x-) from right pixel of palette_value_to_pixel_lookup
+;	20					2						Left					Used to set left pixel (bits -x-x-x-x) from left pixel of palette_value_to_pixel_lookup
+;	22					3						Left					Used to set left pixel (bits x-x-x-x-) to primary colour of palette 
 
 ; Each sprite data byte is ABCDabcd (4 pixels: Aa Bb Cc Dd). Aa and Bb
 ; are masked out, leaving 00CD00cd. Then each of Cc and Dd are
@@ -2166,9 +2183,9 @@ f $FE                        ; white bg, cyan bg
 ; | C | c | Idx | Val |   | D | d | Idx | Val |
 ; |---+---+-----+-----|   |---+---+-----+-----|
 ; | 0 | 0 |  0  | $00 |   | 0 | 0 |  0  | $00 |
-; | 0 | 1 |  1  | $01 |   | 0 | 1 |  1  | $02 |
-; | 1 | 0 |  2  | $10 |   | 1 | 0 |  2  | $20 |
-; | 1 | 1 |  3  | $11 |   | 1 | 1 |  3  | $22 |
+; | 0 | 1 |  1  | $02 |   | 0 | 1 |  1  | $01 |
+; | 1 | 0 |  2  | $20 |   | 1 | 0 |  2  | $10 |
+; | 1 | 1 |  3  | $22 |   | 1 | 1 |  3  | $11 |
 ;
 ; So once the data has been masked out, the `Val' values are in hand.
 ; They are used directly as ZP addresses to look up Mode 2 pixel
@@ -2187,18 +2204,20 @@ f $FE                        ; white bg, cyan bg
 ;
 ; Then add some masking and stuff...
 
+# set up reference bit patterns to map from colour index 3 on the sprite map to a bit pattern in &22 (left pixel) and &11 (right pixel)
 &0ee1: b5 73            LDA &73,X # X = 1, &74 this_object_palette_old ; X = 0, &73 this_object_palette
 &0ee3: 4a               LSR                                                     # use our palette
 &0ee4: 4a               LSR
 &0ee5: 4a               LSR
 &0ee6: 4a               LSR								# get top nibble (the primary colour)
-&0ee7: a8               TAY								# Y = primary colour
+&0ee7: a8               TAY								# set Y = primary colour
 &0ee8: b9 48 1e         LDA &1e48,Y ; pixel_table		# map colour to mode 2 pixel value with both pixels set to same colour
-&0eeb: 29 55            AND #&55						# mask with 01010101 to get bit pattern for specified colour
+&0eeb: 29 55            AND #&55						# mask with 01010101 to get bit pattern for the right pixel in the specified colour
 &0eed: 85 11            STA &11							# to set up &11 which would define the colour of the right pixel
-&0eef: 0a               ASL
+&0eef: 0a               ASL								# shift the bits to generate the pattern to get the left pixel in the same colour
 &0ef0: 85 22            STA &22							# and &22 to define the colour of the left pixel
 
+# set up reference bit patterns for colour index 1 on the sprite map to a bit pattern in &02 (left pixel) and &01 (right pixel)
 &0ef2: b5 73            LDA &73,X # X = 1, &74 this_object_palette_old ; X = 0, &73 this_object_palette
 &0ef4: 29 0f            AND #&0f						# mask to get lower nibble
 &0ef6: a8               TAY								# Y = palette % 16
@@ -2210,12 +2229,14 @@ f $FE                        ; white bg, cyan bg
 &0f02: 0a               ASL								# shift the bit pattern so it can be used to set the colour of the left pixel in mode 2
 &0f03: 85 02            STA &02							# store in &02 for setting the colour of the left pixel for index 1
 
+# set up reference bit patterns for colour index 2 on the sprite map to a bit pattern in &20 (left pixel) and &10 (right pixel)
 &0f05: 98               TYA								# get back the colour pair definition from palette_value_to_pixel_lookup
 &0f06: 29 aa            AND #&aa						# mask to get the colour of the left pixel from the pair
 &0f08: 85 20            STA &20							# store in &20 for setting the value of the left pixel to index 2
 &0f0a: 4a               LSR
 &0f0b: 85 10            STA &10							# and &10 for setting the value of the right pixel to index 2
 
+# work out if the reference bit patterns for left and right need to be swapped over
 &0f0d: b5 63            LDA &63,X # X = 1, &64 this_sprite_flipping_flags_old ; X = 0, &63 this_sprite_flipping_flags
 &0f0f: 85 65            STA &65 ; plot_flipping_flags (bit 7 is horizontal flip, bit 6 is vertical y flip)
 &0f11: 4a               LSR
@@ -2240,92 +2261,105 @@ f $FE                        ; white bg, cyan bg
 &0f34: 84 22            STY &22
 
 ; dont_swap
-# Calculate the offset between rows in the sprite
-&0f36: a9 20            LDA #&20			                        # offset between rows is &20
-&0f38: a0 00            LDY #&00			                        # (regular vertical orientation)
-&0f3a: 24 65            BIT &65 ; plot_flipping_flags
-&0f3c: 70 03            BVS &0f41
-&0f3e: a9 e0            LDA #&e0			                        # offset between rows is &ffe0 (or -&20)
-&0f40: 88               DEY				                        # (inverse vertical orientation)
+# Calculate the offset between rows in the sprite sheet (each row is 32 bytes long)
+&0f36: a9 20            LDA #&20			                        # start with offset between rows is &20
+&0f38: a0 00            LDY #&00			                        # and a regular vertical orientation
+&0f3a: 24 65            BIT &65 ; plot_flipping_flags				# are we plotting bottom upwards?
+&0f3c: 70 03            BVS &0f41 ; set sprite_byte_offset_between_rows
+&0f3e: a9 e0            LDA #&e0			                        # make offset between rows is &ffe0 (or -&20)
+&0f40: 88               DEY											# and set inverse vertical orientation
+
+; set_sprite_byte_offset_between_rows
 &0f41: 8d 7d 10         STA &107d ; sprite_byte_offset_between_rows             # self modifying code
 &0f44: 8c 85 10         STY &1085 ; sprite_byte_offset_between_rows_h           # self modifying code
 
-# Calculate the sprite address
-&0f47: b5 4d            LDA &4d,X # X = 1, &4e this_sprite_height_old ; X = 0, &4d this_sprite_height  // start at bottom of sprite
-&0f49: 50 02            BVC &0f4d						// branch if sprite not upside down
-&0f4b: a9 00            LDA #&00						// start from top of sprite instead
+# Calculate the offset address to start reading the data from the sprite sheet (will point to the start of the first or last line)
+&0f47: b5 4d            LDA &4d,X ; this_sprite_height_old / this_sprite_height		# hhhhh00v get height so start plotting from bottom of sprite
+&0f49: 50 02            BVC &0f4d						# check bit 6 of plot_flipping flags - branch if not plotting from the top
+&0f4b: a9 00            LDA #&00						# start from top of sprite instead
 
 &0f4d: 18               CLC
-&0f4e: 75 61            ADC (&61,X) # X = 1, &62 this_sprite_b_old ; X = 0, &61 this_sprite_b
-&0f50: 69 00            ADC #&00
-&0f52: 0a               ASL
-&0f53: 69 00            ADC #&00
+&0f4e: 75 61            ADC (&61,X) ; this_sprite_b_old / this_sprite_b		# r4 r3 r2 r1 r0 0 r6 r5 get the row offset for the start of the sprite data
+&0f50: 69 00            ADC #&00					# any carry from adding bit 4s is added onto the bit 5 total
+&0f52: 0a               ASL							
+&0f53: 69 00            ADC #&00					# rotate bits left
 &0f55: 0a               ASL
-&0f56: 69 00            ADC #&00
-&0f58: 85 9d            STA &9d
+&0f56: 69 00            ADC #&00					# rotate bits left
+&0f58: 85 9d            STA &9d						# store r2 r1 r0 0 r6 r5 r4 r3
+													#   ( +	h2 h1 h0 0  0  v h4 h3 )
+													# where the bottom 4 bits are of interest as the high byte of the calculation to get an address
 
-&0f5a: 29 e0            AND #&e0
-&0f5c: 05 9c            ORA &9c
-&0f5e: 69 ec            ADC #&ec							// sprite_data starts at &53ec
-&0f60: 8d 23 10         STA &1023 ; sprite_address                              # self modifying code
-&0f63: a5 9d            LDA &9d
-&0f65: 29 0f            AND #&0f
-&0f67: 69 53            ADC #&53							// sprite_data starts at &53ec
-&0f69: 8d 24 10         STA &1024 ; sprite_address_h                            # self modifying code
+&0f5a: 29 e0            AND #&e0					# mask to get the lowest 3 bits of the row offset
+&0f5c: 05 9c            ORA &9c	; sprite_byte_offset_within_row		# add the byte offset from the start of the row (5 bits long)
+&0f5e: 69 ec            ADC #&ec					# sprite_data starts at &53ec
+&0f60: 8d 23 10         STA &1023 ; sprite_address  # store low byte of address in self modifying code
+&0f63: a5 9d            LDA &9d						# get back the high byte information
+&0f65: 29 0f            AND #&0f					# mask to get the 4 lowest bits
+&0f67: 69 53            ADC #&53					# sprite_data starts at &53ec
+&0f69: 8d 24 10         STA &1024 ; sprite_address_h	# store high byte of address in self modifying code
 
-# Calculate the number of bytes in a line of the sprite
-&0f6c: b5 57            LDA &57,X # X = 1, &58 this_object_screen_x_low_old ; X = 0, &57 this_object_screen_x_low
-&0f6e: 29 10            AND #&10
-&0f70: 75 4b            ADC (&4b,X) # X = 1, &4c this_sprite_width_old ; X = 0, &4b this_sprite_width
-&0f72: 85 99            STA &99
-&0f74: 6a               ROR
-&0f75: 29 f0            AND #&f0
-&0f77: 4a               LSR
-&0f78: 85 a0            STA &a0
+# Calculate part of the screen address of the right co-ordinate where the sprite will be plotted
+&0f6c: b5 57            LDA &57,X ; this_object_screen_x_low_old / this_object_screen_x_low
+&0f6e: 29 10            AND #&10					# will the sprite be plotted on an odd or even pixel?
+&0f70: 75 4b            ADC (&4b,X) ; this_sprite_width_old / this_sprite_width
+&0f72: 85 99            STA &99						# store whether plotting will end on an odd or even pixel (only bit 4 is relevant)
+&0f74: 6a               ROR							# shift right and bring in any carry
+&0f75: 29 f0            AND #&f0					# mask for top 4 bits, this should leave the number of bytes
+&0f77: 4a               LSR							# shift right again, dividing by 2
+&0f78: 85 a0            STA &a0						# store result 0 x x x x 0 0 0 
+
+# Calculate bytes_per_line_in_sprite
 &0f7a: b5 5f            LDA &5f,X # X = 1, &60 this_sprite_a_old ; X = 0, &5f this_sprite_a
-&0f7c: 29 30            AND #&30
-&0f7e: 75 4b            ADC (&4b,X) # X = 1, &4c this_sprite_width_old ; X = 0, &4b this_sprite_width
-&0f80: 6a               ROR
-&0f81: 4a               LSR
-&0f82: 4a               LSR
-&0f83: 4a               LSR
-&0f84: a8               TAY
-&0f85: 4a               LSR
-&0f86: 4a               LSR
+&0f7c: 29 30            AND #&30					# get pixel offset within sprite sheet 00pp0000
+&0f7e: 75 4b            ADC (&4b,X)	; this_sprite_width_old / this_sprite_width		# add width wwww000h    
+&0f80: 6a               ROR							# Cwwww000
+&0f81: 4a               LSR							# 0Cwwww00
+&0f82: 4a               LSR							# 00Cwwww0
+&0f83: 4a               LSR							# 000Cwwww
+&0f84: a8               TAY							# save in Y the sprite width + the pixel offset on the sprite sheet
+&0f85: 4a               LSR							# 0000Cwww
+&0f86: 4a               LSR							# 00000Cww
 &0f87: 85 69            STA &69 ; bytes_per_line_in_sprite
-# Calculate the number of bytes in a line on the screen. The sprite data is
-# unpacked into the stack - we also calculate where to put it.
+
+# get sprite width
 &0f89: b5 4b            LDA &4b,X # X = 1, &4c this_sprite_width_old ; X = 0, &4b this_sprite_width
 &0f8b: 4a               LSR
 &0f8c: 4a               LSR
 &0f8d: 4a               LSR
 &0f8e: 4a               LSR
-&0f8f: 85 9d            STA &9d
-&0f91: 98               TYA
-&0f92: 29 03            AND #&03
+&0f8f: 85 9d            STA &9d						# store number of pixels -1 
+
+# ensure that the start and end positions of the unpacked sprite data will be bookended with 0 bytes
+&0f91: 98               TYA							# get back sprite width + the pixel offset on the sprite sheet
+&0f92: 29 03            AND #&03					# mask to get bottom 2 bits
 &0f94: 18               CLC
 &0f95: 65 6a            ADC &6a ; copy_of_stack_pointer_6a
-&0f97: e9 01            SBC #&01
-&0f99: 8d 52 10         STA &1052                                               # self modifying code
+&0f97: e9 01            SBC #&01					# probably subtract 2 as carry will be clear
+&0f99: 8d 52 10         STA &1052                   # self modifying code
 &0f9c: aa               TAX
 &0f9d: e8               INX
-&0f9e: e5 9d            SBC &9d
+&0f9e: e5 9d            SBC &9d						# subtract pixel count
 &0fa0: e9 02            SBC #&02
-&0fa2: 8d 55 10         STA &1055                                               # self modifying code
-&0fa5: a0 ca            LDY #&ca		                                # &ca = DEX (right facing)
-&0fa7: 24 65            BIT &65 ; plot_flipping_flags
-&0fa9: 10 04            BPL &0faf
-&0fab: aa               TAX
+&0fa2: 8d 55 10         STA &1055                   # self modifying code
+
+# Determine where the sprite data will be stored and in which direction the data will be read.
+&0fa5: a0 ca            LDY #&ca						# &ca = DEX instruction (for right facing)
+&0fa7: 24 65            BIT &65 ; plot_flipping_flags	# check if sprite is flipped 
+&0fa9: 10 04            BPL &0faf						# branch if actually left facing
+&0fab: aa               TAX								
 &0fac: ca               DEX
-&0fad: a0 e8            LDY #&e8		                                # &e8 = INX (left facing)
-&0faf: a5 99            LDA &99
-&0fb1: 29 10            AND #&10
-&0fb3: f0 04            BEQ &0fb9
-&0fb5: 8c b8 0f         STY &0fb8                                               # self modifying code
-&0fb8: e8               INX                                                     # either INX or DEX from &0fb5
-&0fb9: 86 6b            STX &6b ; bytes_per_line_on_screen
-&0fbb: 8c 5c 10         STY &105c		                                # self modifying code
-&0fbe: 8c 60 10         STY &1060		                                # self modifying code
+&0fad: a0 e8            LDY #&e8		                # &e8 = INX instruction (for left facing)
+
+&0faf: a5 99            LDA &99							# get whether plotting will end on an odd or even pixel
+&0fb1: 29 10            AND #&10						# mask to get indication of odd or even number
+&0fb3: f0 04            BEQ &0fb9						# branch over if even (no modification required)
+&0fb5: 8c b8 0f         STY &0fb8                       # set next instruction to INX or DEX
+&0fb8: xx               INX / DEX                       # adjust ptr to remove a pixel that doesn't belong to the sprite
+
+&0fb9: 86 6b            STX &6b ; ptr_to_unpacked_sprite_data
+&0fbb: 8c 5c 10         STY &105c						# set instruction to INX or DEX
+&0fbe: 8c 60 10         STY &1060		                # set instruction to INX or DEX
+
 # Calculate the number of lines in the sprite
 &0fc1: a6 ae            LDX &ae ; plotter_x
 &0fc3: b5 4d            LDA &4d,X # X = 1, &4e this_sprite_height_old ; X = 0, &4d this_sprite_height
@@ -2333,160 +2367,215 @@ f $FE                        ; white bg, cyan bg
 &0fc6: 4a               LSR
 &0fc7: 4a               LSR
 &0fc8: 85 6c            STA &6c ; lines_in_sprite
-# Calculate the screen address of the sprite
-&0fca: b5 59            LDA &59,X # X = 1, &5a this_object_screen_y_low_old ; X = 0, &59 this_object_screen_y_low
+
+# Calculate the screen address to place the sprite from game co-ordinates
+# Address can be calculated as 0 1 1 y9 y8 y7 y6 xa | x9 x8 x7 x6 x5 y5 y4 y3
+# Calculate the y co-ordinate of the bottom of the rectangle where the sprite will be plotted and store in screen_address
+&0fca: b5 59            LDA &59,X ; this_object_screen_y_low_old / this_object_screen_y_low
 &0fcc: 18               CLC
-&0fcd: 75 4d            ADC (&4d,X) # X = 1, &4e this_sprite_height_old ; X = 0, &4d this_sprite_height
-&0fcf: 85 8f            STA &8f ; screen_address
-&0fd1: b5 5d            LDA &5d,X # X = 1, &5e this_object_screen_y_old ; X = 0 &5d this_object_screen_y
+&0fcd: 75 4d            ADC (&4d,X) ; this_sprite_height_old / this_sprite_height
+&0fcf: 85 8f            STA &8f ; screen_address			# store low byte of bottom y location where sprite will be plotted in game co-ordinates
+
+&0fd1: b5 5d            LDA &5d,X ; this_object_screen_y_old / this_object_screen_y
 &0fd3: 69 00            ADC #&00
-&0fd5: 85 90            STA &90; screen_address_h
-&0fd7: 20 58 1f         JSR &1f58 ; scroll_screen
-&0fda: a5 8f            LDA &8f ; screen_address
-&0fdc: 46 90            LSR &90; screen_address_h
-&0fde: 6a               ROR
-&0fdf: 46 90            LSR &90; screen_address_h
-&0fe1: 6a               ROR
-&0fe2: 46 90            LSR &90; screen_address_h
-&0fe4: 6a               ROR
-&0fe5: a8               TAY
-&0fe6: 29 07            AND #&07
-&0fe8: 05 a0            ORA &a0
-&0fea: 85 a1            STA &a1
-&0fec: 09 07            ORA #&07
-&0fee: 85 a0            STA &a0
-&0ff0: b5 57            LDA &57,X # X = 1, &58 this_object_screen_x_low_old ; X = 0, &57 this_object_screen_x_low
-&0ff2: 29 e0            AND #&e0
+&0fd5: 85 90            STA &90; screen_address_h			# store high byte of bottom y location where sprite will be plotted in game co-ordinates
+
+&0fd7: 20 58 1f         JSR &1f58 ; set_screen_start_address		# set screen start address register in 6845
+
+# convert to pixel co-ordinates (first using 0,0 as the origin, rather than the window position)
+# start by discarding lowest 3 bits of the y co-ordinate (y0 to y2)
+&0fda: a5 8f            LDA &8f ; screen_address			# get low byte of y co-ordinate back
+&0fdc: 46 90            LSR &90; screen_address_h			# shift high byte right, lowest bit to carry
+&0fde: 6a               ROR									# shift low byte right, bringing in carry
+&0fdf: 46 90            LSR &90; screen_address_h			# shift high byte right, lowest bit to carry
+&0fe1: 6a               ROR									# shift low byte right, bringing in carry
+&0fe2: 46 90            LSR &90; screen_address_h			# shift high byte right, lowest bit to carry
+&0fe4: 6a               ROR									# shift low byte right, bringing in carry
+
+&0fe5: a8               TAY									# save low byte for later
+&0fe6: 29 07            AND #&07							# get bottom 3 bits of low byte ()
+&0fe8: 05 a0            ORA &a0								# merge in sprite width 
+&0fea: 85 a1            STA &a1	; screen_address_offset		# this is used to track the offset from screen_address of pixel being drawn
+
+&0fec: 09 07            ORA #&07							# set bottom 3 bits
+&0fee: 85 a0            STA &a0	; screen_address_reset		# when plotting goes above a character boundary this is used to reset screen_address_offset
+
+&0ff0: b5 57            LDA &57,X ; this_object_screen_x_low_old / this_object_screen_x_low
+&0ff2: 29 e0            AND #&e0							# mask to get top 3 bits x7 x6 x5
 &0ff4: 65 b2            ADC &b2 ; screen_start_square_x_low_copy
 &0ff6: 85 8f            STA &8f ; screen_address
-&0ff8: 98               TYA
-&0ff9: 29 f8            AND #&f8
-&0ffb: 55 5b            EOR &5b,X # X = 1, &5c this_object_screen_x_old ; X = 0, &5b this_object_screen_x
+
+&0ff8: 98               TYA									# get back low byte of screen_address 
+&0ff9: 29 f8            AND #&f8							# mask to get ya y9 y8 y7 y6 0 0 0
+&0ffb: 55 5b            EOR &5b,X ; this_object_screen_x_old / this_object_screen_x		# ???
 &0ffd: 65 b3            ADC &b3 ; some_screen_address_offset
 &0fff: 6a               ROR
 &1000: 66 8f            ROR &8f ; screen_address
 &1002: 4a               LSR
 &1003: 66 8f            ROR &8f ; screen_address
-&1005: 09 60            ORA #&60
+&1005: 09 60            ORA #&60							# set bits to bring address into range &6000 - &7fff
 &1007: 85 90            STA &90; screen_address_h
+
 ; plot_lines_loop
-&1009: c9 7f            CMP #&7f
-&100b: d0 13            BNE &1020 ; plot_sprite_line
-&100d: a5 8f            LDA &8f ; screen_address
+&1009: c9 7f            CMP #&7f							# has the calculated screen address matched &7fxx ?
+&100b: d0 13            BNE &1020 ; unpack_sprite_data		# branch if not
+
+&100d: a5 8f            LDA &8f ; screen_address			# get low byte of screen address
 &100f: 18               CLC
-&1010: 65 a1            ADC &a1
-&1012: 90 0c            BCC &1020 ; plot_sprite_line
-&1014: 85 67            STA &67 ; something_plot_var
-&1016: a9 50            LDA #&50		                                # set &1070 to BVC &109c
-&1018: 8d 70 10         STA &1070		                                # self modifying code
+&1010: 65 a1            ADC &a1	; screen_address_offset		# add offset to end of line to find whether an overflow will happen
+&1012: 90 0c            BCC &1020 ; unpack_sprite_data		# branch if no overflow
+
+# adjust the code to plot the line of the sprite twice, once at the top of screen memory and then again at the bottom
+&1014: 85 67            STA &67 ; screen_address_overflow	# store the overflow calculation result
+&1016: a9 50            LDA #&50		                    # set &1070 to BVC &109c
+&1018: 8d 70 10         STA &1070		                    # self modifying code
 &101b: a9 2a            LDA #&2a		
-&101d: 8d 71 10         STA &1071		                                # self modifying code
-; plot_sprite_line
-&1020: a4 69            LDY &69 ; bytes_per_line_in_sprite
-# For each byte in the sprite data, unpack it onto the stack.
+&101d: 8d 71 10         STA &1071		                    # self modifying code
+
+; unpack_sprite_data
+&1020: a4 69            LDY &69 ; bytes_per_line_in_sprite				# init loop for each line of the sprite
+
+# For each byte in a line of sprite data, unpack it onto the stack. 4 bytes will be pushed for each byte of sprite data.
+# As a sprite could be 16 pixels wide, but could be split over byte boundries, presumably a maximum of 20 bytes can be pushed
 ; line_loop
-&1022: b9 ff ff         LDA &ffff,Y                                             # actually LDA &sprite_address,Y from &0f60, &0f69
+&1022: b9 ff ff         LDA &xxxx,Y ; sprite_address                    # get sprite data (address set at &0f60 & &0f69)
+
 &1025: aa               TAX
-&1026: 29 11            AND #&11
+&1026: 29 11            AND #&11										# mask to get 4th pixel colour index
 &1028: 8d 2c 10         STA &102c		                                # self modifying code - &102c = sprite_data & 0x11
-&102b: a5 ff            LDA &ff			                                # actually LDA &(sprite_data & 0x11) from &1028
-&102d: 48               PHA			                                # push on to stack
+&102b: a5 ff            LDA &xx			                                # actually LDA &(sprite_data & 0x11) from &1028
+&102d: 48               PHA												# push on to stack
+
 &102e: 8a               TXA
-&102f: 29 22            AND #&22
+&102f: 29 22            AND #&22										# mask to get 3rd pixel colour index
 &1031: 8d 35 10         STA &1035		                                # self modifying code - &1035 = sprite_data & 0x22
-&1034: a5 ff            LDA &ff			                                # actually LDA &(sprite_data & 0x22) from &1031
-&1036: 48               PHA			                                # push on to stack
+&1034: a5 ff            LDA &xx			                                # actually LDA &(sprite_data & 0x22) from &1031
+&1036: 48               PHA												# push on to stack
+
 &1037: 8a               TXA
 &1038: 4a               LSR
 &1039: 4a               LSR
 &103a: aa               TAX
-&103b: 29 11            AND #&11
+&103b: 29 11            AND #&11										# mask to get 2nd pixel colour index
 &103d: 8d 41 10         STA &1041		                                # self modifying code - &1041 = sprite_data & 0x44 / 4
-&1040: a5 ff            LDA &ff			                                # actually LDA &(sprite_data & 0x44 / 4) from &103d
-&1042: 48               PHA			                                # push on to stack
+&1040: a5 ff            LDA &xx			                                # actually LDA &(sprite_data & 0x44 / 4) from &103d
+&1042: 48               PHA												# push on to stack
+
 &1043: 8a               TXA
-&1044: 29 22            AND #&22
+&1044: 29 22            AND #&22										# mask to get 1st pixel colour
 &1046: 8d 4a 10         STA &104a		                                # self modifying code - &104a = sprite_data & 0x88 / 4
-&1049: a5 ff            LDA &ff			                                # actually LDA &(sprite_data & 0x88 / 4) from &1046
-&104b: 48               PHA			                                # push on to stack
-&104c: 88               DEY
-&104d: 10 d3            BPL &1022 ; line_loop
-&104f: 48               PHA
-&1050: c8               INY
-&1051: 8c ff 01         STY &01ff		                                # actually &01XX from &0f99
-&1054: 8c ff 01         STY &01ff		                                # actually &01XX from &0fa2
-&1057: 38               SEC
-&1058: a4 a1            LDY &a1
-&105a: a6 6b            LDX &6b ; bytes_per_line_on_screen
-; plot_screen_loop
+&1049: a5 ff            LDA &xx			                                # actually LDA &(sprite_data & 0x88 / 4) from &1046
+&104b: 48               PHA												# push on to stack
+
+&104c: 88               DEY												# decrement loop counter
+&104d: 10 d3            BPL &1022 ; line_loop							# loop
+
+&104f: 48               PHA												# push an extra byte
+&1050: c8               INY												# set Y = 0
+&1051: 8c xx 01         STY &01xx										# set to 0 (location on stack set at &0f99)
+&1054: 8c xx 01         STY &01yy		                                # set to 0 (location on stack set at &0fa2)
+
+&1057: 38               SEC												# set carry for subtract operation during plot_one_line_loop
+&1058: a4 a1            LDY &a1	; screen_address_offset					# init loop counter - set Y to point to the offset of the last screen address of the current line
+
+; plot_one_line
+&105a: a6 6b            LDX &6b ; ptr_to_unpacked_sprite_data			# init to point to start/end of the pixel data on stack
+
+; plot_one_line_loop
 # Now take that data from the stack and plot it to the screen - if the
 # plotting mode is set to overwrite, just plot it, otherwise consider
-# what is there already - if it's background data (&80 is set), don't.
-&105c: ca               DEX			                                # actually either DEX or INX from &0fbb
+# what is there already - if it's background data (&80 is set), don't overwrite it
+
+# get next two bytes from stack and merge them together to get required bit pattern for 2 pixels
+&105c: ca               DEX	/ INX		                                # actually either DEX or INX from &0fbb
 &105d: bd 00 01         LDA &0100,X		                                # read data from stack
-&1060: ca               DEX			                                # actually either DEX or INX from &0fbe
-&1061: 1d 00 01         ORA &0100,X
-&1064: 51 8f            EOR (&8f),Y ; screen_address 	                        # read the current screen data
-&1066: 30 02            BMI &106a		                                # actually either "EOR, BMI &106a" or "BMI &1068, EOR" from &10f0
-&1068: 91 8f            STA (&8f),Y ; screen_address                            # plot the sprite to screen depending on plotting mode
+&1060: ca               DEX	/ INX		                                # actually either DEX or INX from &0fbe
+&1061: 1d 00 01         ORA &0100,X										# read next data from stack
+
+	# if display_mode is overwrite regardless...
+&1064: 30 02            BMI &1068		                                # if bit 7 set (which it would be for plotting background data) then branch over to plotting it
+&1066: 51 8f            EOR (&8f),Y ; screen_address + Y                # read the current screen data
+
+	# if display_mode is overwrite when empty...
+&1064: 51 8f            EOR (&8f),Y ; screen_address + Y                # read the current screen data
+&1066: 30 02            BMI &106a		                                # if bit 7 set (which it will be if background data is already present on the pixel) then skip over plotting
+
+&1068: 91 8f            STA (&8f),Y ; screen_address + Y                # plot the sprite to screen depending on plotting mode
+
 &106a: 98               TYA
-&106b: e9 08            SBC #&08
+&106b: e9 08            SBC #&08										# adjust destination address to move to next pair of pixels on the left
 &106d: a8               TAY
-&106e: b0 ec            BCS &105c ; plot_screen_loop
-&1070: a6 6a            LDX &6a ; copy_of_stack_pointer_6a	                # actually either "LDX &6a" or "BVC &109c" from &10c5, &10c5 or &1016, &101b
-     # 50 2a		BVC &109c
-&1072: 9a               TXS			                                # reset stack pointer
+&106e: b0 ec            BCS &105c ; plot_one_line_loop					# branch if there's no underflow
+
+next instruction is BVC &109c for a double pass (set at &1016 and &101b), OR LDX &6a for a single pass (set at &10c5 and &10ca)
+either:
+&1070: 50 2a		    BVC &109c ; deal_with_double_pass		# always jump
+or:
+&1070: a6 6a            LDX &6a ; copy_of_stack_pointer_6a		# get back original stack pointer
+
+; check_for_next_line
+&1072: 9a               TXS			                            # reset stack pointer
 &1073: c6 6c            DEC &6c ; lines_in_sprite
-&1075: 30 58            BMI &10cf ; plotting_done                               # any more lines to do? if not, leave
-&1077: c6 a1            DEC &a1
-&1079: ad 23 10         LDA &1023 ; sprite_address
-&107c: 69 20            ADC #&20		                                # actually ADC #sprite_byte_offset_between_rows from &0f41
-&107e: 8d 23 10         STA &1023 ; sprite_address
-&1081: ad 24 10         LDA &1024 ; sprite_address_h
-&1084: 69 00            ADC #&00		                                # actually ADC #sprite_byte_offset_between_rows_h from &0f44
-&1086: 8d 24 10         STA &1024 ; sprite_address_h
-&1089: c0 f9            CPY #&f9
-&108b: b0 93            BCS &1020 ; plot_sprite_line
-&108d: a5 a0            LDA &a0
-&108f: 85 a1            STA &a1
-&1091: a5 90            LDA &90; screen_address_h
-&1093: e9 01            SBC #&01
-&1095: 09 60            ORA #&60
-&1097: 85 90            STA &90; screen_address_h
-&1099: 4c 09 10         JMP &1009 ; plot_lines_loop                             # do it all again for the next line
-&109c: a5 90            LDA &90; screen_address_h
-&109e: c9 7f            CMP #&7f
-&10a0: 49 1f            EOR #&1f
-&10a2: 85 90            STA &90; screen_address_h
-&10a4: 90 0c            BCC &10b2
-&10a6: a5 8f            LDA &8f ; screen_address
-&10a8: 85 68            STA &68 ; some_other_plot_var
-&10aa: a9 00            LDA #&00
-&10ac: 85 8f            STA &8f ; screen_address
-&10ae: a4 67            LDY &67 ; something_plot_var
-&10b0: b0 a8            BCS &105a
-&10b2: a5 68            LDA &68 ; some_other_plot_var
-&10b4: 85 8f            STA &8f ; screen_address
-&10b6: a6 6a            LDX &6a ; copy_of_stack_pointer_6a
-&10b8: c0 f9            CPY #&f9
-&10ba: 90 07            BCC &10c3
-&10bc: c6 67            DEC &67 ; something_plot_var
+&1075: 30 58            BMI &10cf ; plotting_done               # any more lines to do? if not, leave
+
+&1077: c6 a1            DEC &a1	; screen_addess_offset			# adjust the offset to the screen_address to target the next line up
+&1079: ad 23 10         LDA &1023 ; sprite_address				# get low byte of address of sprite on sheet
+&107c: 69 xx            ADC #&20 / #&e0                         # add sprite_byte_offset_between_rows (set at &0f41)
+&107e: 8d 23 10         STA &1023 ; sprite_address				# store updated address
+&1081: ad 24 10         LDA &1024 ; sprite_address_h			# get high byte of address of sprite on sheet
+&1084: 69 xx            ADC #&00 / #&ff                         # add sprite_byte_offset_between_rows_h (set at &0f44)
+&1086: 8d 24 10         STA &1024 ; sprite_address_h			# store updated address
+
+&1089: c0 f9            CPY #&f9								# do we need to adjust the screen_address_h because we are crossing a character row boundary?
+&108b: b0 93            BCS &1020 ; unpack_sprite_data			# branch if not to get the sprite data for the next line up
+&108d: a5 a0            LDA &a0	; screen_address_reset			# load original value for screen_address_offset
+&108f: 85 a1            STA &a1	; screen_address_offset			# reset screen_address_offset
+&1091: a5 90            LDA &90; screen_address_h				# get current value
+&1093: e9 01            SBC #&01								# subtract 2 (carry is clear) - this subtracts &200 from the screen address to move up a character row
+&1095: 09 60            ORA #&60								# make sure always targetting mapped screen memory &6000 to &7fff
+&1097: 85 90            STA &90; screen_address_h				# store revised high byte
+&1099: 4c 09 10         JMP &1009 ; plot_lines_loop             # do it all again for the next line
+
+; deal_with_double_pass
+&109c: a5 90            LDA &90; screen_address_h				# get high byte
+&109e: c9 7f            CMP #&7f								# clear carry if screen_address_h is less than &7f or e this would happen)
+&10a0: 49 1f            EOR #&1f								# toggle bits 0 to 4. So on the 1st pass, 7F becomes 60. On the 2nd pass, it goes back to 7f.
+&10a2: 85 90            STA &90; screen_address_h				# store revised address
+&10a4: 90 0c            BCC &10b2 ; complete_second_pass		# branch if screen_address_h was &80 or more
+
+&10a6: a5 8f            LDA &8f ; screen_address				# get low byte
+&10a8: 85 68            STA &68 ; copy_of_screen_address		# store a copy to pick up after completing second pass
+&10aa: a9 00            LDA #&00								
+&10ac: 85 8f            STA &8f ; screen_address				# set low byte to 0 (offset will point to the right place)
+&10ae: a4 67            LDY &67 ; screen_address_overflow		# set screen address offset
+&10b0: b0 a8            BCS &105a ; plot_one_line				# plot the missing pixels from the end of the line at the start of screen memory (this always jumps) 
+
+; complete_second_pass
+&10b2: a5 68            LDA &68 ; copy_of_screen_address		# get stored copy of screen_address
+&10b4: 85 8f            STA &8f ; screen_address				# reset low byte
+&10b6: a6 6a            LDX &6a ; copy_of_stack_pointer_6a		# reset pointer to sprite data
+&10b8: c0 f9            CPY #&f9								# do we need to adjust the screen_address_h because we are crossing a character row boundary?
+&10ba: 90 07            BCC &10c3 ; reset_for_single_pass		# branch if so
+&10bc: c6 67            DEC &67 ; screen_address_overflow		# adjust overflow to target next line up
 &10be: 18               CLC
-&10bf: a5 6c            LDA &6c ; lines_in_sprite
-&10c1: d0 af            BNE &1072
-&10c3: a9 a6            LDA #&a6                                                # set &1070 to LDX &6a
-&10c5: 8d 70 10         STA &1070			                        # self modifying code
+&10bf: a5 6c            LDA &6c ; lines_in_sprite				# get number of lines remaining
+&10c1: d0 af            BNE &1072 ; check_for_next_line			# branch when lines remain, keeping double-pass in place
+
+; reset_for_single_pass
+&10c3: a9 a6            LDA #&a6								# set &1070 to LDX &6a
+&10c5: 8d 70 10         STA &1070			                    # self modifying code
 &10c8: a9 6a            LDA #&6a
-&10ca: 8d 71 10         STA &1071                                               # self modifying code
-&10cd: 90 a3            BCC &1072
+&10ca: 8d 71 10         STA &1071                               # self modifying code
+&10cd: 90 a3            BCC &1072 ; check_for_next_line			# always jumps
+
 ; plotting_done
 &10cf: 4c c6 0e         JMP &0ec6 ; object_redrawing_loop
 
 ; plot_background_strip_from_cache
-&10d2: 20 f0 10         JSR &10f0 ; change_display_mode                         # set display mode to "overwrite"
+&10d2: 20 f0 10         JSR &10f0 ; toggle_display_mode                         # set display mode to "overwrite"
 
 &10d5: c6 af            DEC &af ; strip_length
-&10d7: 30 17            BMI &10f0 ; change_display_mode                         # revert display mode to "if empty", and leave
+&10d7: 30 17            BMI &10f0 ; toggle_display_mode                         # revert display mode to "if empty", and leave
 
 &10d9: a6 af            LDX &af ; strip_length
 &10db: bd ed 07         LDA &07ed,X ; background_strip_cache_orientation        # get the square data from the cache
@@ -2499,16 +2588,17 @@ f $FE                        ; white bg, cyan bg
 &10eb: e6 95            INC &95 ; square_x                                      # move to next square (modified from &375b)
 &10ed: 4c d5 10         JMP &10d5
 
-; change_display_mode
-&10f0: a2 01            LDX #&01			                        # swap &1064-1065 and &1066-&1067
-&10f2: bd 64 10         LDA &1064,X			                        # this changes the display mode between overwriting
-&10f5: bc 66 10         LDY &1066,X			                        # regardless and overwriting only if empty
-&10f8: 9d 66 10         STA &1066,X			
+; toggle_display_mode
+; swaps the instruction at &1064-5 with that at &1066-7 to change the display_mode between overwriting regardless and overwriting only if empty
+&10f0: a2 01            LDX #&01			                        # init loop counter
+&10f2: bd 64 10         LDA &1064,X			                        # read 1st instruction
+&10f5: bc 66 10         LDY &1066,X			                        # read 2nd instruction
+&10f8: 9d 66 10         STA &1066,X									# write 2nd instruction
 &10fb: 98               TYA				
-&10fc: 9d 64 10         STA &1064,X			
-&10ff: ca               DEX				
-&1100: 10 f0            BPL &10f2			
-&1102: 60               RTS
+&10fc: 9d 64 10         STA &1064,X									# write 1st instruction
+&10ff: ca               DEX											# decrement loop counter
+&1100: 10 f0            BPL &10f2									# loop around
+&1102: 60               RTS											
 
 # unused code
 &1103: 20 98 23         JSR &2398 ; setup_background_sprite_values
@@ -3347,7 +3437,7 @@ f $FE                        ; white bg, cyan bg
 
 &1658: a5 c7            LDA &c7 ; screen_start_square_x_low
 &165a: 85 b2            STA &b2 ; screen_start_square_x_low_copy
-&165c: 85 b0            STA &b0 ; screen_offset
+&165c: 85 b0            STA &b0 ; screen_start
 &165e: a5 ca            LDA &ca ; screen_start_square_y
 &1660: 4a               LSR
 &1661: 85 9b            STA &9b
@@ -3372,10 +3462,10 @@ f $FE                        ; white bg, cyan bg
 &1682: d0 f2            BNE &1676
 &1684: 85 b3            STA &b3 ; some_screen_address_offset
 &1686: 4a               LSR
-&1687: 66 b0            ROR &b0 ; screen_offset
+&1687: 66 b0            ROR &b0 ; screen_start
 &1689: 4a               LSR
-&168a: 66 b0            ROR &b0 ; screen_offset
-&168c: 85 b1            STA &b1 ; screen_offset_h
+&168a: 66 b0            ROR &b0 ; screen_start
+&168c: 85 b1            STA &b1 ; screen_start_h
 &168e: a2 02            LDX #&02
 
 &1690: a9 00            LDA #&00
@@ -4047,9 +4137,9 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 ; not_being_used
 &1aac: 20 20 1e         JSR &1e20 ; get_object_weight			        # calculate object weight
 &1aaf: 85 38            STA &38 ; this_object_weight
-&1ab1: c9 07            CMP #&07    					        # is the object affected by gravity?
-&1ab3: 66 2c            ROR &2c ; object_affected_by_gravity 
-&1ab5: 10 03            BPL &1aba ; no_anti_gravity
+&1ab1: c9 07            CMP #&07    								# set carry if the object has weight 7
+&1ab3: 66 2c            ROR &2c ; object_unaffected_by_gravity		# set bit 7 from carry
+&1ab5: 10 03            BPL &1aba ; no_anti_gravity					# jump over if affected by gravity
 &1ab7: 20 a3 28         JSR &28a3 ; zero_velocities			        # if not, zero its y velocity
 ; no_anti_gravity
 &1aba: a6 75            LDX &75 ; this_object_sprite
@@ -4126,8 +4216,8 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1b4b: 85 37            STA &37 ; this_object_angle		                # set object flags_copy2 to match
 ; not_held_object
 &1b4d: 20 48 2a         JSR &2a48 ; calculate_object_maxes
-&1b50: 24 2c            BIT &2c ; object_affected_by_gravity		        # is the object static?
-&1b52: 30 63            BMI &1bb7 ; static_object
+&1b50: 24 2c            BIT &2c ; object_unaffected_by_gravity		        # is the object static?
+&1b52: 30 63            BMI &1bb7 ; static_object							# branch if it is
 &1b54: 20 64 2a         JSR &2a64 ; determine_what_supporting
 &1b57: a4 aa            LDY &aa ; current_object
 &1b59: d0 17            BNE &1b72 ; not_player2                                 # is this the player?
@@ -4405,13 +4495,14 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1d59: 66 dd            ROR &dd ; object_held                                   # if so, forget it
 &1d5b: 38               SEC
 ; is_player
-&1d5c: 24 2b            BIT &2b ; object_is_invisible
-&1d5e: 30 01            BMI &1d61                                               # is the object invisible?
-&1d60: 38               SEC                                                     # set if so, or being removed
-&1d61: a5 70            LDA &70 ; this_object_flags_old
-&1d63: 6a               ROR
-&1d64: 6a               ROR
-&1d65: 29 c0            AND #&c0
+&1d5c: 24 2b            BIT &2b ; object_is_invisible							# test if object is invisible
+&1d5e: 30 01            BMI &1d61                                               # branch over if so
+&1d60: 38               SEC                                                     # set carry if so, or being removed
+
+&1d61: a5 70            LDA &70 ; this_object_flags_old							# get object flags
+&1d63: 6a               ROR														# move carry to bit 7, move bit 0 to carry
+&1d64: 6a               ROR														# move carry to bit 6, move bit 0 to bit 7
+&1d65: 29 c0            AND #&c0												# mask to get bits 6 and 7
 &1d67: 85 9c            STA &9c
 &1d69: 4a               LSR
 &1d6a: 4a               LSR
@@ -4476,12 +4567,12 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1def: 20 1f 16         JSR &161f ; refocus_on_player
 &1df2: 20 84 36         JSR &3684 ; redraw_screen
 &1df5: a2 00            LDX #&00
-&1df7: 8e 89 2e         STX &2e89 ; can_we_scroll_screen
+&1df7: 8e 89 2e         STX &2e89 ; can_we_set_screen_start_address
 &1dfa: 20 a5 0c         JSR &0ca5 ; plot_object
 &1dfd: ec cb 14         CPX &14cb ; player_object_number
 &1e00: d0 0e            BNE &1e10                                               # is it the player?
 &1e02: 20 d2 10         JSR &10d2 ; plot_background_strip_from_cache            # if so, process some other things too
-&1e05: 20 58 1f         JSR &1f58 ; scroll_screen 
+&1e05: 20 58 1f         JSR &1f58 ; set_screen_start_address 
 &1e08: 20 7e 20         JSR &207e ; particle_evolution
 &1e0b: 20 e8 0b         JSR &0be8 ; consider_objects_on_secondary_stack
 &1e0e: a6 aa            LDX &aa ; current_object
@@ -4498,12 +4589,12 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1e1d: 85 df            STA &df ; player_facing
 &1e1f: 60               RTS
 
-; get_object_gravity_flags
+; get_object_weight
 ; on entry, Y is the object index on the primary stack
 ; on exit, A has the object weight in bits 0 to 2
 ;          X is the type of object
 &1e20: a9 07            LDA #&07
-; get_object_gravity_flags_arbitrary_and
+; get_arbitrary_object_gravity_flags
 ; on entry, Y is the object index on the primary stack
 ;           A is the mask to apply to the gravity flags
 ; on exit, A has the flags requested
@@ -4531,7 +4622,23 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 #1e44: 00 80 07 70 ; water_orientation_lookup
 
 ; pixel_table
-#1e48: 00 03 0c 0f 30 33 3c 3f c0 c3 cc cf f0 f3 fc ff
+# this maps a colour index to mode 2 format (lrlrlrlr) where both pixels are set to that colour
+#1e48: 00	black
+#1e49: 03	red		00000011
+#1e4a: 0c	green	00001100
+#1e4b: 0f	yellow	00001111
+#1e4c: 30	blue	00110000
+#1e4d: 33	magenta	00110011
+#1e4e: 3c	cyan	00111100
+#1e4f: 3f	white	00111111
+#1e50: c0	black	11000000
+#1e51: c3	red		11000011
+#1e52: cc	green	11001100
+#1e53: cf	yellow	11001111
+#1e54: f0	blue	11110000
+#1e55: f3	magenta	11110011
+#1e56: fc	cyan	11111100
+#1e57: ff	white	11111111
 
 #1e58: ff ; number_of_particles
 #1e59: f8 ; number_of_particles_x8
@@ -4567,8 +4674,8 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1e79: f0 49            BEQ &1ec4 ; reserve_object_in_this_slot	                # if so, use it
 
 	; slot is occupied... 
-&1e7b: a9 50            LDA #&50				# set mask to bits 4 and 6
-&1e7d: 20 22 1e         JSR &1e22 ; get_object_gravity_flags_arbitrary_and		# get gravity flags bits 4 and 6
+&1e7b: a9 50            LDA #&50								# set mask to bits 4 and 6 (todo: what do these describe?)
+&1e7d: 20 22 1e         JSR &1e22 ; get_arbitrary_object_gravity_flags		# get gravity flags bits 4 and 6
 &1e80: c9 40            CMP #&40
 &1e82: d0 11            BNE &1e95				                # keep looking if bit 6 is not set, or bit 4 is set
 
@@ -4588,17 +4695,17 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 	; no free slots found
 &1e98: 38               SEC
-&1e99: a4 2f            LDY &2f ; objects_two_reserve
+&1e99: a4 2f            LDY &2f ; objects_two_reserve			#
 &1e9b: f0 61            BEQ &1efe				                # no free slots leave, unsuccessful
 
 &1e9d: a9 08            LDA #&08
-&1e9f: 20 22 1e         JSR &1e22 ; get_object_gravity_flags_arbitrary_and	# get flag for is object damaged?
-&1ea2: f0 0b            BEQ &1eaf							# branch if not damaged
+&1e9f: 20 22 1e         JSR &1e22 ; get_arbitrary_object_gravity_flags	# get flag for is this a nest dweller?
+&1ea2: f0 0b            BEQ &1eaf							# branch if it's not
 
-&1ea4: be 66 09         LDX &0966,Y ; object_stack_data_pointer		
+&1ea4: be 66 09         LDX &0966,Y ; object_stack_data_pointer
 &1ea7: bd 86 09         LDA &0986,X ; background_objects_data
 &1eaa: 69 03            ADC #&03
-&1eac: 9d 86 09         STA &0986,X ; background_objects_data	# add 3+c to object's data
+&1eac: 9d 86 09         STA &0986,X ; background_objects_data	# add 4 to object's data to increment the number of dwellers in the nest
 
 &1eaf: 98               TYA
 &1eb0: 20 29 1e         JSR &1e29 ; stop_supporting_objects
@@ -4700,10 +4807,10 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1f55: a9 ff            LDA #&ff
 &1f57: 60               RTS
 
-; scroll_screen
-&1f58: ad 89 2e         LDA &2e89 ; can_we_scroll_screen
+; set_screen_start_address
+&1f58: ad 89 2e         LDA &2e89 ; can_we_set_screen_start_address
 &1f5b: d0 34            BNE &1f91                                               # if not, leave
-&1f5d: ce 89 2e         DEC &2e89 ; can_we_scroll_screen                        # don't scroll again until we've redrawn objects
+&1f5d: ce 89 2e         DEC &2e89 ; can_we_set_screen_start_address                        # don't scroll again until we've redrawn objects
 &1f60: ad e4 11         LDA &11e4 ; palette_register_updating
 &1f63: c9 02            CMP #&02
 &1f65: 90 f9            BCC &1f60
@@ -4711,31 +4818,32 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 &1f67: a9 00            LDA #&00
 &1f69: 8d e4 11         STA &11e4 ; palette_register_updating
 
-&1f6c: 08               PHP
-&1f6d: 78               SEI
-&1f6e: a5 b0            LDA &b0 ; screen_offset
-&1f70: 85 9c            STA &9c
-&1f72: a5 b1            LDA &b1 ; screen_offset_h
+&1f6c: 08               PHP										# push flags including interrupt clear state
+&1f6d: 78               SEI										# stop interrupts
+&1f6e: a5 b0            LDA &b0 ; screen_start					# get low byte of start address
+&1f70: 85 9c            STA &9c									# store it in temporary location
+&1f72: a5 b1            LDA &b1 ; screen_start_h				# get high byte of start address
 
-&1f74: 4a               LSR A										# address must be divided by 8 before sending to 6845
-&1f75: 66 9c            ROR &9c	; low
-&1f77: 4a               LSR A
-&1f78: 66 9c            ROR &9c	; low
-&1f7a: 4a               LSR A
-&1f7b: 66 9c            ROR &9c	; low
+# address must be divided by 8 before sending to 6845
+&1f74: 4a               LSR A									# halve high address, place lowest bit in carry		
+&1f75: 66 9c            ROR &9c	; low							# halve low address, shift in the carry
+&1f77: 4a               LSR A									# halve high address, place lowest bit in carry
+&1f78: 66 9c            ROR &9c	; low							# halve low address, shift in the carry
+&1f7a: 4a               LSR A									# halve high address, place lowest bit in carry
+&1f7b: 66 9c            ROR &9c	; low							# halve low address, shift in the carry
 
-&1f7d: 69 0c            ADC #&0c								# add C00 * 8 to address to take it into the &6000-&7FFF range
+&1f7d: 69 0c            ADC #&0c								# add to high address to take it into the &6000-&7FFF range (&c00 * 8 = &6000)
 
-&1f7f: a0 0c            LDY #&0c	                                        # 6845 r12 - screen start address register low
-&1f81: 8c 00 fe         STY &fe00 	                                        # write to video controller
-&1f84: 8d 01 fe         STA &fe01 	                                        # write to video controller
+&1f7f: a0 0c            LDY #&0c	                            # 6845 r12 - screen start address register high
+&1f81: 8c 00 fe         STY &fe00 	                            # set register on video controller
+&1f84: 8d 01 fe         STA &fe01 	                            # write data to video controller
 
-&1f87: a5 9c            LDA &9c
-&1f89: c8               INY													# 6845 r13 - screen start address register high 
-&1f8a: 8c 00 fe         STY &fe00 	                                        # write to video controller
-&1f8d: 8d 01 fe         STA &fe01 	                                        # write to video controller
+&1f87: a5 9c            LDA &9c									# load low address
+&1f89: c8               INY										# 6845 r13 - screen start address register low 
+&1f8a: 8c 00 fe         STY &fe00 	                            # set register on video controller
+&1f8d: 8d 01 fe         STA &fe01 	                            # write data to video controller
 
-&1f90: 28               PLP													# includes CLI
+&1f90: 28               PLP										# includes CLI
 &1f91: 60               RTS
 
 ; flash_screen_background
@@ -6884,7 +6992,7 @@ and Y is this_object_supporting, OR the original object_type for an explosion
 
 &2e88: 00 ; chatter_pitch
 
-&2e89: ff ; can_we_scroll_screen
+&2e89: ff ; can_we_set_screen_start_address		# 0 if 
 
 ; consider_side_collisions
 &2e8a: a9 00            LDA #&00
@@ -7557,7 +7665,7 @@ limited to +/- Y
 
 ; drop_object
 &32c8: 24 dd            BIT &dd ; object_held			                # are we holding an object?
-&32ca: 30 fb            BMI &32c7				                # if not, leave
+&32ca: 30 fb            BMI &32c7										# if not, leave
 &32cc: 38               SEC
 &32cd: 66 dd            ROR &dd ; object_held			                # if so, stop holding it
 &32cf: 4c a5 14         JMP &14a5 ; play_high_beep
@@ -8184,12 +8292,13 @@ e336d: 90 02            BCC &3371
 &36aa: 85 9c            STA &9c ; scroll_width                                  # get the width of the scrolled area
 &36ac: a2 11            LDX #&11
 &36ae: 38               SEC
-&36af: a5 b0            LDA &b0 ; screen_offset
+&36af: a5 b0            LDA &b0 ; screen_start
 &36b1: 24 cc            BIT &cc ; scroll_square_x_velocity_high
 &36b3: 30 02            BMI &36b7
 &36b5: e5 9c            SBC &9c ; scroll_width
+
 &36b7: 85 8f            STA &8f ; screen_address
-&36b9: a5 b1            LDA &b1 ; screen_offset_h
+&36b9: a5 b1            LDA &b1 ; screen_start_h
 &36bb: e9 00            SBC #&00
 &36bd: 18               CLC
 &36be: 69 60            ADC #&60			                        # calculate the screen address for the edge
@@ -8234,10 +8343,10 @@ e336d: 90 02            BCC &3371
 &36fd: 98               TYA
 &36fe: f0 02            BEQ &3702                                               # are we scrolling down?
 &3700: a4 d1            LDY &d1 ; scroll_y_direction                            # if so, Y = scroll_y_velocity
-&3702: a5 b0            LDA &b0 ; screen_offset
+&3702: a5 b0            LDA &b0 ; screen_start
 &3704: 18               CLC
 &3705: 85 93            STA &93 ; screen_address_two
-&3707: a5 b1            LDA &b1 ; screen_offset_h
+&3707: a5 b1            LDA &b1 ; screen_start_h
 &3709: 79 94 35         ADC &3594,Y ; scroll_screen_address_offsets
 &370c: 29 1f            AND #&1f
 &370e: 09 60            ORA #&60
@@ -8963,7 +9072,7 @@ maggot x = &06 a = &08
 #	and p when set additionally considers the player
 # and also, Y is specified in the form rttttttt
 #   where, if r is set, then ttttttt specifies the object type range to look for
-#   and, if r is clear, then ttttttt specifies the specific object type to look for
+#   and, if r is clear, then ttttttt specifies the a second specific object type to look for
 # on exit, X is the index of the matching object on the primary stack or &ff if not found
 #	also &3c25 nearest_object will have the same value as X
 #	and &3c28 nearest_distance will be set
@@ -9281,7 +9390,7 @@ maggot x = &06 a = &08
 # A, X = &bc this_object_data
 # Y = &bd new_object_data_pointer; CPY #&00
 &3e1b: f0 6b            BEQ &3e88						# is object_data_pointer = 0? if so, leave
-&3e1d: a2 05            LDX #&05						# initial value that might be passed to reserve_objects in Y?
+&3e1d: a2 05            LDX #&05						# set default value that might be passed to reserve_objects in Y
 &3e1f: a5 2d            LDA &2d ; background_processing_flag
 &3e21: 29 90            AND #&90						# bits 4 (time passing) and 7 (something display related) are of interest
 &3e23: f0 23            BEQ &3e48 ; randomly_emit_object	# branch if neither set, then &2d is probably &20 and the player is in the square
@@ -11198,7 +11307,7 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 ; on entry, Y is the object index on the primary stack
 ; on exit, carry will be set if object can trigger switches, and carry will be clear if not
 ;          X is the type of the object indicated by Y
-;
+; any object with a weight of 2 or more, and is not triax or a clawed robot can trigger a switch
 ;       0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f
 ;   00 ok ok ok no -- -- ok ok ok -- ok ok -- -- ok ok
 ;   10 ok ok ok ok ok ok ok ok no ok ok ok ok ok ok --
@@ -11208,16 +11317,20 @@ f		Switch	AE			toggle	01		located by nest just to the right and underwater of th
 ;   50 ok ok ok ok ok ok ok ok no ok ok ok ok ok ok ok
 ;   60 ok no no ok --
 &49c5: 20 20 1e         JSR &1e20 ; get_object_weight		# on exit, A = how heavy is the object that is touching the switch, and X is the object type
-&49c8: c9 02            CMP #&02					        # if it has weight less than 3
-&49ca: 90 0e            BCC &49da					        # then it doesn't trigger the switch
-&49cc: e0 35            CPX #&35					        # X = object type
-&49ce: f0 06            BEQ &49d6					        # &35 = engine fire doesn't trigger switch
-&49d0: e0 27            CPX #&27					        # &27 = maggot 
-&49d2: b0 06            BCS &49da					        # objects &28 - &63 do trigger switch
-&49d4: e0 22            CPX #&22					        # objects &00 - &22 do trigger switch 
-&49d6: 2a               ROL
-&49d7: 49 01            EOR #&01
-&49d9: 6a               ROR
+&49c8: c9 02            CMP #&02					        # if it has weight less than 2
+&49ca: 90 0e            BCC &49da					        # then exit with carry clear (it doesn't trigger the switch)
+
+&49cc: e0 35            CPX #&35					        # &35 = engine fire (X is object type)
+&49ce: f0 06            BEQ &49d6					        # if equal then carry is set, so exit clearing carry (doesn't trigger switch)
+
+&49d0: e0 27            CPX #&27					        # set carry if object type is &27 or more
+&49d2: b0 06            BCS &49da					        # objects &27 - &63 can trigger switch
+&49d4: e0 22            CPX #&22					        # set carry is object type is &22 or more
+															# objects &00 - &21 can trigger switch 
+
+&49d6: 2a               ROL									# move carry to bit 0
+&49d7: 49 01            EOR #&01							# flip bit 0
+&49d9: 6a               ROR									# move it back to carry
 &49da: 60               RTS
 
 ; switch_effects
@@ -11861,7 +11974,7 @@ door	palette												speed	min_energy
 &4dc4: 85 51            STA &51 ; this_object_y_low					# set y within square
 &4dc6: c6 51            DEC &51 ; this_object_y_low					# decrement it for some reason
 ; no_beam_motion
-&4dc8: 20 c5 0b         JSR &0bc5 ; has_object_been_hit_by_rcd_beam             # has the beam been hit by the rcd beam? carry clear if yes
+&4dc8: 20 c5 0b         JSR &0bc5 ; has_object_been_hit_by_rcd_beam             # has the teleport beam been hit by the rcd beam? carry clear if yes
 &4dcb: b0 05            BCS &4dd2 ; set_colour_via_rotator                             # jump over if not
 &4dcd: a9 00            LDA #&00												# indicates setting state of teleport
 &4dcf: 20 ac 31         JSR &31ac ; toggle_door_locked_state                    # toggle its on/off state
@@ -11898,25 +12011,26 @@ door	palette												speed	min_energy
 &4df1: 85 73            STA &73 ; this_object_palette                           # set colour of sucker
 
 &4df3: a5 07            LDA &07 ; current_object_rotator_low
-&4df5: f0 14            BEQ &4e0b ; no_check_for_trigger_object					# 1 in 8 chance to not check for trigger
+&4df5: f0 14            BEQ &4e0b ; check_active_status					        # 1 in 8 chance to not check for trigger
 
 &4df7: bd 37 4e         LDA &4e37,X ; sucker_attracted_lookup                   # get the trigger for the sucker
-&4dfa: 30 0d            BMI &4e09 ; no_attraction                               # if always active then skip over
+&4dfa: 30 0d            BMI &4e09 ; store_active_status                         # if always active then skip over check for specific trigger item(s)
 
 &4dfc: a8               TAY
 &4dfd: c9 55            CMP #&55                                                # is target &55 coronium boulder
-&4dff: d0 02            BNE &4e03                                               # if so, then also look for
+&4dff: d0 02            BNE &4e03                                               # if so, then also look for:
 &4e01: a0 0b            LDY #&0b                                                # &0b yellow ball
+
 &4e03: 20 2a 3c         JSR &3c2a ; find_nearest_object							# sets X to the index of the object on the primary stack, or &ff if not found
 &4e06: 8a               TXA                                                     # move result to accumulator
 &4e07: 49 ff            EOR #&ff												# so A becomes 0 if nothing found, alternatively bit 7 will be set if a match was found
 
-; no_attraction
-&4e09: 85 11            STA &11 ; this_object_extra                             # this_object_extra = attracted object
+; store_active_status
+&4e09: 85 11            STA &11 ; this_object_extra                             # store and cache active state in bit 7 of this_object_extra (1 if active)
 
-; no_check_for_trigger_object
-&4e0b: a5 11            LDA &11 ; this_object_extra
-&4e0d: 10 18            BPL &4e27 ; no_attraction_2                             # if no trigger object found, skip
+; check_active_status
+&4e0b: a5 11            LDA &11 ; this_object_extra								# retrieve last active state
+&4e0d: 10 18            BPL &4e27 ; do_small_damage_to_touched_object           # if not active then don't suck/blow
 
 &4e0f: a6 bc            LDX &bc ; this_object_data
 &4e11: bd 49 4e         LDA &4e49,X ; sucker_action_and_palette
@@ -11929,19 +12043,22 @@ door	palette												speed	min_energy
 &4e1f: a5 db            LDA &db ; timer_3										# get random number
 &4e21: 85 37            STA &37 ; this_object_angle								# change appearance by flipping sprite left/right plotting
 &4e23: c9 50            CMP #&50												# 1 in 256 chance to do &50 damage instead of 2
-&4e25: f0 02            BEQ &4e29
+&4e25: f0 02            BEQ &4e29 ; damage_touched_object
 
-; no_attraction_2
-&4e27: a9 02            LDA #&02												# preload amount of damage
+; do_small_damage_to_touched_object
+&4e27: a9 02            LDA #&02												# set small amount of damage
+
+; damage_touched_object
 &4e29: a4 3b            LDY &3b ; this_object_supporting                        # are we touching anything?
 &4e2b: 30 b1            BMI &4dde                                               # if not, leave
+
 &4e2d: 20 fa 13         JSR &13fa ; play_sound                          
 #4e30: 57 07 57 95 ; sound data
 &4e34: 4c a6 24         JMP &24a6 ; take_damage                                 # if so, damage it!
 
 #4e37: ff 3e 11 55 10 ff 55 10 0f ; sucker_attracted_lookup ; &3e = door, &10 = pirahna, &55 = coronium, &11 = wasp, &0f = worm, &ff = always active
 #4e40: 50 30 7f 40 50 7f 7f 50 40 ; sucker_sucking_distances
-#4e49: 5f ac bf 3d f9 58 a2 d8 4b ; sucker_action_and_palette
+#4e49: 5f ac bf 3d f9 58 a2 d8 4b ; sucker_action_and_palette ; format is pppppppa where ppppppp is the palette, and a is 1 for sucking action and 0 for blowing action
 
 # sucker properties
 

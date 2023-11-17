@@ -634,10 +634,13 @@ namespace ExileWorldGenerator
                 if (this.chkShowVisualOverlays.Checked && OnSquareAffectedBySelectedSwitch(squareProperties))
                     {
                     Debug.WriteLine($"Animation frame {squareProperties.AnimationFrame}");
-                    var a = 0x30 * squareProperties.AnimationFrame;
-                    using (Brush brush = new SolidBrush(Color.FromArgb(a, Color.LightGray)))
+                    var a = 0xc0;
+                    using (Brush brush = new SolidBrush(Color.FromArgb(a, Color.White)))
                         {
-                        e.Graphics.FillRectangle(brush, e.CellBounds);
+                        Rectangle r = e.CellBounds;
+                        int length = (int) (-4 * squareProperties.AnimationFrame * this._zoom);
+                        r.Inflate(length, length);
+                        e.Graphics.FillRectangle(brush, r);
                         }
                     }
                 }
