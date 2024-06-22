@@ -1,23 +1,22 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net48</TargetFramework>
+    <TargetFramework>net6.0-windows</TargetFramework>
     <AssemblyTitle>ExileWorldGenerator</AssemblyTitle>
     <Company>J Saffron Consulting Ltd</Company>
     <Product>Exile World Generator</Product>
-    <Copyright>Copyright © J Saffron Consulting 2019-2023</Copyright>
+    <Copyright>Copyright © J Saffron Consulting 2019-2024</Copyright>
     <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+    <UseWindowsForms>True</UseWindowsForms>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
   </PropertyGroup>
   <PropertyGroup>
     <StartupObject>ExileWorldGenerator.Program</StartupObject>
+    <LangVersion>8</LangVersion>
+    <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="System.Windows.Forms" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Update="MainForm.cs">
-      <SubType>Form</SubType>
-    </Compile>
+    <Compile Update="MainForm.cs" />
     <Compile Update="MainForm.Designer.cs">
       <DependentUpon>MainForm.cs</DependentUpon>
     </Compile>

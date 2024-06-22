@@ -11,7 +11,7 @@ namespace ExileWorldGenerator
         private static readonly byte[] WallPaletteThreeLookup = BuildWallPaletteThreeLookup();
         private static readonly byte[] WallPaletteFourLookup = BuildWallPaletteFourLookup();
 
-        internal static PaletteData GetPalette(ref byte background, ref byte orientation, byte squareX, byte squareY)
+        internal static GetPaletteResult GetPalette(byte background, byte orientation, byte squareX, byte squareY)
             {
             if (background > 0x3f)
                 throw new ArgumentOutOfRangeException();
@@ -22,6 +22,9 @@ namespace ExileWorldGenerator
             byte accumulator;
             // ReSharper restore InlineOutVariableDeclaration
             Flags flags = new Flags();
+
+            byte? overriddenOrientation = null;
+            byte? overriddenBackground = null;
 
             Load(out accumulator, BackgroundPaletteLookup[background], ref flags);
             var backgroundPalette = accumulator;
@@ -91,13 +94,13 @@ palette_not_four:
             Eor(ref accumulator, squareY, ref flags);
             RotateRight(ref accumulator, ref flags);
             if (flags.Carry) 
-                background = 0x19;
+                overriddenBackground = 0x19;  // change background to empty square
             RotateRight(ref accumulator, ref flags);
             SubtractWithBorrow(ref accumulator, squareY, ref flags);
             And(ref accumulator, 0x40, ref flags);
             Eor(ref accumulator, orientation, ref flags);
             BitTest(accumulator,orientation, ref flags);
-            orientation = accumulator;
+            overriddenOrientation = accumulator;
             Load(out accumulator, 0xB1, ref flags);
             if (!flags.Overflow) goto palette_not_six;
             AddWithCarry(ref accumulator, 0x0a, ref flags);
@@ -108,13 +111,14 @@ palette_not_five:
 
 // palette 6
             Load(out accumulator, 0x9c, ref flags);
-            BitTest(accumulator, orientation, ref flags);
+            BitTest(accumulator, overriddenOrientation.GetValueOrDefault(orientation), ref flags);
             if (!flags.Overflow) goto palette_not_six;
             Load(out accumulator, 0xcf, ref flags);
 
         palette_not_six:
             var displayedPalette = accumulator;
-            var result = new PaletteData {BackgroundPalette = backgroundPalette, Palette = Palette.FromByte(displayedPalette)};
+            var paletteData = new PaletteData(backgroundPalette, Palette.FromByte(displayedPalette));
+            var result = new GetPaletteResult(paletteData, overriddenBackground, overriddenOrientation);
             return result;
             }
 

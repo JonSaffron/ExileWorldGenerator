@@ -55,26 +55,22 @@ namespace ExileWorldGenerator
 
             using (Graphics g = Graphics.FromImage(sprite))
                 {
-                using (SolidBrush b = new SolidBrush(Color.Black))
+                using (SolidBrush blackBrush = new SolidBrush(Color.Black))
                     {
-                    g.FillRectangle(b, 0, 0, SquareSize.Width, SquareSize.Height);
+                    g.FillRectangle(blackBrush, 0, 0, SquareSize.Width, SquareSize.Height);
                     }
 
                 if (waterLevelType != WaterLevelType.AboveWater)
                     {
-                    using (SolidBrush b = new SolidBrush(Color.FromArgb(0x80, Color.Blue)))
-                        {
-                        var top = (waterLevelType == WaterLevelType.OnWaterLine) ? 3 : 0;
-                        g.FillRectangle(b, 0, top, SquareSize.Width, SquareSize.Height);
-                        }
+                    using SolidBrush darkBlueBrush = new SolidBrush(Color.FromArgb(0x80, Color.Blue));
+                    var top = (waterLevelType == WaterLevelType.OnWaterLine) ? 3 : 0;
+                    g.FillRectangle(darkBlueBrush, 0, top, SquareSize.Width, SquareSize.Height);
                     }
 
                 if (waterLevelType == WaterLevelType.OnWaterLine)
                     {
-                    using (SolidBrush b = new SolidBrush(Color.FromArgb(0x80, Color.Cyan)))
-                        {
-                        g.FillRectangle(b, 0, 2, SquareSize.Width, 1);
-                        }
+                    using SolidBrush lightBlueBrush = new SolidBrush(Color.FromArgb(0x80, Color.Cyan));
+                    g.FillRectangle(lightBlueBrush, 0, 2, SquareSize.Width, 1);
                     }
                 }
 
@@ -84,15 +80,17 @@ namespace ExileWorldGenerator
         /// <summary>
         /// Adds a background sprite
         /// </summary>
-        /// <param name="backgroundAndOrientation">Specifies the background type in the bottom 6 bits, the vertical flip and alignment in bit 6, and the horizontal flip and alignment in bit 7</param>
+        /// <param name="background">Specifies the background type in the bottom 6 bits</param>
+        /// <param name="orientation">Specifies the vertical flip and alignment in bit 6, and the horizontal flip and alignment in bit 7</param>
         /// <param name="palette">Specifies the palette to use when drawing the sprite</param>
         /// <returns>A SpriteBuilder object containing the added background sprite</returns>
         [Pure]
-        public SpriteBuilder AddBackgroundSprite(byte backgroundAndOrientation, Palette palette)
+        public SpriteBuilder AddBackgroundSprite(byte background, byte orientation, Palette palette)
             {
-            byte background = (byte) (backgroundAndOrientation & 0x3f);
-            bool flipHorizontallyAndRightAlign = (backgroundAndOrientation & 0x80) != 0;
-            bool flipVerticallyAndBottomAlign = (backgroundAndOrientation & 0x40) != 0;
+            Debug.Assert((background & 0b1100_0000) == 0);
+            Debug.Assert((orientation & 0x3f) == 0);
+            bool flipHorizontallyAndRightAlign = (orientation & 0x80) != 0;
+            bool flipVerticallyAndBottomAlign = (orientation & 0x40) != 0;
 
             byte spriteIndex = BackgroundSpriteLookup[background];
             byte offsetAlongY = (byte) (BackgroundYOffsetLookup[background] & 0xf0);
@@ -177,7 +175,8 @@ namespace ExileWorldGenerator
             Palette palette;
             if (objectType == 0xd)
                 {
-                Debug.Assert(objectData.HasValue);
+                if (objectData == null)
+                    throw new InvalidOperationException("objectData is null");
                 palette = SuckerPalettes[objectData.Value & 0x7f];
                 }
             else
@@ -361,17 +360,17 @@ namespace ExileWorldGenerator
         /// <summary>
         /// Adds a sprite for a door
         /// </summary>
-        /// <param name="backgroundAndOrientation">Specifies the type of door in the bottom 6 bits, the vertical alignment in bit 6, and the horizontal alignment in bit 7</param>
+        /// <param name="backgroundObjectType">Specifies the type of door (either 3 for metal door, or 4 for a stone door)</param>
+        /// <param name="orientation">Specifies the vertical alignment in bit 6, and the horizontal alignment in bit 7</param>
         /// <param name="data">Specifies the data associated with the door which indicates the palette to use</param>
         /// <returns>A SpriteBuilder object containing the added door sprite</returns>
         [Pure]
-        public SpriteBuilder BuildDoor(byte backgroundAndOrientation, byte data)
+        public SpriteBuilder BuildDoor(byte backgroundObjectType, byte orientation, byte data)
             {
-            var backgroundObjectType = backgroundAndOrientation & 0x3f;
             Debug.Assert(backgroundObjectType == 3 || backgroundObjectType == 4);
 
-            bool rightAlign = (backgroundAndOrientation & 0x80) != 0;
-            bool bottomAlign = (backgroundAndOrientation & 0x40) == 0;
+            bool rightAlign = (orientation & 0x80) != 0;
+            bool bottomAlign = (orientation & 0x40) == 0;
             var doorIsHorizontal = rightAlign ^ bottomAlign;
             byte spriteIndex;
             switch (backgroundObjectType)
@@ -383,7 +382,7 @@ namespace ExileWorldGenerator
                     spriteIndex = (byte) (doorIsHorizontal ? 0x3c : 0x41);
                     break;
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(backgroundAndOrientation));
+                    throw new ArgumentOutOfRangeException(nameof(backgroundObjectType));
                 }
 
             byte key = (byte) ((data >> 4) & 0b111);
